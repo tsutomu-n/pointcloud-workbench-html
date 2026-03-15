@@ -11,6 +11,7 @@
 - 必須機能: WebGL、File API、ArrayBuffer
 - 取り扱い対象: `.las`, `.laz`
 - 画面上の上限表示: `.las` 最大 3GB / `.laz` 最大 2GB
+- 実装上の上限: LAS は 3GB超、LAZ は 2GB超で読み込み不可
 
 ## 3. 起動手順
 1. `PointCloudWorkbench.html` をブラウザで開く
