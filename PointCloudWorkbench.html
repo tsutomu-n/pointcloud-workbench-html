@@ -5455,6 +5455,18 @@
         incrementBytes: 256 * MB,
         incrementMs: 30000,
       };
+      const POINT_PARSE_TIMEOUT_POLICY = {
+        minimumMs: 30000,
+        maximumMs: 300000,
+        baseBytes: 128 * MB,
+        incrementBytes: 256 * MB,
+        incrementMs: 15000,
+      };
+      const FILE_IO_POLICY = {
+        headerBytes: 512,
+        lasPointChunkBytes: 8 * MB,
+        lazHeapChunkBytes: 8 * MB,
+      };
       const SUPPORTED_LANGUAGES = ["ja", "en", "zh"];
 
       function getQualityConfig(quality) {
@@ -5541,11 +5553,32 @@
         );
       }
 
-      async function readFileAsArrayBuffer(
-        file,
+      function getPointParseTimeoutMs(totalBytes) {
+        const size = Number(totalBytes);
+        if (!Number.isFinite(size) || size <= 0) {
+          return POINT_PARSE_TIMEOUT_POLICY.minimumMs;
+        }
+
+        const extraSteps = Math.max(
+          0,
+          Math.ceil(
+            (size - POINT_PARSE_TIMEOUT_POLICY.baseBytes) /
+              POINT_PARSE_TIMEOUT_POLICY.incrementBytes,
+          ),
+        );
+
+        return Math.min(
+          POINT_PARSE_TIMEOUT_POLICY.maximumMs,
+          POINT_PARSE_TIMEOUT_POLICY.minimumMs +
+            extraSteps * POINT_PARSE_TIMEOUT_POLICY.incrementMs,
+        );
+      }
+
+      async function readBlobAsArrayBuffer(
+        blob,
         loadSessionId = activeLoadSessionId,
       ) {
-        const readTimeoutMs = getFileReadTimeoutMs(file);
+        const readTimeoutMs = getFileReadTimeoutMs(blob);
         const timeoutMessage =
           `ファイル読み込みがタイムアウトしました（${Math.round(readTimeoutMs / 1000)}秒）`;
 
@@ -5553,7 +5586,7 @@
 
         if (typeof FileReader !== "function") {
           return await Promise.race([
-            file.arrayBuffer(),
+            blob.arrayBuffer(),
             new Promise((_, reject) => {
               setTimeout(() => reject(new Error(timeoutMessage)), readTimeoutMs);
             }),
@@ -5616,8 +5649,15 @@
           };
 
           activeFileReader = reader;
-          reader.readAsArrayBuffer(file);
+          reader.readAsArrayBuffer(blob);
         });
+      }
+
+      async function readFileAsArrayBuffer(
+        file,
+        loadSessionId = activeLoadSessionId,
+      ) {
+        return await readBlobAsArrayBuffer(file, loadSessionId);
       }
 
       function normalizeLanguage(value) {

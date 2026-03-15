@@ -279,6 +279,56 @@ function createContext() {
   return context;
 }
 
+function installImmediateBlobReader(context) {
+  class MockFileReader {
+    constructor() {
+      this.readyState = 0;
+      this.result = null;
+      this.error = null;
+    }
+
+    readAsArrayBuffer(blob) {
+      this.readyState = 1;
+      context.__blobReadCalls = (context.__blobReadCalls || 0) + 1;
+      context.__blobReadSizes = context.__blobReadSizes || [];
+      context.__blobReadSizes.push(blob.size || 0);
+      this.result = blob.__buffer || new ArrayBuffer(0);
+      this.readyState = 2;
+      if (typeof this.onload === "function") {
+        this.onload();
+      }
+    }
+
+    abort() {
+      this.readyState = 2;
+      if (typeof this.onabort === "function") {
+        this.onabort();
+      }
+    }
+  }
+
+  context.FileReader = MockFileReader;
+  context.window.FileReader = MockFileReader;
+}
+
+function createChunkedFile(buffer, name = "scan.las") {
+  return {
+    name,
+    size: buffer.byteLength,
+    slice(start = 0, end = buffer.byteLength) {
+      const sliced = buffer.slice(start, end);
+      return {
+        size: sliced.byteLength,
+        __buffer: sliced,
+        arrayBuffer: async () => sliced,
+      };
+    },
+    arrayBuffer: async () => {
+      throw new Error("full file read should not be used");
+    },
+  };
+}
+
 test("load session helpers isolate stale loads", () => {
   const context = createContext();
 
@@ -566,4 +616,90 @@ test("cancelLoading aborts an active FileReader read", async () => {
   await expect(readPromise).rejects.toThrow(/__CANCELLED__/);
   expect(context.__readerStarted).toBe(1);
   expect(context.__readerAbortCalls).toBe(1);
+});
+
+test("parseLASPointsFromFile reads sampled LAS data via slices without full file reads", async () => {
+  const context = createContext();
+  installImmediateBlobReader(context);
+
+  vm.runInContext(
+    `
+      window.__pcwTestApi.beginLoadSession();
+      window.__pcwTestApi.setWorkflowState({
+        selectedQuality: "low",
+      });
+    `,
+    context,
+  );
+
+  const recordLength = 20;
+  const buffer = new ArrayBuffer(recordLength * 3);
+  const view = new DataView(buffer);
+  for (let i = 0; i < 3; i++) {
+    const offset = i * recordLength;
+    view.setInt32(offset, i + 1, true);
+    view.setInt32(offset + 4, i + 11, true);
+    view.setInt32(offset + 8, i + 21, true);
+    view.setUint16(offset + 12, 100 + i, true);
+    view.setUint8(offset + 15, 2 + i);
+  }
+
+  context.__file = createChunkedFile(buffer, "sample.las");
+  context.__header = {
+    pointDataOffset: 0,
+    pointDataRecordLength: recordLength,
+    numberOfPointRecords: 3,
+    xScaleFactor: 1,
+    yScaleFactor: 1,
+    zScaleFactor: 1,
+    xOffset: 0,
+    yOffset: 0,
+    zOffset: 0,
+    pointDataRecordFormat: 1,
+  };
+
+  const points = await vm.runInContext(
+    "window.__pcwTestApi.parseLASPointsFromFile(__file, __header, { chunkBytes: 20 })",
+    context,
+  );
+
+  expect(points).toHaveLength(3);
+  expect(points[0]).toEqual({
+    x: 1,
+    y: 11,
+    z: 21,
+    intensity: 100,
+    classification: 2,
+  });
+  expect(points[2]).toEqual({
+    x: 3,
+    y: 13,
+    z: 23,
+    intensity: 102,
+    classification: 4,
+  });
+  expect(context.__blobReadCalls).toBe(3);
+});
+
+test("readFileIntoWasmHeap streams file slices into WASM memory", async () => {
+  const context = createContext();
+  installImmediateBlobReader(context);
+
+  vm.runInContext("window.__pcwTestApi.beginLoadSession()", context);
+
+  const source = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]);
+  context.__file = createChunkedFile(source.buffer, "sample.laz");
+  context.__wasmModule = {
+    HEAPU8: new Uint8Array(32),
+  };
+
+  await vm.runInContext(
+    "window.__pcwTestApi.readFileIntoWasmHeap(__file, __wasmModule, 4, __file.size, { chunkBytes: 3 })",
+    context,
+  );
+
+  expect(Array.from(context.__wasmModule.HEAPU8.slice(4, 12))).toEqual(
+    Array.from(source),
+  );
+  expect(context.__blobReadCalls).toBe(3);
 });
