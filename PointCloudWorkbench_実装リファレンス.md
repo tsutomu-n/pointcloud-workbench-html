@@ -1,6 +1,6 @@
 # PointCloudWorkbench 実装リファレンス
 
-更新日時: 2026-03-02 11:44:07 JST
+更新日時: 2026-03-15 21:33:42 JST
 
 ## 1. スコープ
 - 対象: `PointCloudWorkbench.html`（単一ファイル構成）
@@ -9,7 +9,8 @@
 ### 1.1 誤読防止の前提
 - 本書の行番号リンクは更新日時時点で検証済み。`PointCloudWorkbench.html` 変更後は再確認が必要。
 - 言語セレクタは `setAppLanguage()` により `document.documentElement.lang` と `localStorage.viewerLanguage` を更新する。UI文言の動的翻訳機構はない。
-- ファイルサイズ拒否条件は `size > 2GB`。`size === 2GB` は `critical` 扱いで継続可能。
+- ファイルサイズ拒否条件は LAS は `3GB超`、LAZ は `2GB超` を拒否します。
+- LAS は `3GBちょうど`、LAZ は `2GBちょうど` まで `critical` 扱いで継続可能です。
 
 ## 2. 外部依存
 - `three.js r128`（CDN）
@@ -39,6 +40,7 @@
 - `selectedQuality`
 - `performanceDetected`
 - `qualityManuallySelected`
+- 読み込み整合は `window._loadingCancelled`、`loadSessionSequence`、`activeLoadSessionId` でも補完する
 
 ### 4.2 `statsData`
 - `fileName`, `fileSize`, `lasVersion`
@@ -57,7 +59,9 @@
 ### 4.4 主要定数
 - `DEFAULT_QUALITY = "medium"`
 - `qualitySettings` のキーは `low | medium | high | maximum`（UI表示は `LOW / MEDIUM / HIGH / MAX`）
-- `FILE_SIZE_THRESHOLDS = { advisory: 100MB, warning: 500MB, critical: 1024MB, maximum: 2048MB }`
+- `FILE_SIZE_THRESHOLDS = { advisory: 100MB, warning: 500MB, critical: 1024MB, maximum: 3072MB }`
+- `FILE_SIZE_LIMITS = { las: 3GB, laz: 2GB }`
+- `FILE_READ_TIMEOUT_POLICY` はサイズ依存で `60秒〜300秒` に拡張
 - `SUPPORTED_LANGUAGES = ["ja", "en", "zh"]`
 
 ## 5. 初期化フロー
@@ -74,14 +78,16 @@
 
 ## 6. 読み込みパイプライン
 1. `window.startDataLoading()`
-2. `loadLASFileActual(file)` または `loadSampleDataActual()`
-3. `buildPointCloudFromArrayBuffer(arrayBuffer, fileName, fileSize)`
-4. `parsePointsFromArrayBuffer()`
-5. `parseLASHeader()` / `parseLASPoints()`（LAS）
-6. `decompressLAZFile()` / `decodeLAZPoint()`（LAZ）
-7. `createPointCloudFromData(points, header, filename)`
-8. `setupPointCloudVisualization()`
-9. `completeLoading()`
+2. `beginLoadSession()`
+3. `loadLASFileActual(file)` または `loadSampleDataActual()`
+4. `readFileAsArrayBuffer()`（実ファイル時）
+5. `buildPointCloudFromArrayBuffer(arrayBuffer, fileName, fileSize)`
+6. `parsePointsFromArrayBuffer()`
+7. `parseLASHeader()` / `parseLASPoints()`（LAS）
+8. `decompressLAZFile()` / `decodeLAZPoint()`（LAZ）
+9. `createPointCloudFromData(points, header, filename)`
+10. `setupPointCloudVisualization()`
+11. `completeLoading()`
 
 ## 7. LAS/LAZ 実装要点
 
@@ -94,11 +100,13 @@
 - 品質設定の上限点数まで等間隔サンプリング
 - scale/offset 適用済み座標を生成
 - point format に応じて分類値のオフセットを切替
+- タイムアウトとキャンセルは握りつぶさず上位へ伝播
 
 ### 7.3 `decompressLAZFile()`
 - laz-perf の `LASZip` を使った逐次展開
 - `maxPoints` 超過時は `skipRate` で間引き
 - 診断情報を `window.__lazDebug` に保存
+- 圧縮ファイルを WASM 側へ複製するため、LAS より上限を保守的にしている
 
 ## 8. 点群生成と描画
 
@@ -135,12 +143,14 @@
 
 ## 10. ファイルサイズ判定
 - 共通判定: `checkFileSizeLimits(file)`
+- 形式別上限: LAS は 3GB、LAZ は 2GB
 - 利用箇所:
 - `handleFileSelect()`
 - `updateFileInfo()`
 - `loadLASFileActual()`
-- 2GB超 (`maximum`) は `canProceed = false` として読込拒否
-- 比較演算は `>`。`2GBちょうど` は `critical` で継続可能
+- `readFileAsArrayBuffer()` が FileReader + `abort()` で読み込み中断を扱う
+- LAS の 3GB超、LAZ の 2GB超 (`maximum`) は `canProceed = false` として読込拒否
+- 比較演算は `>`。LAS の `3GBちょうど`、LAZ の `2GBちょうど` は `critical` で継続可能
 
 ## 11. 表示モード・分類
 - `window.setColorMode(mode)` から `executeColorModeChange(mode)` を呼ぶ
