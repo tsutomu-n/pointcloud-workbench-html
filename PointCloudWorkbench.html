@@ -3309,7 +3309,7 @@
                 ファイルを選択
               </button>
               <div class="dropzone-hint" id="dropzoneHint">
-                .las / .laz（最大3GB）
+                .las 最大3GB / .laz 最大2GB
               </div>
               <input
                 type="file"
@@ -5372,6 +5372,7 @@
       window._loadingCancelled = false;
       let loadSessionSequence = 0;
       let activeLoadSessionId = 0;
+      let activeFileReader = null;
       let autoAdvanceAfterFileSelect = false;
       let progressAnnouncementState = {
         percent: -1,
@@ -5442,6 +5443,11 @@
         critical: 1024 * MB,
         maximum: 3 * GB,
       };
+      const FILE_SIZE_LIMITS = {
+        default: { maxBytes: 3 * GB, label: "3GB" },
+        las: { maxBytes: 3 * GB, label: "3GB" },
+        laz: { maxBytes: 2 * GB, label: "2GB" },
+      };
       const FILE_READ_TIMEOUT_POLICY = {
         minimumMs: 60000,
         maximumMs: 300000,
@@ -5453,6 +5459,13 @@
 
       function getQualityConfig(quality) {
         return qualitySettings[quality] || qualitySettings[DEFAULT_QUALITY];
+      }
+
+      function getFileSizeLimitPolicy(file) {
+        const extension = resolveFileExtension(file?.name || "");
+        if (extension === "las") return FILE_SIZE_LIMITS.las;
+        if (extension === "laz") return FILE_SIZE_LIMITS.laz;
+        return FILE_SIZE_LIMITS.default;
       }
 
       function beginLoadSession() {
@@ -5492,6 +5505,21 @@
         }
       }
 
+      function abortActiveFileRead() {
+        if (
+          activeFileReader &&
+          activeFileReader.readyState === 1 &&
+          typeof activeFileReader.abort === "function"
+        ) {
+          try {
+            activeFileReader.abort();
+          } catch (error) {
+            console.warn("FileReader abortに失敗:", error);
+          }
+        }
+        activeFileReader = null;
+      }
+
       function getFileReadTimeoutMs(file) {
         const size = Number(file?.size);
         if (!Number.isFinite(size) || size <= 0) {
@@ -5511,6 +5539,85 @@
           FILE_READ_TIMEOUT_POLICY.minimumMs +
             extraSteps * FILE_READ_TIMEOUT_POLICY.incrementMs,
         );
+      }
+
+      async function readFileAsArrayBuffer(
+        file,
+        loadSessionId = activeLoadSessionId,
+      ) {
+        const readTimeoutMs = getFileReadTimeoutMs(file);
+        const timeoutMessage =
+          `ファイル読み込みがタイムアウトしました（${Math.round(readTimeoutMs / 1000)}秒）`;
+
+        ensureLoadSessionActive(loadSessionId);
+
+        if (typeof FileReader !== "function") {
+          return await Promise.race([
+            file.arrayBuffer(),
+            new Promise((_, reject) => {
+              setTimeout(() => reject(new Error(timeoutMessage)), readTimeoutMs);
+            }),
+          ]);
+        }
+
+        return await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          let settled = false;
+          const timeoutId = setTimeout(() => {
+            if (settled) return;
+            try {
+              if (reader.readyState === 1 && typeof reader.abort === "function") {
+                reader.abort();
+              }
+            } catch (_) {
+              // noop
+            }
+            reject(new Error(timeoutMessage));
+          }, readTimeoutMs);
+
+          const cleanup = () => {
+            settled = true;
+            clearTimeout(timeoutId);
+            if (activeFileReader === reader) {
+              activeFileReader = null;
+            }
+          };
+
+          reader.onload = () => {
+            if (settled) return;
+            try {
+              ensureLoadSessionActive(loadSessionId);
+              const result = reader.result;
+              if (!(result instanceof ArrayBuffer)) {
+                throw new Error("ファイル読み込み結果が不正です");
+              }
+              cleanup();
+              resolve(result);
+            } catch (error) {
+              cleanup();
+              reject(error);
+            }
+          };
+
+          reader.onerror = () => {
+            if (settled) return;
+            cleanup();
+            reject(
+              new Error(
+                reader.error?.message || "ファイル読み込みに失敗しました",
+              ),
+            );
+          };
+
+          reader.onabort = () => {
+            if (settled) return;
+            cleanup();
+            reject(new Error("__CANCELLED__"));
+          };
+
+          activeFileReader = reader;
+          reader.readAsArrayBuffer(file);
+        });
       }
 
       function normalizeLanguage(value) {
@@ -6261,9 +6368,9 @@
           // Check file size (basic checks only)
           if (typeof file.size !== "number" || file.size <= 0) {
             errors.push("ファイルサイズが無効です");
-          } else if (file.size > FILE_SIZE_THRESHOLDS.maximum) {
-            // 3GB limit
-            errors.push("ファイルサイズが大きすぎます (3GB超)");
+          } else if (file.size > getFileSizeLimitPolicy(file).maxBytes) {
+            const limitPolicy = getFileSizeLimitPolicy(file);
+            errors.push(`ファイルサイズが大きすぎます (${limitPolicy.label}超)`);
           }
 
           return {
@@ -6339,9 +6446,9 @@
             errors.push("ファイルサイズが無効です");
           } else if (file.size === 0) {
             errors.push("ファイルが空です");
-          } else if (file.size > FILE_SIZE_THRESHOLDS.maximum) {
-            // 3GB limit
-            errors.push("ファイルサイズが大きすぎます (3GB超)");
+          } else if (file.size > getFileSizeLimitPolicy(file).maxBytes) {
+            const limitPolicy = getFileSizeLimitPolicy(file);
+            errors.push(`ファイルサイズが大きすぎます (${limitPolicy.label}超)`);
           }
 
           // Check last modified date
@@ -6366,6 +6473,7 @@
       function checkFileSizeLimits(file) {
         try {
           const size = Number(file?.size);
+          const limitPolicy = getFileSizeLimitPolicy(file);
 
           if (!Number.isFinite(size) || size < 0) {
             return {
@@ -6376,12 +6484,12 @@
             };
           }
 
-          if (size > FILE_SIZE_THRESHOLDS.maximum) {
+          if (size > limitPolicy.maxBytes) {
             return {
               canProceed: false,
               isCritical: true,
               level: "maximum",
-              message: `ファイルサイズが大きすぎます (${formatFileSize(size)})。最大 3GB まで対応しています。`,
+              message: `ファイルサイズが大きすぎます (${formatFileSize(size)})。この形式は最大 ${limitPolicy.label} まで対応しています。`,
             };
           } else if (size > FILE_SIZE_THRESHOLDS.critical) {
             return {
@@ -6965,6 +7073,7 @@
           }
 
           // Reset workflow state
+          abortActiveFileRead();
           clearActiveLoadSession();
           window._loadingCancelled = false;
           workflowState.step = "file-select";
@@ -7146,6 +7255,7 @@
 
       window.cancelLoading = function () {
         window._loadingCancelled = true;
+        abortActiveFileRead();
         const cancelledLoadSessionId = activeLoadSessionId;
         clearActiveLoadSession(cancelledLoadSessionId);
         showToast("読み込みをキャンセルしました", "info");
@@ -7452,22 +7562,8 @@
           updateProgress(20, "ファイル読み込み中...");
 
           let arrayBuffer;
-          const readTimeoutMs = getFileReadTimeoutMs(file);
           try {
-            arrayBuffer = await Promise.race([
-              file.arrayBuffer(),
-              new Promise((_, reject) => {
-                setTimeout(
-                  () =>
-                    reject(
-                      new Error(
-                        `ファイル読み込みがタイムアウトしました（${Math.round(readTimeoutMs / 1000)}秒）`,
-                      ),
-                    ),
-                  readTimeoutMs,
-                );
-              }),
-            ]);
+            arrayBuffer = await readFileAsArrayBuffer(file);
           } catch (readError) {
             if (readError.message === "__CANCELLED__" || window._loadingCancelled) {
               throw readError;
@@ -13093,6 +13189,7 @@
 
           // Stop monitoring
           memoryMonitor.stopMonitoring();
+          abortActiveFileRead();
 
           // Clean up event listeners
           cleanupEventListeners();
@@ -13133,6 +13230,7 @@
           parseLASPoints,
           checkFileSizeLimits,
           getFileReadTimeoutMs,
+          readFileAsArrayBuffer,
         };
       }
 
