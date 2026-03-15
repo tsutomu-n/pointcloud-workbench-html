@@ -8,8 +8,9 @@
 ## この索引の前提
 - 行番号リンクは上記更新日時時点で検証済みです。`PointCloudWorkbench.html` の編集後は行番号がずれる可能性があります。
 - 言語セレクタは `document.documentElement.lang` と `localStorage.viewerLanguage` を更新します。UI文言のリアルタイム翻訳は実装されていません。
-- ファイルサイズ判定は `3GB超` を拒否します。`3GBちょうど` は `critical` 扱いで継続可能です。
-- `2GB超〜3GB以下` は実験運用帯です。`LOW` からの開始と負荷監視を前提にしてください。
+- ファイルサイズ判定は LAS は `3GB超`、LAZ は `2GB超` を拒否します。
+- LAS の `3GBちょうど` と LAZ の `2GBちょうど` は `critical` 扱いで継続可能です。
+- LAS の `2GB超〜3GB以下` は実験運用帯です。`LOW` からの開始と負荷監視を前提にしてください。
 
 ## 運用者向け
 - `PointCloudWorkbench_運用手順書.md`
