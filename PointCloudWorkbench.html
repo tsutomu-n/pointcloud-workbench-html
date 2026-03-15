@@ -8493,113 +8493,46 @@
         const offset = header.pointDataOffset;
         const recordLength = header.pointDataRecordLength;
 
-        const quality = workflowState.selectedQuality;
-        const maxPoints = getQualityConfig(quality).maxPoints;
-        const pointCount = Math.min(header.numberOfPointRecords, maxPoints);
+        const samplingPlan = getLASSamplingPlan(
+          header.numberOfPointRecords,
+          workflowState.selectedQuality,
+        );
 
         document.getElementById("totalPoints").textContent =
-          pointCount.toLocaleString();
+          samplingPlan.pointCount.toLocaleString();
 
-        // タイムアウト設定 (30秒)
         const startTime = Date.now();
-        const timeoutMs = 30000;
+        const timeoutMs = getPointParseTimeoutMs(arrayBuffer.byteLength);
 
-        // 等間隔サンプリングでデータを抽出
-        const step = pointCount > 0
-          ? Math.max(1, Math.floor(header.numberOfPointRecords / pointCount))
-          : 1;
-
-        for (let i = 0; i < pointCount; i++) {
-          const pointIndex = i * step;
+        for (let i = 0; i < samplingPlan.pointCount; i++) {
+          const pointIndex = i * samplingPlan.step;
           const pointOffset = offset + pointIndex * recordLength;
 
           if (pointOffset + recordLength > arrayBuffer.byteLength) break;
 
           try {
-            // Read raw integer coordinates from LAS file
-            const rawX = view.getInt32(pointOffset, true);
-            const rawY = view.getInt32(pointOffset + 4, true);
-            const rawZ = view.getInt32(pointOffset + 8, true);
-
-            // Apply proper scaling and offset transformation
-            const x = rawX * header.xScaleFactor + header.xOffset;
-            const y = rawY * header.yScaleFactor + header.yOffset;
-            const z = rawZ * header.zScaleFactor + header.zOffset;
-            const intensity = view.getUint16(pointOffset + 12, true);
-
-            // Debug raw vs scaled coordinates for first few points
-            if (i < 5) {
-              console.log(
-                `点${i}: raw(${rawX}, ${rawY}, ${rawZ}) → scaled(${x.toFixed(2)}, ${y.toFixed(2)}, ${z.toFixed(2)})`,
-              );
-              console.log(
-                `       scale factors: ${header.xScaleFactor}, ${header.yScaleFactor}, ${header.zScaleFactor}`,
-              );
-              console.log(
-                `       offsets: ${header.xOffset}, ${header.yOffset}, ${header.zOffset}`,
-              );
+            const point = decodeLASPointRecord(view, pointOffset, header, i);
+            if (point) {
+              points.push(point);
             }
 
-            // 点データ形式によって分類データの位置が異なる
-            let classification;
-            let classificationFlags = null; // PDRF 6-10 の場合に保存
-
-            if (header.pointDataRecordFormat === 0) {
-              // Format 0: 分類データなし
-              classification = 1; // 未分類として扱う
-            } else if (header.pointDataRecordFormat >= 6) {
-              // PDRF 6-10: Byte 16 が classification、Byte 15 は classification flags
-              classificationFlags = view.getUint8(pointOffset + 15);
-              classification = view.getUint8(pointOffset + 16);
-            } else {
-              // PDRF 0-5: Byte 15 が classification
-              classification = view.getUint8(pointOffset + 15);
-            }
-
-            // 最初の10点の分類データをデバッグ出力
-            if (i < 10) {
-              console.log(
-                `点${i}: x=${x.toFixed(2)}, y=${y.toFixed(2)}, z=${z.toFixed(2)}, intensity=${intensity}, classification=${classification}`,
-              );
-            }
-
-            // Validate coordinates are finite and within reasonable bounds
-            if (
-              isFinite(x) &&
-              isFinite(y) &&
-              isFinite(z) &&
-              Math.abs(x) < 1e10 &&
-              Math.abs(y) < 1e10 &&
-              Math.abs(z) < 1e10
-            ) {
-              points.push({ x, y, z, intensity, classification });
-            } else if (i < 10) {
-              console.warn(
-                `点${i}: 無効な座標値をスキップ - x=${x}, y=${y}, z=${z}`,
-              );
-            }
-
-            // タイムアウトチェック
             if (Date.now() - startTime > timeoutMs) {
               throw new Error(
-                `データ処理がタイムアウトしました (${timeoutMs / 1000}秒経過)`,
+                `データ処理がタイムアウトしました (${Math.round(timeoutMs / 1000)}秒経過)`,
               );
             }
 
-            // プログレス更新 (より頻繁に)
             if (i % 1000 === 0) {
-              const progress = 40 + (i / pointCount) * 30; // 40%から70%
+              const progress = 40 + (i / Math.max(samplingPlan.pointCount, 1)) * 30;
               updateProgress(
                 progress,
-                `点データ解析: ${i.toLocaleString()}/${pointCount.toLocaleString()}`,
+                `点データ解析: ${i.toLocaleString()}/${samplingPlan.pointCount.toLocaleString()}`,
               );
               document.getElementById("loadedPoints").textContent =
                 i.toLocaleString();
-              // より頻繁なイベントループ制御
               await new Promise((resolve) => setTimeout(resolve, 1));
             }
 
-            // 更に細かいイベントループ制御
             if (i % 500 === 0) {
               await new Promise((resolve) => requestAnimationFrame(resolve));
               if (isLoadCancelledForSession(loadSessionId)) return null;
@@ -8632,6 +8565,14 @@
       async function decompressLAZFile(arrayBuffer, options = {}) {
         console.log("LAZファイル解凍開始");
         const loadSessionId = activeLoadSessionId;
+        const isFileSource =
+          arrayBuffer &&
+          typeof arrayBuffer === "object" &&
+          typeof arrayBuffer.slice === "function" &&
+          typeof arrayBuffer.size === "number";
+        const sourceSize = isFileSource
+          ? arrayBuffer.size
+          : arrayBuffer.byteLength;
 
         const quality = options.quality ?? workflowState.selectedQuality;
         const qualityConfig = getQualityConfig(quality);
@@ -8641,7 +8582,7 @@
         const lazDebug = {
           stage: "init",
           fileName: options.fileName || "unknown.laz",
-          fileSize: arrayBuffer.byteLength,
+          fileSize: sourceSize,
           timestamp: new Date().toISOString(),
           maxPoints,
           processedPoints: 0,
@@ -8665,7 +8606,11 @@
 
         let baseHeader = null;
         try {
-          baseHeader = parseLASHeader(arrayBuffer);
+          if (isFileSource) {
+            baseHeader = await parseLASHeaderFromFile(arrayBuffer, loadSessionId);
+          } else {
+            baseHeader = parseLASHeader(arrayBuffer);
+          }
         } catch (headerError) {
           console.warn(
             "LAZヘッダー解析に失敗（laz-perfフォールバック使用）:",
@@ -8695,17 +8640,32 @@
 
         const LazPerf = await createLazPerf();
         const wasmModule = LazPerf;
-        const fileSize = arrayBuffer.byteLength;
+        const fileSize = sourceSize;
         const filePointer = wasmModule._malloc(fileSize);
-        const fileHeap = new Uint8Array(
-          wasmModule.HEAPU8.buffer,
-          filePointer,
-          fileSize,
-        );
-        const sourceBytes = new Uint8Array(arrayBuffer);
-        fileHeap.set(sourceBytes);
-        lazDebug.previewBytes = Array.from(
-          sourceBytes.slice(0, Math.min(32, fileSize)),
+        if (isFileSource) {
+          await readFileIntoWasmHeap(
+            arrayBuffer,
+            wasmModule,
+            filePointer,
+            fileSize,
+            { loadSessionId },
+          );
+          lazDebug.copyStrategy = "file-chunked-to-wasm";
+        } else {
+          const fileHeap = new Uint8Array(
+            wasmModule.HEAPU8.buffer,
+            filePointer,
+            fileSize,
+          );
+          const sourceBytes = new Uint8Array(arrayBuffer);
+          fileHeap.set(sourceBytes);
+          lazDebug.previewBytes = Array.from(
+            sourceBytes.slice(0, Math.min(32, fileSize)),
+          );
+          lazDebug.copyStrategy = "arraybuffer-to-wasm";
+        }
+        lazDebug.previewBytes = lazDebug.previewBytes || Array.from(
+          wasmModule.HEAPU8.slice(filePointer, filePointer + Math.min(32, fileSize)),
         );
         lazDebug.stage = "buffer-loaded";
 
@@ -13595,9 +13555,11 @@
             return workflowState;
           },
           parseLASPoints,
+          parseLASPointsFromFile,
           checkFileSizeLimits,
           getFileReadTimeoutMs,
           readFileAsArrayBuffer,
+          readFileIntoWasmHeap,
         };
       }
 

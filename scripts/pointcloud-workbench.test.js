@@ -86,6 +86,14 @@ function createContext() {
   const elements = new Map();
   const documentEvents = new Map();
   const windowEvents = new Map();
+  const NativeDate = Date;
+  function MockDate(...args) {
+    return new NativeDate(...args);
+  }
+  MockDate.now = () => NativeDate.now();
+  MockDate.parse = NativeDate.parse;
+  MockDate.UTC = NativeDate.UTC;
+  MockDate.prototype = NativeDate.prototype;
 
   const document = {
     body: createMockElement("body"),
@@ -233,7 +241,7 @@ function createContext() {
     Boolean,
     Object,
     JSON,
-    Date,
+    Date: MockDate,
     Promise,
     Uint8Array,
     Uint16Array,
@@ -280,6 +288,12 @@ function createContext() {
 }
 
 function installImmediateBlobReader(context) {
+  const noOpTimer = () => 1;
+  context.setTimeout = noOpTimer;
+  context.clearTimeout = () => {};
+  context.window.setTimeout = noOpTimer;
+  context.window.clearTimeout = () => {};
+
   class MockFileReader {
     constructor() {
       this.readyState = 0;
