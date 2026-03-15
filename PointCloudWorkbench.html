@@ -5411,11 +5411,15 @@
         originalPoints: 0,
         decodedPoints: 0,
         displayPoints: 0,
+        displayRatio: 0,
         loadStartTime: 0,
         processStartTime: 0,
         header: null,
         classificationCounts: {},
         classificationSource: "file",
+        loadStrategy: "-",
+        estimatedPeakMemoryMB: 0,
+        loadRiskLevel: "ok",
       };
 
       let statsVisible = false;
@@ -5429,11 +5433,14 @@
         selectedQuality: "medium", // デフォルト中品質
         performanceDetected: false,
         qualityManuallySelected: false,
+        previewHeader: null,
+        previewProfile: null,
       };
       window._loadingCancelled = false;
       let loadSessionSequence = 0;
       let activeLoadSessionId = 0;
       let activeFileReader = null;
+      let filePreviewSequence = 0;
       let autoAdvanceAfterFileSelect = false;
       let progressAnnouncementState = {
         percent: -1,
@@ -5527,6 +5534,15 @@
         headerBytes: 512,
         lasPointChunkBytes: 8 * MB,
         lazHeapChunkBytes: 8 * MB,
+      };
+      const LOAD_PROFILE_MEMORY_MODEL = {
+        runtimeOverheadMB: 192,
+        pointObjectBytesPerPoint: 64,
+        lasChunkMultiplier: 0.15,
+        lasChunkFloorMB: 48,
+        lasChunkCapMB: 384,
+        lazHeapOverheadMB: 128,
+        fallbackBufferOverheadMB: 160,
       };
       const SUPPORTED_LANGUAGES = ["ja", "en", "zh"];
 
@@ -5701,11 +5717,244 @@
         };
       }
 
+      function getClassificationQualityPresentation(classificationStats) {
+        const stats =
+          classificationStats && typeof classificationStats === "object"
+            ? classificationStats
+            : {};
+        const recommendedModeText =
+          stats.recommendedMode === "classification"
+            ? "種類で色分け"
+            : "標高で色分け";
+
+        switch (stats.quality) {
+          case "poor":
+            return {
+              qualityText: "不良",
+              indicatorClass: "error",
+              buttonClass: "classification-error",
+              recommendedModeText,
+            };
+          case "limited":
+            return {
+              qualityText: "限定的",
+              indicatorClass: "warning",
+              buttonClass: "classification-warning",
+              recommendedModeText,
+            };
+          case "good":
+            return {
+              qualityText: "良好",
+              indicatorClass: "good",
+              buttonClass: "classification-good",
+              recommendedModeText,
+            };
+          default:
+            return {
+              qualityText: "標準",
+              indicatorClass: "",
+              buttonClass: "",
+              recommendedModeText,
+            };
+        }
+      }
+
       function getFileSizeLimitPolicy(file) {
         const extension = resolveFileExtension(file?.name || "");
         if (extension === "las") return FILE_SIZE_LIMITS.las;
         if (extension === "laz") return FILE_SIZE_LIMITS.laz;
         return FILE_SIZE_LIMITS.default;
+      }
+
+      function formatPercentage(value, digits = 2) {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return "-";
+        return numeric.toFixed(digits);
+      }
+
+      function formatEstimatedMemoryMB(value) {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric) || numeric <= 0) return "-";
+        if (numeric >= 1024) {
+          return `${(numeric / 1024).toFixed(1)}GB`;
+        }
+        return `${Math.round(numeric)}MB`;
+      }
+
+      function getFileTypeLabel(file) {
+        const extension = resolveFileExtension(file?.name || "");
+        if (extension === "las") return "LAS";
+        if (extension === "laz") return "LAZ";
+        return "ファイル";
+      }
+
+      function getLoadStrategyInfo(file) {
+        const extension = resolveFileExtension(file?.name || "");
+        const isLocalBlob = !!file && typeof file.slice === "function";
+
+        if (file?.isSample) {
+          return {
+            key: "sample-generated",
+            label: "サンプル生成",
+            detail: "内部サンプルデータを直接生成します。",
+          };
+        }
+        if (extension === "las" && isLocalBlob) {
+          return {
+            key: "las-chunked",
+            label: "LAS chunked 読み込み",
+            detail: "ヘッダー先読み後、点データを chunk 単位で解析します。",
+          };
+        }
+        if (extension === "laz" && isLocalBlob) {
+          return {
+            key: "laz-wasm-chunked",
+            label: "LAZ chunked + WASM ヒープ",
+            detail: "圧縮データを chunk ごとに WASM ヒープへ転送して展開します。",
+          };
+        }
+        return {
+          key: "arraybuffer-fallback",
+          label: "ArrayBuffer 全量読込",
+          detail: "互換経路のためファイル全体を一度に読み込みます。",
+        };
+      }
+
+      function getEstimatedMemoryBudgetMB() {
+        const fromPerformance = Number(performanceData?.hardwareSpecs?.memoryGB);
+        if (Number.isFinite(fromPerformance) && fromPerformance > 0) {
+          return Math.round(fromPerformance * 1024 * 0.45);
+        }
+
+        const fromNavigator = Number(navigator?.deviceMemory);
+        if (Number.isFinite(fromNavigator) && fromNavigator > 0) {
+          return Math.round(fromNavigator * 1024 * 0.45);
+        }
+
+        return 4096;
+      }
+
+      function getFormatSpecificSizeHint(file, level) {
+        const extension = resolveFileExtension(file?.name || "");
+        if (
+          extension === "laz" &&
+          ["warning", "critical", "maximum"].includes(level)
+        ) {
+          return "LAZ は内部デコーダ用メモリを使うため、LAS より安全域が狭い形式です。";
+        }
+        if (extension === "las" && level === "critical") {
+          return "LAS は chunked 読み込みですが、表示点数と GPU メモリには上限があります。";
+        }
+        return "";
+      }
+
+      function buildLoadProfile(
+        file,
+        quality = workflowState.selectedQuality,
+        header = workflowState.previewHeader,
+      ) {
+        const safeFile = file || workflowState.selectedFile || {};
+        const settings = getQualityConfig(quality);
+        const sizeBytes = Math.max(0, Number(safeFile?.size) || 0);
+        const sizeMB = sizeBytes / MB;
+        const strategy = getLoadStrategyInfo(safeFile);
+        const totalPoints = Number(header?.numberOfPointRecords);
+        const hasPointCount = Number.isFinite(totalPoints) && totalPoints > 0;
+        const displayPoints = hasPointCount
+          ? Math.min(totalPoints, settings.maxPoints)
+          : settings.maxPoints;
+        const displayRatioPercent = hasPointCount
+          ? Math.min(100, (displayPoints / totalPoints) * 100)
+          : null;
+
+        let stagingMB = LOAD_PROFILE_MEMORY_MODEL.fallbackBufferOverheadMB;
+        if (strategy.key === "sample-generated") {
+          stagingMB = 16;
+        } else if (strategy.key === "las-chunked") {
+          stagingMB = Math.min(
+            LOAD_PROFILE_MEMORY_MODEL.lasChunkCapMB,
+            Math.max(
+              LOAD_PROFILE_MEMORY_MODEL.lasChunkFloorMB,
+              sizeMB * LOAD_PROFILE_MEMORY_MODEL.lasChunkMultiplier,
+            ),
+          );
+        } else if (strategy.key === "laz-wasm-chunked") {
+          stagingMB = sizeMB + LOAD_PROFILE_MEMORY_MODEL.lazHeapOverheadMB;
+        } else if (resolveFileExtension(safeFile?.name || "") === "laz") {
+          stagingMB =
+            sizeMB * 2 + LOAD_PROFILE_MEMORY_MODEL.fallbackBufferOverheadMB;
+        } else {
+          stagingMB = sizeMB + LOAD_PROFILE_MEMORY_MODEL.fallbackBufferOverheadMB;
+        }
+
+        const pointObjectMB =
+          (displayPoints * LOAD_PROFILE_MEMORY_MODEL.pointObjectBytesPerPoint) /
+          MB;
+        const estimatedPeakMemoryMB = Math.max(
+          64,
+          Math.round(
+            LOAD_PROFILE_MEMORY_MODEL.runtimeOverheadMB +
+              settings.memoryMB +
+              pointObjectMB +
+              stagingMB,
+          ),
+        );
+        const safeBudgetMB = getEstimatedMemoryBudgetMB();
+
+        let riskLevel = "ok";
+        if (estimatedPeakMemoryMB >= safeBudgetMB * 0.85) {
+          riskLevel = "critical";
+        } else if (estimatedPeakMemoryMB >= safeBudgetMB * 0.6) {
+          riskLevel = "warning";
+        } else if (estimatedPeakMemoryMB >= safeBudgetMB * 0.4) {
+          riskLevel = "advisory";
+        }
+
+        if (
+          strategy.key === "laz-wasm-chunked" &&
+          (riskLevel === "ok" || riskLevel === "advisory") &&
+          sizeMB >= 1024
+        ) {
+          riskLevel = "warning";
+        }
+
+        const riskLabelMap = {
+          ok: "低",
+          advisory: "注意",
+          warning: "高",
+          critical: "非常に高い",
+        };
+        const pointSummary = hasPointCount
+          ? `${displayPoints.toLocaleString()}点 / ${totalPoints.toLocaleString()}点 (${formatPercentage(displayRatioPercent)}%)`
+          : `最大 ${settings.maxPoints.toLocaleString()}点`;
+        const fileType = getFileTypeLabel(safeFile);
+        const riskMessage =
+          `${fileType} / ${strategy.label} / 推定ピークRAM 約${formatEstimatedMemoryMB(estimatedPeakMemoryMB)}` +
+          (strategy.key === "laz-wasm-chunked"
+            ? " / LAZ は内部デコーダ保持ぶんの安全域が狭いです。"
+            : "");
+
+        return {
+          fileType,
+          strategyKey: strategy.key,
+          strategyLabel: strategy.label,
+          strategyDetail: strategy.detail,
+          totalPoints: hasPointCount ? totalPoints : null,
+          displayPoints,
+          displayRatioPercent,
+          estimatedPeakMemoryMB,
+          safeBudgetMB,
+          riskLevel,
+          riskLabel: riskLabelMap[riskLevel] || "低",
+          pointSummary,
+          riskMessage,
+        };
+      }
+
+      function clearSelectedFilePreview() {
+        filePreviewSequence += 1;
+        workflowState.previewHeader = null;
+        workflowState.previewProfile = null;
       }
 
       function beginLoadSession() {
@@ -6572,9 +6821,11 @@
 
             // Safe state update
             try {
+              clearSelectedFilePreview();
               workflowState.selectedFile = file;
               updateFileInfo(file);
               updateLastFileInfo(); // ファイル選択後は「前回のセッション」を非表示
+              void analyzeSelectedFilePreview(file);
 
               // Enable next button safely
               const proceedBtn = document.getElementById("proceedToQuality");
@@ -6742,6 +6993,7 @@
         try {
           const size = Number(file?.size);
           const limitPolicy = getFileSizeLimitPolicy(file);
+          const typeLabel = getFileTypeLabel(file);
 
           if (!Number.isFinite(size) || size < 0) {
             return {
@@ -6753,32 +7005,42 @@
           }
 
           if (size > limitPolicy.maxBytes) {
+            const hint = getFormatSpecificSizeHint(file, "maximum");
             return {
               canProceed: false,
               isCritical: true,
               level: "maximum",
-              message: `ファイルサイズが大きすぎます (${formatFileSize(size)})。この形式は最大 ${limitPolicy.label} まで対応しています。`,
+              message:
+                `${typeLabel} ファイルサイズが大きすぎます (${formatFileSize(size)})。` +
+                `この形式は最大 ${limitPolicy.label} まで対応しています。` +
+                (hint ? ` ${hint}` : ""),
             };
           } else if (size > FILE_SIZE_THRESHOLDS.critical) {
+            const hint = getFormatSpecificSizeHint(file, "critical");
             return {
               canProceed: true,
               isCritical: false,
               level: "critical",
-              message: `非常に大きなファイルです (${formatFileSize(size)})。LOW品質から始めることを強く推奨します。`,
+              message:
+                `非常に大きな ${typeLabel} ファイルです (${formatFileSize(size)})。LOW品質から始めることを強く推奨します。` +
+                (hint ? ` ${hint}` : ""),
             };
           } else if (size > FILE_SIZE_THRESHOLDS.warning) {
+            const hint = getFormatSpecificSizeHint(file, "warning");
             return {
               canProceed: true,
               isCritical: false,
               level: "warning",
-              message: `大容量ファイルです (${formatFileSize(size)})。LOW〜MEDIUM品質での開始を推奨します。`,
+              message:
+                `大容量の ${typeLabel} ファイルです (${formatFileSize(size)})。LOW〜MEDIUM品質での開始を推奨します。` +
+                (hint ? ` ${hint}` : ""),
             };
           } else if (size > FILE_SIZE_THRESHOLDS.advisory) {
             return {
               canProceed: true,
               isCritical: false,
               level: "advisory",
-              message: `大きなファイルです (${formatFileSize(size)})。品質設定を慎重に選択してください。`,
+              message: `大きな ${typeLabel} ファイルです (${formatFileSize(size)})。品質設定を慎重に選択してください。`,
             };
           } else {
             return {
@@ -6882,6 +7144,7 @@
 
       function resetFileSelection() {
         try {
+          clearSelectedFilePreview();
           workflowState.selectedFile = null;
           hideFileInfo();
           autoAdvanceAfterFileSelect = false;
@@ -6928,6 +7191,13 @@
         const fileName = document.getElementById("selectedFileName");
         const fileSize = document.getElementById("selectedFileSize");
         const fileWarning = document.getElementById("selectedFileWarning");
+        const previewHeader =
+          workflowState.selectedFile === file ? workflowState.previewHeader : null;
+        const profile = buildLoadProfile(
+          file,
+          workflowState.selectedQuality,
+          previewHeader,
+        );
 
         fileName.textContent = file.name;
         fileSize.textContent = `ファイルサイズ: ${formatFileSize(file.size)}`;
@@ -6940,7 +7210,18 @@
           sizeCheck.level === "critical" ||
           sizeCheck.level === "maximum"
         ) {
-          fileWarning.textContent = sizeCheck.message;
+          const details = [sizeCheck.message, profile.riskMessage];
+          if (profile.totalPoints) {
+            details.push(`推定表示: ${profile.pointSummary}`);
+          }
+          fileWarning.textContent = details.join(" ");
+          fileWarning.style.display = "block";
+        } else if (profile.totalPoints || profile.riskLevel !== "ok") {
+          const details = [profile.riskMessage];
+          if (profile.totalPoints) {
+            details.push(`推定表示: ${profile.pointSummary}`);
+          }
+          fileWarning.textContent = details.join(" ");
           fileWarning.style.display = "block";
         } else {
           fileWarning.style.display = "none";
@@ -6995,12 +7276,19 @@
         saveLastFileName(fileName);
 
         // サンプルデータを仮想的にセット
+        clearSelectedFilePreview();
         workflowState.selectedFile = {
           name: fileName,
           size: fileSize,
           isSample: true,
           samplePath: filePath,
         };
+        workflowState.previewHeader = { numberOfPointRecords: fileSize };
+        workflowState.previewProfile = buildLoadProfile(
+          workflowState.selectedFile,
+          workflowState.selectedQuality,
+          workflowState.previewHeader,
+        );
 
         updateFileInfo(workflowState.selectedFile);
         updateLastFileInfo(); // ファイル選択後は「前回のセッション」を非表示
@@ -8311,6 +8599,55 @@
           loadSessionId,
         );
         return parseLASHeader(headerBuffer);
+      }
+
+      async function analyzeSelectedFilePreview(file, options = {}) {
+        const previewFile = file || workflowState.selectedFile;
+        const quality = options.quality || workflowState.selectedQuality;
+        const shouldStore = options.store !== false;
+        const requestId = shouldStore ? ++filePreviewSequence : filePreviewSequence;
+
+        if (!previewFile || typeof previewFile !== "object") {
+          const emptyProfile = buildLoadProfile(null, quality, null);
+          if (shouldStore) {
+            workflowState.previewHeader = null;
+            workflowState.previewProfile = emptyProfile;
+          }
+          return { header: null, profile: emptyProfile };
+        }
+
+        let header = null;
+        const extension = resolveFileExtension(previewFile.name || "");
+        if (
+          typeof previewFile.slice === "function" &&
+          (extension === "las" || extension === "laz")
+        ) {
+          try {
+            header = await parseLASHeaderFromFile(previewFile, 0);
+          } catch (error) {
+            console.warn("ファイルプレビュー解析に失敗:", error);
+          }
+        }
+
+        const profile = buildLoadProfile(previewFile, quality, header);
+
+        if (shouldStore) {
+          if (
+            requestId !== filePreviewSequence ||
+            workflowState.selectedFile !== previewFile
+          ) {
+            return { header, profile, stale: true };
+          }
+
+          workflowState.previewHeader = header;
+          workflowState.previewProfile = profile;
+          updateFileInfo(previewFile);
+          if (workflowState.step === "quality-select") {
+            updateEstimations();
+          }
+        }
+
+        return { header, profile };
       }
 
       async function parseLASPointsFromFile(
