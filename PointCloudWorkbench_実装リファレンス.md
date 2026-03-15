@@ -99,6 +99,7 @@
 ### 7.1 `parseLASHeader()`
 - シグネチャ `LASF` を検証
 - LAS 1.4 の 64-bit 点数を処理
+- 圧縮フラグ付き LAZ (`pointDataRecordFormat` の上位ビット) は base format へ正規化してから点数判定する
 - `pointDataRecordFormat` と `legacyPointCount` に応じて点数解釈を分岐
 
 ### 7.2 `parseLASPoints()`

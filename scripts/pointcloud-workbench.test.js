@@ -353,17 +353,21 @@ function createLasHeaderBuffer({
   pointDataOffset = 227,
   pointDataRecordFormat = 1,
   pointDataRecordLength = 28,
+  versionMajor = 1,
+  versionMinor = 2,
+  pointCount64 = 0n,
 } = {}) {
   const buffer = new ArrayBuffer(512);
   const view = new DataView(buffer);
   const bytes = new Uint8Array(buffer);
   bytes.set(new TextEncoder().encode("LASF"), 0);
-  view.setUint8(24, 1);
-  view.setUint8(25, 2);
+  view.setUint8(24, versionMajor);
+  view.setUint8(25, versionMinor);
   view.setUint32(96, pointDataOffset, true);
   view.setUint8(104, pointDataRecordFormat);
   view.setUint16(105, pointDataRecordLength, true);
   view.setUint32(107, pointCount, true);
+  view.setBigUint64(247, BigInt(pointCount64), true);
   view.setFloat64(131, 0.01, true);
   view.setFloat64(139, 0.01, true);
   view.setFloat64(147, 0.01, true);
@@ -794,6 +798,31 @@ test("analyzeSelectedFilePreview reads header via slices and returns point count
   expect(preview.header.numberOfPointRecords).toBe(543210);
   expect(preview.profile.strategyKey).toBe("las-chunked");
   expect(context.__blobReadCalls).toBe(1);
+});
+
+test("analyzeSelectedFilePreview keeps legacy point count for compressed LAZ headers", async () => {
+  const context = createContext();
+  installImmediateBlobReader(context);
+
+  const headerBuffer = createLasHeaderBuffer({
+    pointCount: 1065,
+    pointDataOffset: 1301,
+    pointDataRecordFormat: 128,
+    pointDataRecordLength: 20,
+    versionMajor: 1,
+    versionMinor: 2,
+    pointCount64: 5064672093372088392n,
+  });
+  context.__file = createChunkedFile(headerBuffer, "point10.las.laz");
+
+  const preview = await vm.runInContext(
+    "window.__pcwTestApi.analyzeSelectedFilePreview(__file)",
+    context,
+  );
+
+  expect(preview.header.numberOfPointRecords).toBe(1065);
+  expect(preview.profile.displayPoints).toBe(1065);
+  expect(preview.profile.displayRatioPercent).toBe(100);
 });
 
 test("updateEstimations uses preview header to show exact ratio and load profile", () => {

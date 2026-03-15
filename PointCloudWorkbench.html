@@ -9090,13 +9090,19 @@
           throw new Error("LASファイル形式ではありません");
         }
 
+        const rawPointDataRecordFormat = view.getUint8(104);
+        const normalizedPointDataRecordFormat =
+          rawPointDataRecordFormat & 0x3f;
         const header = {
           signature: signature,
           versionMajor: view.getUint8(24),
           versionMinor: view.getUint8(25),
           pointDataOffset: view.getUint32(96, true),
           pointDataRecordLength: view.getUint16(105, true),
-          pointDataRecordFormat: view.getUint8(104),
+          pointDataRecordFormat: normalizedPointDataRecordFormat,
+          pointDataRecordFormatRaw: rawPointDataRecordFormat,
+          isCompressedPointFormat:
+            normalizedPointDataRecordFormat !== rawPointDataRecordFormat,
           xScaleFactor: view.getFloat64(131, true),
           yScaleFactor: view.getFloat64(139, true),
           zScaleFactor: view.getFloat64(147, true),
@@ -9114,9 +9120,15 @@
         // LAS 1.4 64-bit 点数フィールド対応
         // まずlegacy 32-bit点数を読み込む
         const legacyPointCount = view.getUint32(107, true);
+        const supportsLas14PointCount =
+          header.versionMajor > 1 ||
+          (header.versionMajor === 1 && header.versionMinor >= 4);
 
         // 条件: PDRF>=6 または legacy点数が無効(=0) の場合に64-bitを使用
-        if (header.pointDataRecordFormat >= 6 || legacyPointCount === 0) {
+        if (
+          supportsLas14PointCount &&
+          (header.pointDataRecordFormat >= 6 || legacyPointCount === 0)
+        ) {
           // PDRF 6-10: 64-bit 点数フィールドを使用
           // Number of Point Records: byte offset 247
           const pointCountBigInt = view.getBigUint64(247, true);
