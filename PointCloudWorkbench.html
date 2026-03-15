@@ -3309,7 +3309,7 @@
                 ファイルを選択
               </button>
               <div class="dropzone-hint" id="dropzoneHint">
-                .las / .laz（最大2GB）
+                .las / .laz（最大3GB）
               </div>
               <input
                 type="file"
@@ -5369,6 +5369,9 @@
         performanceDetected: false,
         qualityManuallySelected: false,
       };
+      window._loadingCancelled = false;
+      let loadSessionSequence = 0;
+      let activeLoadSessionId = 0;
       let autoAdvanceAfterFileSelect = false;
       let progressAnnouncementState = {
         percent: -1,
@@ -5432,16 +5435,82 @@
       };
       const DEFAULT_QUALITY = "medium";
       const MB = 1024 * 1024;
+      const GB = 1024 * MB;
       const FILE_SIZE_THRESHOLDS = {
         advisory: 100 * MB,
         warning: 500 * MB,
         critical: 1024 * MB,
-        maximum: 2048 * MB,
+        maximum: 3 * GB,
+      };
+      const FILE_READ_TIMEOUT_POLICY = {
+        minimumMs: 60000,
+        maximumMs: 300000,
+        baseBytes: 256 * MB,
+        incrementBytes: 256 * MB,
+        incrementMs: 30000,
       };
       const SUPPORTED_LANGUAGES = ["ja", "en", "zh"];
 
       function getQualityConfig(quality) {
         return qualitySettings[quality] || qualitySettings[DEFAULT_QUALITY];
+      }
+
+      function beginLoadSession() {
+        loadSessionSequence += 1;
+        activeLoadSessionId = loadSessionSequence;
+        return activeLoadSessionId;
+      }
+
+      function isLoadSessionActive(loadSessionId) {
+        return Number.isInteger(loadSessionId) &&
+          loadSessionId > 0 &&
+          activeLoadSessionId === loadSessionId;
+      }
+
+      function clearActiveLoadSession(loadSessionId = activeLoadSessionId) {
+        if (!Number.isInteger(loadSessionId) || loadSessionId <= 0) {
+          return false;
+        }
+        if (activeLoadSessionId !== loadSessionId) {
+          return false;
+        }
+        activeLoadSessionId = 0;
+        return true;
+      }
+
+      function isLoadCancelledForSession(loadSessionId = activeLoadSessionId) {
+        if (window._loadingCancelled) return true;
+        if (loadSessionId > 0) {
+          return !isLoadSessionActive(loadSessionId);
+        }
+        return false;
+      }
+
+      function ensureLoadSessionActive(loadSessionId) {
+        if (isLoadCancelledForSession(loadSessionId)) {
+          throw new Error("__CANCELLED__");
+        }
+      }
+
+      function getFileReadTimeoutMs(file) {
+        const size = Number(file?.size);
+        if (!Number.isFinite(size) || size <= 0) {
+          return FILE_READ_TIMEOUT_POLICY.minimumMs;
+        }
+
+        const extraSteps = Math.max(
+          0,
+          Math.ceil(
+            (size - FILE_READ_TIMEOUT_POLICY.baseBytes) /
+              FILE_READ_TIMEOUT_POLICY.incrementBytes,
+          ),
+        );
+
+        return Math.min(
+          FILE_READ_TIMEOUT_POLICY.maximumMs,
+          FILE_READ_TIMEOUT_POLICY.minimumMs +
+            extraSteps * FILE_READ_TIMEOUT_POLICY.incrementMs,
+        );
       }
 
       function normalizeLanguage(value) {
@@ -6193,8 +6262,8 @@
           if (typeof file.size !== "number" || file.size <= 0) {
             errors.push("ファイルサイズが無効です");
           } else if (file.size > FILE_SIZE_THRESHOLDS.maximum) {
-            // 2GB limit
-            errors.push("ファイルサイズが大きすぎます (2GB以上)");
+            // 3GB limit
+            errors.push("ファイルサイズが大きすぎます (3GB超)");
           }
 
           return {
@@ -6271,8 +6340,8 @@
           } else if (file.size === 0) {
             errors.push("ファイルが空です");
           } else if (file.size > FILE_SIZE_THRESHOLDS.maximum) {
-            // 2GB limit
-            errors.push("ファイルサイズが大きすぎます (2GB以上)");
+            // 3GB limit
+            errors.push("ファイルサイズが大きすぎます (3GB超)");
           }
 
           // Check last modified date
@@ -6312,7 +6381,7 @@
               canProceed: false,
               isCritical: true,
               level: "maximum",
-              message: `ファイルサイズが大きすぎます (${formatFileSize(size)})。最大 2GB まで対応しています。`,
+              message: `ファイルサイズが大きすぎます (${formatFileSize(size)})。最大 3GB まで対応しています。`,
             };
           } else if (size > FILE_SIZE_THRESHOLDS.critical) {
             return {
@@ -6896,6 +6965,7 @@
           }
 
           // Reset workflow state
+          clearActiveLoadSession();
           window._loadingCancelled = false;
           workflowState.step = "file-select";
           workflowState.selectedFile = null;
@@ -6937,6 +7007,7 @@
 
       window.startDataLoading = async function () {
         console.log("データ読み込み開始");
+        let loadSessionId = 0;
 
         try {
           // 必要な状態をチェック
@@ -6953,7 +7024,9 @@
           console.log("  品質:", workflowState.selectedQuality);
 
           // キャンセルフラグリセット
+          loadSessionId = beginLoadSession();
           window._loadingCancelled = false;
+          memoryMonitor.startMonitoring();
 
           // 旧点群が残らないように、読み込み前にクリア
           clearPointCloud();
@@ -7015,12 +7088,17 @@
             await loadLASFileActual(workflowState.selectedFile);
           }
 
+          ensureLoadSessionActive(loadSessionId);
+
           // 完了
           updateProgress(100, "読み込み完了!");
-          completeLoading();
+          completeLoading(loadSessionId);
         } catch (error) {
           // キャンセルは静かに処理（alertなし）
-          if (error.message === "__CANCELLED__" || window._loadingCancelled) {
+          if (
+            error.message === "__CANCELLED__" ||
+            (loadSessionId > 0 && isLoadCancelledForSession(loadSessionId))
+          ) {
             console.log("読み込みキャンセル済み");
             return;
           }
@@ -7049,6 +7127,14 @@
           // 品質選択に戻る
           setTimeout(() => {
             try {
+              if (
+                loadSessionId > 0 &&
+                activeLoadSessionId > 0 &&
+                activeLoadSessionId !== loadSessionId
+              ) {
+                return;
+              }
+              clearActiveLoadSession(loadSessionId);
               goBackToQualitySelection();
             } catch (backError) {
               console.error("戻り処理でエラー:", backError);
@@ -7060,9 +7146,18 @@
 
       window.cancelLoading = function () {
         window._loadingCancelled = true;
+        const cancelledLoadSessionId = activeLoadSessionId;
+        clearActiveLoadSession(cancelledLoadSessionId);
         showToast("読み込みをキャンセルしました", "info");
         setTimeout(() => {
           try {
+            if (
+              cancelledLoadSessionId > 0 &&
+              activeLoadSessionId > 0 &&
+              activeLoadSessionId !== cancelledLoadSessionId
+            ) {
+              return;
+            }
             goBackToQualitySelection();
           } catch (e) {
             console.error("キャンセル後の戻り処理エラー:", e);
@@ -7357,6 +7452,7 @@
           updateProgress(20, "ファイル読み込み中...");
 
           let arrayBuffer;
+          const readTimeoutMs = getFileReadTimeoutMs(file);
           try {
             arrayBuffer = await Promise.race([
               file.arrayBuffer(),
@@ -7365,14 +7461,17 @@
                   () =>
                     reject(
                       new Error(
-                        "ファイル読み込みがタイムアウトしました（60秒）",
+                        `ファイル読み込みがタイムアウトしました（${Math.round(readTimeoutMs / 1000)}秒）`,
                       ),
                     ),
-                  60000,
+                  readTimeoutMs,
                 );
               }),
             ]);
           } catch (readError) {
+            if (readError.message === "__CANCELLED__" || window._loadingCancelled) {
+              throw readError;
+            }
             throw new Error(`ファイル読み込みに失敗: ${readError.message}`);
           }
 
@@ -7386,6 +7485,9 @@
             `LASファイル読み込み完了 (所要時間: ${((Date.now() - startTime) / 1000).toFixed(1)}秒)`,
           );
         } catch (error) {
+          if (error.message === "__CANCELLED__" || window._loadingCancelled) {
+            throw error;
+          }
           console.error("LASファイル読み込みエラー:", error);
 
           // エラーの種類に応じたメッセージ
@@ -7655,6 +7757,9 @@
           arrayBuffer,
           resolvedName,
         );
+        if (!header || points === null) {
+          throw new Error("__CANCELLED__");
+        }
         if (!header || !points) {
           throw new Error("LAZ解析結果が無効です");
         }
@@ -7726,9 +7831,13 @@
               maxPoints:
                 qualitySettings[workflowState.selectedQuality].maxPoints,
             });
+            if (lazResult?.cancelled || lazResult?.points === null) {
+              throw new Error("__CANCELLED__");
+            }
             header = lazResult.header;
             points = lazResult.points;
           } catch (lazError) {
+            if (lazError.message === "__CANCELLED__") throw lazError;
             throw new Error(`LAZファイルの処理に失敗: ${lazError.message}`);
           }
         } else {
@@ -7917,6 +8026,7 @@
       async function parseLASPoints(arrayBuffer, header) {
         const view = new DataView(arrayBuffer);
         const points = [];
+        const loadSessionId = activeLoadSessionId;
         const offset = header.pointDataOffset;
         const recordLength = header.pointDataRecordLength;
 
@@ -7932,7 +8042,9 @@
         const timeoutMs = 30000;
 
         // 等間隔サンプリングでデータを抽出
-        const step = Math.floor(header.numberOfPointRecords / pointCount);
+        const step = pointCount > 0
+          ? Math.max(1, Math.floor(header.numberOfPointRecords / pointCount))
+          : 1;
 
         for (let i = 0; i < pointCount; i++) {
           const pointIndex = i * step;
@@ -8027,14 +8139,22 @@
             // 更に細かいイベントループ制御
             if (i % 500 === 0) {
               await new Promise((resolve) => requestAnimationFrame(resolve));
-              if (window._loadingCancelled) return null;
+              if (isLoadCancelledForSession(loadSessionId)) return null;
             }
           } catch (pointError) {
-            // 個別の点の読み取りエラーは無視
+            const message = pointError?.message || "";
+            if (
+              message === "__CANCELLED__" ||
+              message.includes("タイムアウト") ||
+              pointError?.name === "RangeError" ||
+              pointError?.name === "TypeError"
+            ) {
+              throw pointError;
+            }
           }
         }
 
-        if (window._loadingCancelled) return null;
+        if (isLoadCancelledForSession(loadSessionId)) return null;
 
         if (points.length === 0) {
           throw new Error("有効な点データが見つかりませんでした");
@@ -8048,6 +8168,7 @@
       // LAZファイル解凍（laz-perfベース、診断情報付き）
       async function decompressLAZFile(arrayBuffer, options = {}) {
         console.log("LAZファイル解凍開始");
+        const loadSessionId = activeLoadSessionId;
 
         const quality = options.quality ?? workflowState.selectedQuality;
         const qualityConfig = getQualityConfig(quality);
@@ -8289,14 +8410,18 @@
 
               if (i % 50000 === 0 && i > 0) {
                 await new Promise((resolve) => setTimeout(resolve, 1));
-                if (window._loadingCancelled) return { header, points: null, cancelled: true };
+                if (isLoadCancelledForSession(loadSessionId)) {
+                  return { header, points: null, cancelled: true };
+                }
               }
             }
           } finally {
             wasmModule._free(pointPointer);
           }
 
-          if (window._loadingCancelled) return { header, points: null, cancelled: true };
+          if (isLoadCancelledForSession(loadSessionId)) {
+            return { header, points: null, cancelled: true };
+          }
 
           if (points.length === 0) {
             lazDebug.stage = "no-points";
@@ -9137,12 +9262,16 @@
       }
 
       // 読み込み完了
-      function completeLoading() {
+      function completeLoading(loadSessionId = activeLoadSessionId) {
         console.log("データ読み込み完了");
 
         updateProgress(100, "完了！");
 
         setTimeout(() => {
+          if (isLoadCancelledForSession(loadSessionId)) {
+            return;
+          }
+
           workflowState.step = "complete";
           updateRightPanelVisibility();
 
@@ -9175,11 +9304,16 @@
           animate(); // メインのanimate関数を使用
 
           requestAnimationFrame(() => {
+            if (isLoadCancelledForSession(loadSessionId)) {
+              return;
+            }
             focusPrimaryAction(
               "controls",
               "button, input, select",
             );
           });
+
+          clearActiveLoadSession(loadSessionId);
         }, 1000);
       }
 
@@ -9189,7 +9323,6 @@
       }
 
       function goBackToQualitySelection() {
-        window._loadingCancelled = false;
         workflowState.step = "quality-select";
         updateRightPanelVisibility();
 
@@ -12987,6 +13120,21 @@
 
       // Expose cleanup function globally for emergency use
       window.performFinalCleanup = performFinalCleanup;
+
+      if (window.__PCW_ENABLE_TEST_API__) {
+        window.__pcwTestApi = {
+          beginLoadSession,
+          isLoadSessionActive,
+          clearActiveLoadSession,
+          setWorkflowState(nextState = {}) {
+            Object.assign(workflowState, nextState);
+            return workflowState;
+          },
+          parseLASPoints,
+          checkFileSizeLimits,
+          getFileReadTimeoutMs,
+        };
+      }
 
       console.log("ロバストエラーハンドリングシステムが有効化されました");
       console.log("以下の機能が追加されました:");

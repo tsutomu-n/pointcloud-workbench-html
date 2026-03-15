@@ -1,6 +1,6 @@
 # PointCloudWorkbench 運用手順書
 
-更新日時: 2026-03-02 11:44:07 JST
+更新日時: 2026-03-15 21:33:42 JST
 
 ## 1. 目的
 - 対象: `PointCloudWorkbench.html` の日常運用を担当する利用者、運用担当、検証担当
@@ -10,7 +10,7 @@
 - 推奨ブラウザ: Chrome / Edge / Firefox の最新版
 - 必須機能: WebGL、File API、ArrayBuffer
 - 取り扱い対象: `.las`, `.laz`
-- 画面上の上限表示: 最大 2GB
+- 画面上の上限表示: 最大 3GB
 
 ## 3. 起動手順
 1. `PointCloudWorkbench.html` をブラウザで開く
@@ -46,11 +46,12 @@
 | 100MB以下 | `ok` | 通常運用 |
 | 100MB超〜500MB以下 | `advisory` | `MEDIUM` 以下から開始 |
 | 500MB超〜1GB以下 | `warning` | `LOW` または `MEDIUM` 推奨 |
-| 1GB超〜2GB以下 | `critical` | `LOW` 推奨、PC負荷を監視 |
-| 2GB超 | `maximum` | 読み込み不可、別ファイルを使用 |
+| 1GB超〜3GB以下 | `critical` | `LOW` 推奨、PC負荷を監視 |
+| 3GB超 | `maximum` | 読み込み不可、別ファイルを使用 |
 
 注記:
-- 判定は `>` 比較で実装されているため、ちょうど `2GB` は `critical` 扱い（継続可能）です。
+- 判定は `>` 比較で実装されているため、ちょうど `3GB` は `critical` 扱い（継続可能）です。
+- `2GB超〜3GB以下` は実験運用帯です。`LOW` 品質から開始し、キャンセル復帰やブラウザ負荷を監視してください。
 
 ## 6. 日常操作で使う主要機能
 - 視点切替: 正面、真上、側面、背面、全体表示
@@ -91,7 +92,7 @@
 
 ## 9. 運用チェックリスト
 - `.las` と `.laz` の両方で読み込みできる
-- 2GB超ファイルで読み込み拒否される
+- 3GB超ファイルで読み込み拒否される
 - 品質切替時に推定値が更新される
 - 読み込み完了後に視点・表示モードが操作可能
 - 分類モード時に（必要なら `window.toggleLegendPanel()` で表示して）統計値と凡例内容が整合している
@@ -105,27 +106,27 @@
 
 | 関数 | 行番号リンク | 参照用途 |
 |---|---|---|
-| `loadSampleData` | [PointCloudWorkbench.html#L6511](PointCloudWorkbench.html#L6511) | サンプルデータ選択 |
-| `proceedToQualitySelection` | [PointCloudWorkbench.html#L6570](PointCloudWorkbench.html#L6570) | 品質設定画面への遷移 |
-| `applyQualitySelection` | [PointCloudWorkbench.html#L6640](PointCloudWorkbench.html#L6640) | 品質選択反映 |
-| `startDataLoading` | [PointCloudWorkbench.html#L6938](PointCloudWorkbench.html#L6938) | 読み込み開始 |
-| `cancelLoading` | [PointCloudWorkbench.html#L7061](PointCloudWorkbench.html#L7061) | 読み込みキャンセル |
-| `loadLASFileActual` | [PointCloudWorkbench.html#L7315](PointCloudWorkbench.html#L7315) | 実ファイル読み込み本体 |
-| `completeLoading` | [PointCloudWorkbench.html#L9140](PointCloudWorkbench.html#L9140) | 読み込み完了遷移 |
-| `goBackToFileSelect` | [PointCloudWorkbench.html#L6738](PointCloudWorkbench.html#L6738) | ファイル選択に戻る |
-| `goHome` | [PointCloudWorkbench.html#L6923](PointCloudWorkbench.html#L6923) | ホーム復帰 |
-| `set2DView` | [PointCloudWorkbench.html#L9096](PointCloudWorkbench.html#L9096) | 2D表示切替 |
-| `exit2DView` | [PointCloudWorkbench.html#L9105](PointCloudWorkbench.html#L9105) | 3D表示へ復帰 |
-| `setColorMode` | [PointCloudWorkbench.html#L9351](PointCloudWorkbench.html#L9351) | 色分けモード切替 |
-| `toggleLegendPanel` | [PointCloudWorkbench.html#L9755](PointCloudWorkbench.html#L9755) | 凡例表示切替（開発者コンソール/API向け） |
-| `toggleSlicing` | [PointCloudWorkbench.html#L10083](PointCloudWorkbench.html#L10083) | スライス表示開始/停止 |
-| `show2DSliceView` | [PointCloudWorkbench.html#L10659](PointCloudWorkbench.html#L10659) | 2D断面表示 |
-| `resetSlicing` | [PointCloudWorkbench.html#L10635](PointCloudWorkbench.html#L10635) | スライス設定リセット |
-| `toggleCADMode` | [PointCloudWorkbench.html#L10412](PointCloudWorkbench.html#L10412) | CADモード切替 |
-| `autoClassify` | [PointCloudWorkbench.html#L11535](PointCloudWorkbench.html#L11535) | 自動分類実行 |
-| `toggleStatsPanel` | [PointCloudWorkbench.html#L12603](PointCloudWorkbench.html#L12603) | 統計パネル切替 |
-| `toggleControlsPanel` | [PointCloudWorkbench.html#L12622](PointCloudWorkbench.html#L12622) | 制御パネル表示切替 |
-| `performFinalCleanup` | [PointCloudWorkbench.html#L12957](PointCloudWorkbench.html#L12957) | 緊急クリーンアップ |
+| `loadSampleData` | [PointCloudWorkbench.html#L6580](PointCloudWorkbench.html#L6580) | サンプルデータ選択 |
+| `proceedToQualitySelection` | [PointCloudWorkbench.html#L6639](PointCloudWorkbench.html#L6639) | 品質設定画面への遷移 |
+| `applyQualitySelection` | [PointCloudWorkbench.html#L6709](PointCloudWorkbench.html#L6709) | 品質選択反映 |
+| `startDataLoading` | [PointCloudWorkbench.html#L7008](PointCloudWorkbench.html#L7008) | 読み込み開始 |
+| `cancelLoading` | [PointCloudWorkbench.html#L7147](PointCloudWorkbench.html#L7147) | 読み込みキャンセル |
+| `loadLASFileActual` | [PointCloudWorkbench.html#L7410](PointCloudWorkbench.html#L7410) | 実ファイル読み込み本体 |
+| `completeLoading` | [PointCloudWorkbench.html#L9265](PointCloudWorkbench.html#L9265) | 読み込み完了遷移 |
+| `goBackToFileSelect` | [PointCloudWorkbench.html#L6807](PointCloudWorkbench.html#L6807) | ファイル選択に戻る |
+| `goHome` | [PointCloudWorkbench.html#L6993](PointCloudWorkbench.html#L6993) | ホーム復帰 |
+| `set2DView` | [PointCloudWorkbench.html#L9221](PointCloudWorkbench.html#L9221) | 2D表示切替 |
+| `exit2DView` | [PointCloudWorkbench.html#L9230](PointCloudWorkbench.html#L9230) | 3D表示へ復帰 |
+| `setColorMode` | [PointCloudWorkbench.html#L9484](PointCloudWorkbench.html#L9484) | 色分けモード切替 |
+| `toggleLegendPanel` | [PointCloudWorkbench.html#L9888](PointCloudWorkbench.html#L9888) | 凡例表示切替（開発者コンソール/API向け） |
+| `toggleSlicing` | [PointCloudWorkbench.html#L10216](PointCloudWorkbench.html#L10216) | スライス表示開始/停止 |
+| `show2DSliceView` | [PointCloudWorkbench.html#L10792](PointCloudWorkbench.html#L10792) | 2D断面表示 |
+| `resetSlicing` | [PointCloudWorkbench.html#L10768](PointCloudWorkbench.html#L10768) | スライス設定リセット |
+| `toggleCADMode` | [PointCloudWorkbench.html#L10545](PointCloudWorkbench.html#L10545) | CADモード切替 |
+| `autoClassify` | [PointCloudWorkbench.html#L11668](PointCloudWorkbench.html#L11668) | 自動分類実行 |
+| `toggleStatsPanel` | [PointCloudWorkbench.html#L12736](PointCloudWorkbench.html#L12736) | 統計パネル切替 |
+| `toggleControlsPanel` | [PointCloudWorkbench.html#L12755](PointCloudWorkbench.html#L12755) | 制御パネル表示切替 |
+| `performFinalCleanup` | [PointCloudWorkbench.html#L13090](PointCloudWorkbench.html#L13090) | 緊急クリーンアップ |
 
 ## 12. ユースケース別ガイド（事実ベース）
 
@@ -133,7 +134,7 @@
 
 前提:
 - 500MB超〜1GB以下は `warning` 扱い
-- 1GB超〜2GB以下は `critical` 扱い
+- 1GB超〜3GB以下は `critical` 扱い
 
 操作:
 1. `.las` または `.laz` を選択する
@@ -144,13 +145,13 @@
 - 読み込みは継続可能
 - 操作遅延が出る場合は `LOW` で再読み込みすると改善しやすい
 
-### 12.2 2GB超ファイルを選択した場合
+### 12.2 3GB超ファイルを選択した場合
 
 前提:
-- 2GB超は `maximum`（読み込み不可）
+- 3GB超は `maximum`（読み込み不可）
 
 操作:
-1. 2GBを超えるファイルを選択する
+1. 3GBを超えるファイルを選択する
 
 期待結果:
 - サイズ警告が表示され、読み込みは中止される

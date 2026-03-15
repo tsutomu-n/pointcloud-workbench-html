@@ -5,7 +5,8 @@ const vm = require("vm");
 
 const htmlPath = path.join(__dirname, "..", "PointCloudWorkbench.html");
 const html = fs.readFileSync(htmlPath, "utf8");
-const scriptMatch = html.match(/<script>([\s\S]*?)<\/script>/);
+const scriptMatches = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
+const scriptMatch = scriptMatches.at(-1);
 
 if (!scriptMatch) {
   throw new Error("inline script not found");
