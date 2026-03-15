@@ -288,10 +288,15 @@ function createContext() {
 }
 
 function installImmediateBlobReader(context) {
-  const noOpTimer = () => 1;
-  context.setTimeout = noOpTimer;
+  const selectiveTimer = (callback, delay = 0) => {
+    if (typeof callback === "function" && delay <= 10) {
+      callback();
+    }
+    return 1;
+  };
+  context.setTimeout = selectiveTimer;
   context.clearTimeout = () => {};
-  context.window.setTimeout = noOpTimer;
+  context.window.setTimeout = selectiveTimer;
   context.window.clearTimeout = () => {};
 
   class MockFileReader {
