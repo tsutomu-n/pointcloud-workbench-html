@@ -348,6 +348,37 @@ function createChunkedFile(buffer, name = "scan.las") {
   };
 }
 
+function createLasHeaderBuffer({
+  pointCount = 1000,
+  pointDataOffset = 227,
+  pointDataRecordFormat = 1,
+  pointDataRecordLength = 28,
+} = {}) {
+  const buffer = new ArrayBuffer(512);
+  const view = new DataView(buffer);
+  const bytes = new Uint8Array(buffer);
+  bytes.set(new TextEncoder().encode("LASF"), 0);
+  view.setUint8(24, 1);
+  view.setUint8(25, 2);
+  view.setUint32(96, pointDataOffset, true);
+  view.setUint8(104, pointDataRecordFormat);
+  view.setUint16(105, pointDataRecordLength, true);
+  view.setUint32(107, pointCount, true);
+  view.setFloat64(131, 0.01, true);
+  view.setFloat64(139, 0.01, true);
+  view.setFloat64(147, 0.01, true);
+  view.setFloat64(155, 0, true);
+  view.setFloat64(163, 0, true);
+  view.setFloat64(171, 0, true);
+  view.setFloat64(179, 100, true);
+  view.setFloat64(187, 0, true);
+  view.setFloat64(195, 100, true);
+  view.setFloat64(203, 0, true);
+  view.setFloat64(211, 50, true);
+  view.setFloat64(219, 0, true);
+  return buffer;
+}
+
 test("load session helpers isolate stale loads", () => {
   const context = createContext();
 
@@ -516,6 +547,25 @@ test("LAZ keeps a stricter ceiling than LAS", () => {
   expect(lazBoundary.level).toBe("critical");
   expect(lazOver.canProceed).toBe(false);
   expect(lazOver.level).toBe("maximum");
+});
+
+test("large LAZ warnings include decoder memory caution", () => {
+  const context = createContext();
+
+  context.__largeLaz = {
+    name: "scan.laz",
+    size: Math.floor(1.4 * 1024 * 1024 * 1024),
+  };
+
+  const result = vm.runInContext(
+    "window.__pcwTestApi.checkFileSizeLimits(__largeLaz)",
+    context,
+  );
+
+  expect(result.canProceed).toBe(true);
+  expect(result.level).toBe("critical");
+  expect(result.message).toMatch(/LAZ/);
+  expect(result.message).toMatch(/内部デコーダ|メモリ/);
 });
 
 test("startDataLoading ignores stale completion after cancellation", async () => {
@@ -721,6 +771,67 @@ test("readFileIntoWasmHeap streams file slices into WASM memory", async () => {
     Array.from(source),
   );
   expect(context.__blobReadCalls).toBe(3);
+});
+
+test("analyzeSelectedFilePreview reads header via slices and returns point count", async () => {
+  const context = createContext();
+  installImmediateBlobReader(context);
+
+  const headerBuffer = createLasHeaderBuffer({ pointCount: 543210 });
+  context.__file = createChunkedFile(headerBuffer, "preview.las");
+
+  const hasHelper = vm.runInContext(
+    'typeof window.__pcwTestApi?.analyzeSelectedFilePreview === "function"',
+    context,
+  );
+  expect(hasHelper).toBe(true);
+
+  const preview = await vm.runInContext(
+    "window.__pcwTestApi.analyzeSelectedFilePreview(__file)",
+    context,
+  );
+
+  expect(preview.header.numberOfPointRecords).toBe(543210);
+  expect(preview.profile.strategyKey).toBe("las-chunked");
+  expect(context.__blobReadCalls).toBe(1);
+});
+
+test("updateEstimations uses preview header to show exact ratio and load profile", () => {
+  const context = createContext();
+
+  const hasHelper = vm.runInContext(
+    'typeof window.__pcwTestApi?.updateEstimations === "function" && typeof window.__pcwTestApi?.buildLoadProfile === "function"',
+    context,
+  );
+  expect(hasHelper).toBe(true);
+
+  vm.runInContext(
+    `
+      window.__pcwTestApi.setWorkflowState({
+        selectedFile: {
+          name: "dense.laz",
+          size: 1536 * 1024 * 1024,
+          slice() { return { size: 0, __buffer: new ArrayBuffer(0), arrayBuffer: async () => new ArrayBuffer(0) }; }
+        },
+        selectedQuality: "maximum",
+        previewHeader: {
+          numberOfPointRecords: 5000000
+        }
+      });
+      window.__pcwTestApi.updateEstimations();
+    `,
+    context,
+  );
+
+  expect(context.document.getElementById("estimatedSampling").textContent).toContain(
+    "40.00%",
+  );
+  expect(context.document.getElementById("estimatedRisk").textContent).toMatch(
+    /LAS|LAZ|危険度|推定/,
+  );
+  expect(context.document.getElementById("estimatedLoadPath").textContent).toMatch(
+    /LAZ|WASM|chunked/,
+  );
 });
 
 test("decompressLAZFile keeps source point count when sampling down", async () => {

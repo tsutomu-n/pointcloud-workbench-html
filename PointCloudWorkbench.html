@@ -7582,60 +7582,56 @@
         }
       }
 
-      // Three.js初期化
-      async function initThreeJS() {
-        console.log("Three.js初期化");
+      function removeRendererResizeHandler() {
+        if (!rendererResizeHandler) return;
+        window.removeEventListener("resize", rendererResizeHandler);
+        rendererResizeHandler = null;
+      }
 
-        updateProgress(5, "Three.js初期化中...");
+      function disposeRendererRuntime(options = {}) {
+        const { preserveScene = false } = options;
 
-        // シーン作成
-        scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x001122);
+        if (animationId) {
+          cancelAnimationFrame(animationId);
+          animationId = null;
+        }
 
-        const { width: viewportWidth, height: viewportHeight } =
-          getViewportSize();
+        removeRendererResizeHandler();
 
-        // カメラ作成
-        perspectiveCamera = new THREE.PerspectiveCamera(
-          60,
-          viewportWidth / viewportHeight,
-          1,
-          50000,
-        );
-        perspectiveCamera.position.set(200, 100, 200);
+        if (errorTracker && typeof errorTracker.unbindWebGLContextHandlers === "function") {
+          errorTracker.unbindWebGLContextHandlers(renderer?.domElement);
+        }
 
-        const baseAspect = viewportWidth / viewportHeight;
-        const baseFrustumSize = 200;
-        orthoCamera = new THREE.OrthographicCamera(
-          (baseFrustumSize * baseAspect) / -2,
-          (baseFrustumSize * baseAspect) / 2,
-          baseFrustumSize / 2,
-          baseFrustumSize / -2,
-          0.1,
-          50000,
-        );
-        orthoCamera.position.copy(perspectiveCamera.position);
-        orthoCamera.up.set(0, 1, 0);
+        if (controls && typeof controls.dispose === "function") {
+          controls.dispose();
+        }
+        controls = null;
 
-        camera = perspectiveCamera;
+        if (renderer) {
+          const domElement = renderer.domElement;
+          if (
+            domElement &&
+            domElement.parentElement &&
+            typeof domElement.parentElement.removeChild === "function"
+          ) {
+            domElement.parentElement.removeChild(domElement);
+          }
+          if (typeof renderer.dispose === "function") {
+            renderer.dispose();
+          }
+        }
+        renderer = null;
 
-        // レンダラー作成
-        renderer = new THREE.WebGLRenderer({
-          antialias: true,
-          alpha: false,
-          powerPreference: "high-performance",
-        });
-        renderer.setSize(viewportWidth, viewportHeight, false);
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-        renderer.localClippingEnabled = true; // スライス機能用の設定
-        renderer.domElement.style.width = "100%";
-        renderer.domElement.style.height = "100%";
+        if (!preserveScene) {
+          scene = null;
+          perspectiveCamera = null;
+          orthoCamera = null;
+          camera = null;
+        }
+      }
 
-        document.getElementById("container").appendChild(renderer.domElement);
-
-        // OrbitControls設定（安全な初期化 + フォールバック）
+      function createOrbitControlsInstance(nextCamera, domElement, preservedTarget) {
         try {
-          // 複数のOrbitControls読み込み方法を試す
           let OrbitControlsClass = null;
 
           if (typeof THREE.OrbitControls !== "undefined") {
@@ -7646,51 +7642,48 @@
             OrbitControlsClass = OrbitControls;
           }
 
-          if (OrbitControlsClass) {
-            controls = new OrbitControlsClass(camera, renderer.domElement);
-
-            // 基本設定
-            controls.enableDamping = true;
-            controls.dampingFactor = 0.05;
-            controls.minDistance = 10;
-            controls.maxDistance = 5000;
-
-            // マウス操作設定
-            controls.enableRotate = true; // 左ボタン回転
-            controls.enableZoom = true; // ホイールズーム
-            controls.enablePan = true; // 右ボタンパン
-
-            // パン設定
-            controls.panSpeed = 0.1; // 感度をさらに細かく調整
-            controls.screenSpacePanning = false; // カメラの上方向を基準
-
-            console.log("OrbitControls初期化成功");
-            console.log("  - 左ボタン: 回転");
-            console.log("  - 右ボタン: パン（位置移動）");
-            console.log("  - ホイール: ズーム");
-            console.log("  - Shift+左ボタン: パン");
-          } else {
+          if (!OrbitControlsClass) {
             console.warn(
               "OrbitControlsが利用できません。基本的なカメラ制御のみ使用します",
             );
-            // OrbitControlsなしでも動作するようにする
-            controls = null;
+            return null;
           }
+
+          const nextControls = new OrbitControlsClass(nextCamera, domElement);
+          nextControls.enableDamping = true;
+          nextControls.dampingFactor = 0.05;
+          nextControls.minDistance = 10;
+          nextControls.maxDistance = 5000;
+          nextControls.enableRotate = true;
+          nextControls.enableZoom = true;
+          nextControls.enablePan = true;
+          nextControls.panSpeed = 0.1;
+          nextControls.screenSpacePanning = false;
+
+          if (
+            preservedTarget &&
+            nextControls.target &&
+            typeof nextControls.target.copy === "function"
+          ) {
+            nextControls.target.copy(preservedTarget);
+          }
+
+          return nextControls;
         } catch (controlsError) {
           console.error("OrbitControls初期化エラー:", controlsError);
           console.warn("OrbitControlsなしで続行します");
-          controls = null;
+          return null;
         }
+      }
 
-        // 照明設定
+      function addSceneHelpers(targetScene) {
         const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
-        scene.add(ambientLight);
+        targetScene.add(ambientLight);
 
         const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
         directionalLight.position.set(1000, 1000, 500);
-        scene.add(directionalLight);
+        targetScene.add(directionalLight);
 
-        // グリッドヘルパー追加
         const gridSize = 100;
         const gridDivisions = 10;
         const gridHelper = new THREE.GridHelper(
@@ -7700,15 +7693,24 @@
           0x444444,
         );
         gridHelper.name = "gridHelper";
-        scene.add(gridHelper);
+        targetScene.add(gridHelper);
 
-        // 軸ヘルパー追加（X=赤、Y=緑、Z=青）
         const axisHelper = new THREE.AxesHelper(20);
         axisHelper.name = "axisHelper";
-        scene.add(axisHelper);
+        targetScene.add(axisHelper);
+      }
 
-        // ウィンドウリサイズ対応
-        window.addEventListener("resize", () => {
+      function bindRendererRuntimeHandlers() {
+        if (!renderer) return;
+
+        if (errorTracker && typeof errorTracker.bindWebGLContextHandlers === "function") {
+          errorTracker.bindWebGLContextHandlers(renderer.domElement);
+        }
+
+        removeRendererResizeHandler();
+        rendererResizeHandler = () => {
+          if (!renderer) return;
+
           const { width: viewportWidth, height: viewportHeight } =
             getViewportSize();
           const aspect = viewportWidth / viewportHeight;
@@ -7724,7 +7726,120 @@
 
           renderer.setSize(viewportWidth, viewportHeight, false);
           updateStatsPanelLayout();
+        };
+        window.addEventListener("resize", rendererResizeHandler);
+      }
+
+      function recoverThreeJSContext() {
+        initThreeJS({
+          preserveScene:
+            workflowState.step === "complete" &&
+            !!scene &&
+            !!perspectiveCamera &&
+            !!orthoCamera,
+        }).then(() => {
+          const recoveryMessage = document.querySelector(
+            ".webgl-recovery-message",
+          );
+          if (recoveryMessage) {
+            recoveryMessage.remove();
+          }
+          if (workflowState.step === "complete") {
+            setViewerVisibility(true);
+            animate();
+          }
+        }).catch((error) => {
+          console.error("Three.js復旧エラー:", error);
         });
+      }
+
+      // Three.js初期化
+      async function initThreeJS(options = {}) {
+        console.log("Three.js初期化");
+
+        updateProgress(5, "Three.js初期化中...");
+
+        const preserveScene =
+          options.preserveScene === true &&
+          !!scene &&
+          !!perspectiveCamera &&
+          !!orthoCamera;
+        const previousScene = scene;
+        const previousPerspectiveCamera = perspectiveCamera;
+        const previousOrthoCamera = orthoCamera;
+        const preserveOrthoCamera = preserveScene && camera === orthoCamera;
+        const preservedTarget =
+          controls &&
+          controls.target &&
+          typeof controls.target.clone === "function"
+            ? controls.target.clone()
+            : null;
+
+        disposeRendererRuntime({ preserveScene });
+
+        const { width: viewportWidth, height: viewportHeight } =
+          getViewportSize();
+
+        if (preserveScene) {
+          scene = previousScene;
+          perspectiveCamera = previousPerspectiveCamera;
+          orthoCamera = previousOrthoCamera;
+          camera = preserveOrthoCamera ? orthoCamera : perspectiveCamera;
+
+          perspectiveCamera.aspect = viewportWidth / viewportHeight;
+          perspectiveCamera.updateProjectionMatrix();
+          if (orthoCamera) {
+            updateOrthoFrustumToFit();
+          }
+        } else {
+          scene = new THREE.Scene();
+          scene.background = new THREE.Color(0x001122);
+
+          perspectiveCamera = new THREE.PerspectiveCamera(
+            60,
+            viewportWidth / viewportHeight,
+            1,
+            50000,
+          );
+          perspectiveCamera.position.set(200, 100, 200);
+
+          const baseAspect = viewportWidth / viewportHeight;
+          const baseFrustumSize = 200;
+          orthoCamera = new THREE.OrthographicCamera(
+            (baseFrustumSize * baseAspect) / -2,
+            (baseFrustumSize * baseAspect) / 2,
+            baseFrustumSize / 2,
+            baseFrustumSize / -2,
+            0.1,
+            50000,
+          );
+          orthoCamera.position.copy(perspectiveCamera.position);
+          orthoCamera.up.set(0, 1, 0);
+          camera = perspectiveCamera;
+
+          addSceneHelpers(scene);
+        }
+
+        renderer = new THREE.WebGLRenderer({
+          antialias: true,
+          alpha: false,
+          powerPreference: "high-performance",
+        });
+        renderer.setSize(viewportWidth, viewportHeight, false);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.localClippingEnabled = true;
+        renderer.domElement.style.width = "100%";
+        renderer.domElement.style.height = "100%";
+
+        document.getElementById("container").appendChild(renderer.domElement);
+
+        controls = createOrbitControlsInstance(
+          camera,
+          renderer.domElement,
+          preservedTarget,
+        );
+
+        bindRendererRuntimeHandlers();
 
         updateProgress(15, "Three.js初期化完了");
 
@@ -8381,7 +8496,8 @@
         }
         statsData.loadStartTime = Date.now();
 
-        const headerPointCount = header.numberOfPointRecords ?? points.length;
+        const headerPointCount =
+          header.sourcePointCount ?? header.numberOfPointRecords ?? points.length;
         console.log(`ヘッダー解析成功: ${headerPointCount.toLocaleString()}点`);
 
         if (!headerPointCount || headerPointCount <= 0) {
@@ -8395,8 +8511,9 @@
 
         try {
           statsData.header = header;
-          statsData.originalPoints = headerPointCount;
+          applyPointCountSummary(headerPointCount, points.length);
           statsData.lasVersion = `${header.versionMajor ?? 1}.${header.versionMinor ?? 2}`;
+          statsData.classificationSource = "file";
         } catch (statsError) {
           console.warn("統計情報の更新に失敗（処理続行）:", statsError);
         }
@@ -8950,6 +9067,7 @@
             pointDataOffset: baseHeader?.pointDataOffset ?? 0,
             pointDataRecordLength: pointLength,
             numberOfPointRecords: pointCount,
+            sourcePointCount: pointCount,
             pointDataRecordFormat: pointFormat,
             xScaleFactor: baseHeader?.xScaleFactor ?? 0.01,
             yScaleFactor: baseHeader?.yScaleFactor ?? 0.01,
@@ -9092,7 +9210,7 @@
           if (!isFinite(header.maxZ) && baseHeader?.maxZ !== undefined)
             header.maxZ = baseHeader.maxZ;
 
-          header.numberOfPointRecords = points.length;
+          header.decodedPointCount = points.length;
           lazDebug.stage =
             lazDebug.stage === "completed-partial"
               ? "completed-partial"
@@ -9265,18 +9383,17 @@
             positions[validPointCount * 3 + 1] = y;
             positions[validPointCount * 3 + 2] = z;
 
-            // 高度による色分け（安全な計算）
-            let normalizedZ = 0.5; // デフォルト値
-            if (zRange > 0) {
-              normalizedZ = Math.max(
-                0,
-                Math.min(1, (point.z - header.minZ) / zRange),
-              );
-            }
+            // 高度による色分け（ゼロレンジでも安全）
+            const normalizedZ = normalizeHeightValue(
+              point.z,
+              header.minZ,
+              header.maxZ,
+            );
+            const heightColor = getHeightGradientColor(normalizedZ);
 
-            colors[validPointCount * 3] = normalizedZ;
-            colors[validPointCount * 3 + 1] = 1 - normalizedZ;
-            colors[validPointCount * 3 + 2] = 0.5;
+            colors[validPointCount * 3] = heightColor.r;
+            colors[validPointCount * 3 + 1] = heightColor.g;
+            colors[validPointCount * 3 + 2] = heightColor.b;
 
             // 分類データ（有効点と同じ順序で格納）
             let classification = 1; // デフォルト値（未分類）
@@ -9381,9 +9498,17 @@
 
         // 統計情報更新
         statsData.fileName = filename;
-        statsData.displayPoints = validPointCount; // 有効点数に合わせる
         statsData.header = header;
         statsData.classificationCounts = {};
+        statsData.classificationSource = "file";
+        applyPointCountSummary(
+          header.sourcePointCount ??
+            statsData.originalPoints ??
+            header.numberOfPointRecords ??
+            validPointCount,
+          points.length,
+          validPointCount,
+        );
 
         // 分類統計を集計（有効点のみ）
         for (let i = 0; i < classificationArray.length; i++) {
@@ -9404,13 +9529,12 @@
         );
 
         // 分類データの品質評価（ASPRS標準）
-        const classificationTypes = Object.keys(
+        const qualityAnalysis = buildClassificationStats(
           statsData.classificationCounts,
-        ).length;
-        const unclassifiedCount =
-          (statsData.classificationCounts[0] || 0) +
-          (statsData.classificationCounts[1] || 0);
-        const unclassifiedPercent = (unclassifiedCount / validPointCount) * 100;
+          statsData.displayPoints,
+        );
+        const classificationTypes = qualityAnalysis.types;
+        const unclassifiedPercent = qualityAnalysis.unclassifiedPercent;
 
         console.log(` 分類品質評価:`);
         console.log(`  分類種類数: ${classificationTypes}`);
@@ -10137,10 +10261,7 @@
 
         // 分類モードに切り替える場合、品質チェックを実行（自動分類後はスキップ）
         if (mode === "classification" && colorMode !== "classification") {
-          // 自動分類が実行済みかチェック
-          const hasAutoClassified =
-            statsData.classificationCounts &&
-            Object.keys(statsData.classificationCounts).length > 1;
+          const hasAutoClassified = statsData.classificationSource === "auto";
 
           if (!hasAutoClassified && shouldShowClassificationWarning()) {
             showClassificationWarningModal();
@@ -10218,26 +10339,15 @@
           if (mode === "height") {
             // 実際のデータ範囲を使用した高度による色分け
             const y = positionsData[i + 1]; // 変換後のY座標（高度）
-
-            // Y座標を実際のデータ範囲で正規化
-            const minHeight = 0; // 変換後の最小高度
-            const maxHeight = header.maxZ - header.minZ; // 変換後の高度範囲
-            const normalizedY = Math.max(0, Math.min(1, y / maxHeight));
-
-            // 高度グラデーション：低い=青、中間=緑、高い=赤
-            if (normalizedY < 0.5) {
-              // 低い部分：青から緑
-              const t = normalizedY * 2;
-              colors[i] = 0; // R
-              colors[i + 1] = t; // G
-              colors[i + 2] = 1 - t; // B
-            } else {
-              // 高い部分：緑から赤
-              const t = (normalizedY - 0.5) * 2;
-              colors[i] = t; // R
-              colors[i + 1] = 1 - t; // G
-              colors[i + 2] = 0; // B
-            }
+            const normalizedY = normalizeHeightValue(
+              y,
+              0,
+              header.maxZ - header.minZ,
+            );
+            const heightColor = getHeightGradientColor(normalizedY);
+            colors[i] = heightColor.r;
+            colors[i + 1] = heightColor.g;
+            colors[i + 2] = heightColor.b;
           } else if (mode === "classification") {
             // 分類による色分け
             if (pointCloud.geometry.attributes.classification) {
@@ -10279,12 +10389,9 @@
 
         // 分類表示時の品質警告
         if (mode === "classification" && statsData.classificationCounts) {
-          const classificationTypes = Object.keys(
-            statsData.classificationCounts,
-          ).length;
-          const unclassifiedCount = statsData.classificationCounts[1] || 0;
-          const unclassifiedPercent =
-            (unclassifiedCount / statsData.displayPoints) * 100;
+          const classificationStats = getClassificationStats();
+          const classificationTypes = classificationStats.types;
+          const unclassifiedPercent = classificationStats.unclassifiedPercent;
 
           if (unclassifiedPercent > 90) {
             console.warn(
@@ -10302,6 +10409,7 @@
         unclassifiedPercent,
       ) {
         const btn = document.getElementById("classificationBtn");
+        if (!btn) return;
 
         // 数値型を保証
         const safePercent =
@@ -10341,22 +10449,10 @@
 
       // 分類データの安全な統計取得
       function getClassificationStats() {
-        if (!statsData.classificationCounts || !statsData.displayPoints) {
-          return { types: 0, unclassifiedPercent: 0, isValid: false };
-        }
-
-        const classificationTypes = Object.keys(
+        return buildClassificationStats(
           statsData.classificationCounts,
-        ).length;
-        const unclassifiedCount = statsData.classificationCounts[1] || 0;
-        const unclassifiedPercent =
-          (unclassifiedCount / statsData.displayPoints) * 100;
-
-        return {
-          types: classificationTypes,
-          unclassifiedPercent: unclassifiedPercent,
-          isValid: true,
-        };
+          statsData.displayPoints,
+        );
       }
 
       // 分類警告が必要かどうかを判定
@@ -10448,7 +10544,12 @@
 
         // 統計情報保存
         statsData.classificationCounts = classificationCounts;
-        statsData.displayPoints = totalPoints;
+        statsData.classificationSource = "file";
+        applyPointCountSummary(
+          statsData.originalPoints || totalPoints,
+          totalPoints,
+          totalPoints,
+        );
 
         // コンソール出力
         console.log("分類統計:");
@@ -10494,33 +10595,7 @@
         classificationCounts,
         totalPoints,
       ) {
-        const unclassifiedCount = classificationCounts[1] || 0;
-        const unclassifiedPercent = (unclassifiedCount / totalPoints) * 100;
-        const classificationTypes = Object.keys(classificationCounts).length;
-
-        let quality = "unknown";
-        let recommendedMode = "height";
-
-        if (unclassifiedPercent > 90) {
-          quality = "poor";
-          recommendedMode = "height";
-        } else if (classificationTypes === 1 || unclassifiedPercent > 70) {
-          quality = "limited";
-          recommendedMode = "height";
-        } else if (classificationTypes >= 3 && unclassifiedPercent < 30) {
-          quality = "good";
-          recommendedMode = "classification";
-        } else {
-          quality = "standard";
-          recommendedMode = "height";
-        }
-
-        return {
-          quality,
-          recommendedMode,
-          unclassifiedPercent,
-          classificationTypes,
-        };
+        return buildClassificationStats(classificationCounts, totalPoints);
       }
 
       // 分類UI更新
@@ -10530,7 +10605,7 @@
 
         // 分類ボタンの品質インジケーター更新
         updateClassificationButtonIndicator(
-          qualityAnalysis.classificationTypes,
+          qualityAnalysis.types,
           qualityAnalysis.unclassifiedPercent,
         );
       }
