@@ -1,6 +1,6 @@
 # PointCloudWorkbench 実装リファレンス
 
-更新日時: 2026-03-15 21:33:42 JST
+更新日時: 2026-03-15 21:55:39 JST
 
 ## 1. スコープ
 - 対象: `PointCloudWorkbench.html`（単一ファイル構成）
@@ -62,6 +62,8 @@
 - `FILE_SIZE_THRESHOLDS = { advisory: 100MB, warning: 500MB, critical: 1024MB, maximum: 3072MB }`
 - `FILE_SIZE_LIMITS = { las: 3GB, laz: 2GB }`
 - `FILE_READ_TIMEOUT_POLICY` はサイズ依存で `60秒〜300秒` に拡張
+- `POINT_PARSE_TIMEOUT_POLICY` はサイズ依存で `30秒〜300秒` に拡張
+- `FILE_IO_POLICY` は header 先読込と chunked 読込サイズを定義
 - `SUPPORTED_LANGUAGES = ["ja", "en", "zh"]`
 
 ## 5. 初期化フロー
@@ -80,14 +82,17 @@
 1. `window.startDataLoading()`
 2. `beginLoadSession()`
 3. `loadLASFileActual(file)` または `loadSampleDataActual()`
-4. `readFileAsArrayBuffer()`（実ファイル時）
-5. `buildPointCloudFromArrayBuffer(arrayBuffer, fileName, fileSize)`
-6. `parsePointsFromArrayBuffer()`
-7. `parseLASHeader()` / `parseLASPoints()`（LAS）
-8. `decompressLAZFile()` / `decodeLAZPoint()`（LAZ）
-9. `createPointCloudFromData(points, header, filename)`
-10. `setupPointCloudVisualization()`
-11. `completeLoading()`
+4. `buildPointCloudFromLASFile(file)`（ローカル LAS）
+5. `parseLASHeaderFromFile()` / `parseLASPointsFromFile()`（ローカル LAS）
+6. `buildPointCloudFromLAZFile(file)`（ローカル LAZ）
+7. `readFileIntoWasmHeap()` / `decompressLAZFile()`（ローカル LAZ）
+8. `readFileAsArrayBuffer()` / `buildPointCloudFromArrayBuffer()`（URL 読込や互換経路）
+9. `parsePointsFromArrayBuffer()`
+10. `parseLASHeader()` / `parseLASPoints()`（ArrayBuffer 経路の LAS）
+11. `decodeLAZPoint()`（LAZ）
+12. `createPointCloudFromData(points, header, filename)`
+13. `setupPointCloudVisualization()`
+14. `completeLoading()`
 
 ## 7. LAS/LAZ 実装要点
 
@@ -102,11 +107,17 @@
 - point format に応じて分類値のオフセットを切替
 - タイムアウトとキャンセルは握りつぶさず上位へ伝播
 
-### 7.3 `decompressLAZFile()`
+### 7.3 `parseLASPointsFromFile()`
+- ローカル `LAS` を `slice()` + `FileReader` で chunk 読み込み
+- 巨大 `ArrayBuffer` を作らずに、品質設定に沿って等間隔サンプリング
+- `parseLASHeaderFromFile()` で先頭ヘッダーのみ先読み
+- 進捗更新、キャンセル、サイズ依存タイムアウトを継続
+### 7.4 `decompressLAZFile()`
 - laz-perf の `LASZip` を使った逐次展開
 - `maxPoints` 超過時は `skipRate` で間引き
 - 診断情報を `window.__lazDebug` に保存
 - 圧縮ファイルを WASM 側へ複製するため、LAS より上限を保守的にしている
+- ローカル `LAZ` は `readFileIntoWasmHeap()` で chunk ごとに WASM ヒープへ転送し、JS 全量 `ArrayBuffer` を避ける
 
 ## 8. 点群生成と描画
 
@@ -148,7 +159,8 @@
 - `handleFileSelect()`
 - `updateFileInfo()`
 - `loadLASFileActual()`
-- `readFileAsArrayBuffer()` が FileReader + `abort()` で読み込み中断を扱う
+- `readBlobAsArrayBuffer()` / `readFileAsArrayBuffer()` が FileReader + `abort()` で読み込み中断を扱う
+- `readFileIntoWasmHeap()` が LAZ を chunk ごとに WASM ヒープへ転送する
 - LAS の 3GB超、LAZ の 2GB超 (`maximum`) は `canProceed = false` として読込拒否
 - 比較演算は `>`。LAS の `3GBちょうど`、LAZ の `2GBちょうど` は `critical` で継続可能
 
@@ -215,9 +227,9 @@
 - 表示モード追加時:
 - UIボタン追加、`executeColorModeChange()`、`getModeLabel()`、推奨ロジックを同時更新
 - サイズ基準変更時:
-- `FILE_SIZE_THRESHOLDS` を変更し、他判定ロジックの重複追加はしない
+- `FILE_SIZE_THRESHOLDS` / `FILE_SIZE_LIMITS` を変更し、他判定ロジックの重複追加はしない
 - 読み込み経路追加時:
-- `buildPointCloudFromArrayBuffer()` を共通入口として再利用する
+- ローカルファイルは chunked 経路、URL/互換経路は `buildPointCloudFromArrayBuffer()` を使い分ける
 
 ## 16. 既知の結合ポイント
 - 単一HTMLのため、状態とUIが密結合
