@@ -126,6 +126,7 @@ function createContext() {
 
   const localStorageStore = new Map();
   const windowObject = {
+    __PCW_ENABLE_TEST_API__: true,
     location: {
       href: "http://localhost/",
       reload() {},
@@ -281,22 +282,22 @@ test("load session helpers isolate stale loads", () => {
   const context = createContext();
 
   const hasHelpers = vm.runInContext(
-    'typeof beginLoadSession === "function" && typeof isLoadSessionActive === "function" && typeof clearActiveLoadSession === "function"',
+    'typeof window.__pcwTestApi?.beginLoadSession === "function" && typeof window.__pcwTestApi?.isLoadSessionActive === "function" && typeof window.__pcwTestApi?.clearActiveLoadSession === "function"',
     context,
   );
   expect(hasHelpers).toBe(true);
 
-  const first = vm.runInContext("beginLoadSession()", context);
+  const first = vm.runInContext("window.__pcwTestApi.beginLoadSession()", context);
   expect(first).toBe(1);
-  expect(vm.runInContext("isLoadSessionActive(1)", context)).toBe(true);
+  expect(vm.runInContext("window.__pcwTestApi.isLoadSessionActive(1)", context)).toBe(true);
 
-  const second = vm.runInContext("beginLoadSession()", context);
+  const second = vm.runInContext("window.__pcwTestApi.beginLoadSession()", context);
   expect(second).toBe(2);
-  expect(vm.runInContext("isLoadSessionActive(1)", context)).toBe(false);
-  expect(vm.runInContext("isLoadSessionActive(2)", context)).toBe(true);
+  expect(vm.runInContext("window.__pcwTestApi.isLoadSessionActive(1)", context)).toBe(false);
+  expect(vm.runInContext("window.__pcwTestApi.isLoadSessionActive(2)", context)).toBe(true);
 
-  vm.runInContext("clearActiveLoadSession(2)", context);
-  expect(vm.runInContext("isLoadSessionActive(2)", context)).toBe(false);
+  vm.runInContext("window.__pcwTestApi.clearActiveLoadSession(2)", context);
+  expect(vm.runInContext("window.__pcwTestApi.isLoadSessionActive(2)", context)).toBe(false);
 });
 
 test("parseLASPoints propagates timeout instead of swallowing it", async () => {
@@ -304,8 +305,10 @@ test("parseLASPoints propagates timeout instead of swallowing it", async () => {
 
   vm.runInContext(
     `
-      workflowState.selectedQuality = "low";
-      beginLoadSession();
+      window.__pcwTestApi.setWorkflowState({
+        selectedQuality: "low",
+      });
+      window.__pcwTestApi.beginLoadSession();
       __now = 0;
       Date.now = () => {
         __now += 31000;
@@ -340,7 +343,7 @@ test("parseLASPoints propagates timeout instead of swallowing it", async () => {
   };
 
   await expect(
-    vm.runInContext("parseLASPoints(__buffer, __header, 1)", context),
+    vm.runInContext("window.__pcwTestApi.parseLASPoints(__buffer, __header, 1)", context),
   ).rejects.toThrow(/タイムアウト/);
 });
 
@@ -349,12 +352,14 @@ test("startDataLoading restarts memory monitoring before load", async () => {
 
   vm.runInContext(
     `
-      workflowState.selectedFile = {
-        name: "test.las",
-        size: 1024,
-        arrayBuffer: async () => new ArrayBuffer(0),
-      };
-      workflowState.selectedQuality = "low";
+      window.__pcwTestApi.setWorkflowState({
+        selectedFile: {
+          name: "test.las",
+          size: 1024,
+          arrayBuffer: async () => new ArrayBuffer(0),
+        },
+        selectedQuality: "low",
+      });
       scene = {};
       memoryMonitor.startMonitoring = () => {
         globalThis.__memoryMonitorStartCalls =
@@ -379,11 +384,86 @@ test("startDataLoading restarts memory monitoring before load", async () => {
   expect(context.__memoryMonitorStartCalls).toBe(1);
 });
 
+test("experimental size limit accepts up to 3GB and rejects above it", () => {
+  const context = createContext();
+
+  context.__twoPointFiveGb = { size: Math.floor(2.5 * 1024 * 1024 * 1024) };
+  context.__threeGb = { size: 3 * 1024 * 1024 * 1024 };
+  context.__overThreeGb = { size: 3 * 1024 * 1024 * 1024 + 1 };
+
+  const critical = vm.runInContext(
+    "window.__pcwTestApi.checkFileSizeLimits(__twoPointFiveGb)",
+    context,
+  );
+  const boundary = vm.runInContext(
+    "window.__pcwTestApi.checkFileSizeLimits(__threeGb)",
+    context,
+  );
+  const over = vm.runInContext(
+    "window.__pcwTestApi.checkFileSizeLimits(__overThreeGb)",
+    context,
+  );
+
+  expect(critical.canProceed).toBe(true);
+  expect(critical.level).toBe("critical");
+  expect(boundary.canProceed).toBe(true);
+  expect(boundary.level).toBe("critical");
+  expect(over.canProceed).toBe(false);
+  expect(over.level).toBe("maximum");
+});
+
+test("startDataLoading ignores stale completion after cancellation", async () => {
+  const context = createContext();
+
+  vm.runInContext(
+    `
+      const file = {
+        name: "test.las",
+        size: 1024,
+        arrayBuffer: async () => new ArrayBuffer(0),
+      };
+      window.__pcwTestApi.setWorkflowState({
+        selectedFile: file,
+        selectedQuality: "low",
+      });
+      scene = {};
+      clearPointCloud = () => {};
+      updateRightPanelVisibility = () => {};
+      updateLoadingInfo = () => {};
+      focusPrimaryAction = () => {};
+      updateProgress = () => {};
+      __resolveLoad = null;
+      loadLASFileActual = async () => {
+        await new Promise((resolve) => {
+          __resolveLoad = resolve;
+        });
+      };
+      completeLoading = () => {
+        globalThis.__completeLoadingCalls =
+          (globalThis.__completeLoadingCalls || 0) + 1;
+      };
+      showToast = () => {};
+      document.getElementById = () => ({
+        classList: { add() {}, remove() {} },
+        style: {},
+      });
+    `,
+    context,
+  );
+
+  const loadPromise = vm.runInContext("window.startDataLoading()", context);
+  vm.runInContext("window.cancelLoading()", context);
+  vm.runInContext("__resolveLoad()", context);
+  await loadPromise;
+
+  expect(context.__completeLoadingCalls || 0).toBe(0);
+});
+
 test("getFileReadTimeoutMs scales with file size and caps for very large files", () => {
   const context = createContext();
 
   const hasHelper = vm.runInContext(
-    'typeof getFileReadTimeoutMs === "function"',
+    'typeof window.__pcwTestApi?.getFileReadTimeoutMs === "function"',
     context,
   );
   expect(hasHelper).toBe(true);
@@ -392,9 +472,9 @@ test("getFileReadTimeoutMs scales with file size and caps for very large files",
   context.__mediumFile = { size: 700 * 1024 * 1024 };
   context.__largeFile = { size: 2 * 1024 * 1024 * 1024 };
 
-  const small = vm.runInContext("getFileReadTimeoutMs(__smallFile)", context);
-  const medium = vm.runInContext("getFileReadTimeoutMs(__mediumFile)", context);
-  const large = vm.runInContext("getFileReadTimeoutMs(__largeFile)", context);
+  const small = vm.runInContext("window.__pcwTestApi.getFileReadTimeoutMs(__smallFile)", context);
+  const medium = vm.runInContext("window.__pcwTestApi.getFileReadTimeoutMs(__mediumFile)", context);
+  const large = vm.runInContext("window.__pcwTestApi.getFileReadTimeoutMs(__largeFile)", context);
 
   expect(small).toBe(60000);
   expect(medium).toBeGreaterThan(small);
