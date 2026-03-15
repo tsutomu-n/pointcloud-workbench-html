@@ -413,6 +413,42 @@ test("experimental size limit accepts up to 3GB and rejects above it", () => {
   expect(over.level).toBe("maximum");
 });
 
+test("LAZ keeps a stricter ceiling than LAS", () => {
+  const context = createContext();
+
+  context.__lasBoundary = {
+    name: "scan.las",
+    size: 3 * 1024 * 1024 * 1024,
+  };
+  context.__lazBoundary = {
+    name: "scan.laz",
+    size: 2 * 1024 * 1024 * 1024,
+  };
+  context.__lazOver = {
+    name: "scan.laz",
+    size: 2 * 1024 * 1024 * 1024 + 1,
+  };
+
+  const lasBoundary = vm.runInContext(
+    "window.__pcwTestApi.checkFileSizeLimits(__lasBoundary)",
+    context,
+  );
+  const lazBoundary = vm.runInContext(
+    "window.__pcwTestApi.checkFileSizeLimits(__lazBoundary)",
+    context,
+  );
+  const lazOver = vm.runInContext(
+    "window.__pcwTestApi.checkFileSizeLimits(__lazOver)",
+    context,
+  );
+
+  expect(lasBoundary.canProceed).toBe(true);
+  expect(lazBoundary.canProceed).toBe(true);
+  expect(lazBoundary.level).toBe("critical");
+  expect(lazOver.canProceed).toBe(false);
+  expect(lazOver.level).toBe("maximum");
+});
+
 test("startDataLoading ignores stale completion after cancellation", async () => {
   const context = createContext();
 
@@ -481,4 +517,53 @@ test("getFileReadTimeoutMs scales with file size and caps for very large files",
   expect(medium).toBeGreaterThan(small);
   expect(large).toBeGreaterThanOrEqual(medium);
   expect(large).toBeLessThanOrEqual(300000);
+});
+
+test("cancelLoading aborts an active FileReader read", async () => {
+  const context = createContext();
+
+  const deferredTimers = [];
+  const noOpTimer = () => deferredTimers.length;
+  context.setTimeout = noOpTimer;
+  context.clearTimeout = () => {};
+  context.window.setTimeout = noOpTimer;
+  context.window.clearTimeout = () => {};
+
+  class MockFileReader {
+    constructor() {
+      this.readyState = 0;
+      this.result = null;
+      this.error = null;
+    }
+
+    readAsArrayBuffer() {
+      this.readyState = 1;
+      context.__readerStarted = (context.__readerStarted || 0) + 1;
+    }
+
+    abort() {
+      this.readyState = 2;
+      context.__readerAbortCalls = (context.__readerAbortCalls || 0) + 1;
+      if (typeof this.onabort === "function") {
+        this.onabort();
+      }
+    }
+  }
+
+  context.FileReader = MockFileReader;
+  context.window.FileReader = MockFileReader;
+  context.__file = { name: "scan.las", size: 1024 };
+
+  vm.runInContext("window.__pcwTestApi.beginLoadSession()", context);
+
+  const readPromise = vm.runInContext(
+    "window.__pcwTestApi.readFileAsArrayBuffer(__file)",
+    context,
+  );
+
+  vm.runInContext("window.cancelLoading()", context);
+
+  await expect(readPromise).rejects.toThrow(/__CANCELLED__/);
+  expect(context.__readerStarted).toBe(1);
+  expect(context.__readerAbortCalls).toBe(1);
 });
