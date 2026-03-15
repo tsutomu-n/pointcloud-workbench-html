@@ -3472,6 +3472,14 @@
                 <span class="metric-label">表示点数</span>
                 <span id="estimatedSampling">計算中...</span>
               </div>
+              <div>
+                <span class="metric-label">読込経路</span>
+                <span id="estimatedLoadPath">計算中...</span>
+              </div>
+              <div>
+                <span class="metric-label">危険度</span>
+                <span id="estimatedRisk">計算中...</span>
+              </div>
             </div>
             <div id="qualityRecommendationReason" aria-live="polite">
               推奨品質の根拠を計算中...
@@ -4376,6 +4384,14 @@
                 <div class="stats-item">
                   選択品質:
                   <span class="stats-value" id="selectedQuality">-</span>
+                </div>
+                <div class="stats-item">
+                  読込経路:
+                  <span class="stats-value" id="loadStrategy">-</span>
+                </div>
+                <div class="stats-item">
+                  ピークRAM推定:
+                  <span class="stats-value" id="estimatedPeakMemory">-</span>
                 </div>
               </div>
               <div class="stats-tile">
@@ -5601,6 +5617,7 @@
         statsData.originalPoints = summary.sourceCount;
         statsData.decodedPoints = summary.decodedCount;
         statsData.displayPoints = summary.displayCount;
+        statsData.displayRatio = summary.displayRatio;
         return summary;
       }
 
@@ -7421,6 +7438,9 @@
 
         if (!settings || !file) return;
 
+        const previewHeader = workflowState.previewHeader;
+        const profile = buildLoadProfile(file, quality, previewHeader);
+
         // ファイルサイズに基づく補正
         const sizeFactor = file.isSample
           ? 0.1
@@ -7429,13 +7449,12 @@
           settings.loadTimeSeconds * sizeFactor,
           1,
         );
-        const adjustedMemory = Math.max(settings.memoryMB * sizeFactor, 20);
 
         // 推定値表示更新
         document.getElementById("estimatedTime").textContent =
           `約${Math.round(adjustedLoadTime)}秒`;
         document.getElementById("estimatedMemory").textContent =
-          `約${Math.round(adjustedMemory)}MB`;
+          `約${formatEstimatedMemoryMB(profile.estimatedPeakMemoryMB)}`;
 
         // FPS推定（性能に基づく）
         let estimatedFPS = 60;
@@ -7455,16 +7474,23 @@
         document.getElementById("estimatedFPS").textContent =
           `約${estimatedFPS}FPS`;
 
-        // サンプリングレート表示（ヘッダー解析済みの場合）
         const samplingEl = document.getElementById("estimatedSampling");
-        if (samplingEl && statsData && statsData.header && statsData.header.numberOfPointRecords > 0) {
-          const totalPts = statsData.header.numberOfPointRecords;
-          const displayPts = settings.maxPoints;
-          const rate = Math.min(100, (displayPts / totalPts * 100));
-          samplingEl.textContent = `${rate < 1 ? rate.toFixed(2) : Math.round(rate)}%（${Math.min(displayPts, totalPts).toLocaleString()}点 / ${totalPts.toLocaleString()}点）`;
-          samplingEl.closest('.estimated-info-row') && (samplingEl.closest('.estimated-info-row').style.display = '');
+        if (samplingEl && profile.totalPoints) {
+          samplingEl.textContent =
+            `${formatPercentage(profile.displayRatioPercent)}%（${profile.displayPoints.toLocaleString()}点 / ${profile.totalPoints.toLocaleString()}点）`;
         } else if (samplingEl) {
           samplingEl.textContent = `最大 ${settings.maxPoints.toLocaleString()}点`;
+        }
+
+        const loadPathEl = document.getElementById("estimatedLoadPath");
+        if (loadPathEl) {
+          loadPathEl.textContent = profile.strategyLabel;
+        }
+
+        const riskEl = document.getElementById("estimatedRisk");
+        if (riskEl) {
+          riskEl.textContent =
+            `危険度 ${profile.riskLabel} / 推定ピークRAM 約${formatEstimatedMemoryMB(profile.estimatedPeakMemoryMB)}`;
         }
       }
 
@@ -7632,6 +7658,7 @@
           abortActiveFileRead();
           clearActiveLoadSession();
           window._loadingCancelled = false;
+          clearSelectedFilePreview();
           workflowState.step = "file-select";
           workflowState.selectedFile = null;
           workflowState.selectedQuality = DEFAULT_QUALITY;
@@ -8832,6 +8859,14 @@
           statsData.fileSize = fileSize;
         }
         statsData.loadStartTime = Date.now();
+        const profile = buildLoadProfile(
+          workflowState.selectedFile || {
+            name: resolvedName,
+            size: typeof fileSize === "number" ? fileSize : statsData.fileSize,
+          },
+          workflowState.selectedQuality,
+          header,
+        );
 
         const headerPointCount =
           header.sourcePointCount ?? header.numberOfPointRecords ?? points.length;
@@ -8851,6 +8886,9 @@
           applyPointCountSummary(headerPointCount, points.length);
           statsData.lasVersion = `${header.versionMajor ?? 1}.${header.versionMinor ?? 2}`;
           statsData.classificationSource = "file";
+          statsData.loadStrategy = profile.strategyLabel;
+          statsData.estimatedPeakMemoryMB = profile.estimatedPeakMemoryMB;
+          statsData.loadRiskLevel = profile.riskLevel;
         } catch (statsError) {
           console.warn("統計情報の更新に失敗（処理続行）:", statsError);
         }
@@ -9891,10 +9929,7 @@
         }
 
         // 分類ボタンの品質インジケーター更新
-        updateClassificationButtonIndicator(
-          classificationTypes,
-          unclassifiedPercent,
-        );
+        updateClassificationButtonIndicator(qualityAnalysis);
 
         // 既存の点群を完全に削除（メモリリーク対策強化）
         if (pointCloud) {
@@ -10108,8 +10143,12 @@
               }
             }
 
-            statsData.displayPoints = targetCount;
             statsData.classificationCounts = nextCounts;
+            applyPointCountSummary(
+              statsData.originalPoints || currentCount,
+              statsData.decodedPoints || currentCount,
+              targetCount,
+            );
           }
 
           const loadedPointsEl = document.getElementById("loadedPoints");
@@ -10123,14 +10162,11 @@
             typeof updateClassificationButtonIndicator === "function" &&
             document.getElementById("classificationBtn")
           ) {
-            const classificationTypes = Object.keys(
-              statsData.classificationCounts,
-            ).length;
-            const unclassifiedPercent =
-              ((statsData.classificationCounts[1] || 0) / targetCount) * 100;
             updateClassificationButtonIndicator(
-              classificationTypes,
-              unclassifiedPercent,
+              buildClassificationStats(
+                statsData.classificationCounts,
+                statsData.displayPoints,
+              ),
             );
           }
 
@@ -10397,8 +10433,20 @@
 
           // 読み込み完了トースト
           const loadedFile = workflowState.selectedFile;
-          const ptsNum = statsData && statsData.displayPoints > 0 ? statsData.displayPoints : 0;
-          const ptsText = ptsNum > 0 ? `（${ptsNum.toLocaleString()}点）` : '';
+          const ptsNum = statsData && statsData.displayPoints > 0
+            ? statsData.displayPoints
+            : 0;
+          const sourcePtsNum = statsData && statsData.originalPoints > 0
+            ? statsData.originalPoints
+            : 0;
+          let ptsText = "";
+          if (ptsNum > 0 && sourcePtsNum > ptsNum) {
+            const ratio = (ptsNum / sourcePtsNum) * 100;
+            ptsText =
+              `（${ptsNum.toLocaleString()}点 / ${sourcePtsNum.toLocaleString()}点, ${formatPercentage(ratio)}%）`;
+          } else if (ptsNum > 0) {
+            ptsText = `（${ptsNum.toLocaleString()}点）`;
+          }
           const fname = loadedFile ? (loadedFile.name || loadedFile.fileName || '') : '';
           showToast(`${fname ? fname + ' ' : ''}読み込み完了${ptsText}`, 'success');
 
@@ -10741,18 +10789,16 @@
       }
 
       // 分類ボタン品質インジケーター更新
-      function updateClassificationButtonIndicator(
-        classificationTypes,
-        unclassifiedPercent,
-      ) {
+      function updateClassificationButtonIndicator(classificationStats) {
         const btn = document.getElementById("classificationBtn");
         if (!btn) return;
-
-        // 数値型を保証
-        const safePercent =
-          typeof unclassifiedPercent === "number" ? unclassifiedPercent : 0;
-        const safeTypes =
-          typeof classificationTypes === "number" ? classificationTypes : 0;
+        const stats = classificationStats?.isValid
+          ? classificationStats
+          : buildClassificationStats(
+              statsData.classificationCounts,
+              statsData.displayPoints,
+            );
+        const presentation = getClassificationQualityPresentation(stats);
 
         // 既存の品質クラスを削除
         btn.classList.remove(
@@ -10761,27 +10807,13 @@
           "classification-good",
         );
 
-        let qualityClass = "";
-
-        if (safePercent > 90) {
-          // 90%以上が未分類：エラー状態
-          qualityClass = "classification-error";
-        } else if (safeTypes === 1 || safePercent > 70) {
-          // 単一分類または70%以上未分類：警告状態
-          qualityClass = "classification-warning";
-        } else if (safeTypes >= 3 && safePercent < 30) {
-          // 3種類以上かつ未分類30%未満：良好状態
-          qualityClass = "classification-good";
-        } else {
-          // 中間状態：標準
-          qualityClass = "";
-        }
-
         // スタイルとテキスト更新
-        if (qualityClass) {
-          btn.classList.add(qualityClass);
+        if (presentation.buttonClass) {
+          btn.classList.add(presentation.buttonClass);
         }
-        console.log(`分類ボタン更新: ${qualityClass || "standard"}`);
+        console.log(
+          `分類ボタン更新: ${presentation.buttonClass || "standard"}`,
+        );
       }
 
       // 分類データの安全な統計取得
@@ -10941,10 +10973,7 @@
         updateStatsDisplay();
 
         // 分類ボタンの品質インジケーター更新
-        updateClassificationButtonIndicator(
-          qualityAnalysis.types,
-          qualityAnalysis.unclassifiedPercent,
-        );
+        updateClassificationButtonIndicator(qualityAnalysis);
       }
 
       // 分類凡例パネル機能
@@ -12668,8 +12697,12 @@
         if (classified.building > 0)
           statsData.classificationCounts[6] = classified.building;
 
-        // displayPointsも更新（重要！）
-        statsData.displayPoints = total;
+        statsData.classificationSource = "auto";
+        applyPointCountSummary(
+          statsData.originalPoints || total,
+          statsData.decodedPoints || total,
+          total,
+        );
 
         // 統計表示を更新
         if (typeof updateStatsDisplay === "function") {
@@ -12682,10 +12715,12 @@
         }
 
         // 分類品質の再評価
-        const classificationTypes = Object.keys(
+        const qualityAnalysis = buildClassificationStats(
           statsData.classificationCounts,
-        ).length;
-        const unclassifiedPercent = (classified.unclassified / total) * 100;
+          statsData.displayPoints,
+        );
+        const classificationTypes = qualityAnalysis.types;
+        const unclassifiedPercent = qualityAnalysis.unclassifiedPercent;
 
         console.log(
           `分類品質: 種類数=${classificationTypes}, 未分類率=${unclassifiedPercent.toFixed(1)}%`,
@@ -12695,20 +12730,6 @@
           statsData.classificationCounts,
         );
         console.log("statsData.displayPoints:", statsData.displayPoints);
-
-        // 分類品質評価と UI更新
-        const qualityAnalysis = {
-          unclassifiedPercent: unclassifiedPercent,
-          classificationTypes: classificationTypes,
-          quality:
-            unclassifiedPercent < 10
-              ? "good"
-              : unclassifiedPercent < 50
-                ? "moderate"
-                : "poor",
-          recommendedMode:
-            classificationTypes > 1 ? "classification" : "height",
-        };
 
         // 分類UIを更新（品質インジケーター含む）
         if (typeof updateClassificationUI === "function") {
@@ -12722,7 +12743,10 @@
         window.refreshClassificationStats();
 
         // 分類モードを推奨
-        if (colorMode !== "classification" && classificationTypes > 1) {
+        if (
+          colorMode !== "classification" &&
+          qualityAnalysis.recommendedMode === "classification"
+        ) {
           // 分類完了トーストで色切替を提案
           showToast('分類完了—「種類で色分け」ボタンで色切替できます', 'info');
         }
@@ -13832,6 +13856,13 @@
 
         const loadTime = Date.now() - statsData.loadStartTime;
         const processTime = Date.now() - statsData.processStartTime;
+        const header = statsData.header;
+        const pointSummary = buildPointCountSummary(
+          statsData.originalPoints,
+          statsData.displayPoints,
+          statsData.decodedPoints || statsData.displayPoints,
+        );
+        const selectedQuality = getQualityConfig(workflowState.selectedQuality);
 
         // ファイル情報
         document.getElementById("fileName").textContent = statsData.fileName;
@@ -13841,36 +13872,63 @@
         document.getElementById("lasVersion").textContent =
           statsData.lasVersion;
         document.getElementById("selectedQuality").textContent =
-          qualitySettings[workflowState.selectedQuality].label;
+          selectedQuality.label;
+        const loadStrategyEl = document.getElementById("loadStrategy");
+        if (loadStrategyEl) {
+          loadStrategyEl.textContent = statsData.loadStrategy || "-";
+        }
+        const estimatedPeakMemoryEl =
+          document.getElementById("estimatedPeakMemory");
+        if (estimatedPeakMemoryEl) {
+          estimatedPeakMemoryEl.textContent = statsData.estimatedPeakMemoryMB
+            ? `約${formatEstimatedMemoryMB(statsData.estimatedPeakMemoryMB)}`
+            : "-";
+        }
 
         // 点群統計
         document.getElementById("originalPoints").textContent =
-          statsData.originalPoints.toLocaleString();
+          pointSummary.sourceCount.toLocaleString();
         document.getElementById("displayPoints").textContent =
-          statsData.displayPoints.toLocaleString();
-        const ratio = (
-          (statsData.displayPoints / statsData.originalPoints) *
-          100
-        ).toFixed(1);
-        document.getElementById("displayRatio").textContent = ratio + "%";
+          pointSummary.displayCount.toLocaleString();
+        document.getElementById("displayRatio").textContent =
+          `${formatPercentage(pointSummary.displayRatio, 1)}%`;
 
         // 座標範囲
-        const header = statsData.header;
-        const xRange = (header.maxX - header.minX).toFixed(2);
-        const yRange = (header.maxY - header.minY).toFixed(2);
-        const zRange = (header.maxZ - header.minZ).toFixed(2);
+        const xRangeValue = Math.max(
+          0,
+          Number(header.maxX) - Number(header.minX),
+        );
+        const yRangeValue = Math.max(
+          0,
+          Number(header.maxY) - Number(header.minY),
+        );
+        const zRangeValue = Math.max(
+          0,
+          Number(header.maxZ) - Number(header.minZ),
+        );
+        const xRange = xRangeValue.toFixed(2);
+        const yRange = yRangeValue.toFixed(2);
+        const zRange = zRangeValue.toFixed(2);
 
         document.getElementById("xRange").textContent = xRange + "m";
         document.getElementById("yRange").textContent = yRange + "m";
         document.getElementById("zRange").textContent = zRange + "m";
 
         // 対象面積計算
-        const area = (xRange * yRange).toFixed(0);
-        document.getElementById("targetArea").textContent = area + "m²";
+        const areaSquareMeters = calculateAreaSquareMeters(
+          xRangeValue,
+          yRangeValue,
+        );
+        document.getElementById("targetArea").textContent =
+          areaSquareMeters > 0 ? areaSquareMeters.toFixed(0) + "m²" : "0m²";
 
         // 点密度計算
-        const density = (statsData.displayPoints / parseFloat(area)).toFixed(0);
-        document.getElementById("pointDensity").textContent = density + "点/m²";
+        const density = calculatePointDensity(
+          pointSummary.displayCount,
+          areaSquareMeters,
+        );
+        document.getElementById("pointDensity").textContent =
+          density === null ? "-" : density.toFixed(0) + "点/m²";
 
         // 分類統計（ASPRS標準に基づく）
         let groundCount = 0,
@@ -13900,17 +13958,13 @@
         console.log(`  その他: ${otherCount}点`);
 
         document.getElementById("groundPoints").textContent =
-          groundCount.toLocaleString() +
-          ` (${((groundCount / statsData.displayPoints) * 100).toFixed(1)}%)`;
+          formatCountWithPercent(groundCount, pointSummary.displayCount);
         document.getElementById("vegetationPoints").textContent =
-          vegetationCount.toLocaleString() +
-          ` (${((vegetationCount / statsData.displayPoints) * 100).toFixed(1)}%)`;
+          formatCountWithPercent(vegetationCount, pointSummary.displayCount);
         document.getElementById("waterPoints").textContent =
-          waterCount.toLocaleString() +
-          ` (${((waterCount / statsData.displayPoints) * 100).toFixed(1)}%)`;
+          formatCountWithPercent(waterCount, pointSummary.displayCount);
         document.getElementById("otherPoints").textContent =
-          otherCount.toLocaleString() +
-          ` (${((otherCount / statsData.displayPoints) * 100).toFixed(1)}%)`;
+          formatCountWithPercent(otherCount, pointSummary.displayCount);
 
         // 分類品質情報更新
         updateClassificationQualityDisplay();
@@ -13927,29 +13981,7 @@
       function updateClassificationQualityDisplay() {
         const stats = getClassificationStats();
         if (!stats.isValid) return;
-
-        // 分類品質判定
-        let qualityLevel = "";
-        let qualityText = "";
-        let recommendedModeText = "";
-
-        if (stats.unclassifiedPercent > 90) {
-          qualityLevel = "error";
-          qualityText = "不良";
-          recommendedModeText = "標高で色分け";
-        } else if (stats.types === 1 || stats.unclassifiedPercent > 70) {
-          qualityLevel = "warning";
-          qualityText = "限定的";
-          recommendedModeText = "標高で色分け";
-        } else if (stats.types >= 3 && stats.unclassifiedPercent < 30) {
-          qualityLevel = "good";
-          qualityText = "良好";
-          recommendedModeText = "種類で色分け";
-        } else {
-          qualityLevel = "";
-          qualityText = "標準";
-          recommendedModeText = "標高で色分け";
-        }
+        const presentation = getClassificationQualityPresentation(stats);
 
         // 値を更新
         document.getElementById("classificationTypes").textContent =
@@ -13957,11 +13989,12 @@
         document.getElementById("unclassifiedPercent").textContent =
           stats.unclassifiedPercent.toFixed(1) + "%";
         document.getElementById("recommendedMode").textContent =
-          recommendedModeText;
+          presentation.recommendedModeText;
 
         // 品質評価を色付きインジケーターで表示
         const qualityElement = document.getElementById("classificationQuality");
-        qualityElement.innerHTML = `${qualityText}<span class="quality-indicator ${qualityLevel}">${qualityText.toUpperCase()}</span>`;
+        qualityElement.innerHTML =
+          `${presentation.qualityText}<span class="quality-indicator ${presentation.indicatorClass}">${presentation.qualityText.toUpperCase()}</span>`;
 
         // セクション全体のスタイル更新
         const section = document.getElementById("classificationQualitySection");
@@ -13970,12 +14003,12 @@
           "quality-warning",
           "quality-error",
         );
-        if (qualityLevel) {
-          section.classList.add(`quality-${qualityLevel}`);
+        if (presentation.indicatorClass) {
+          section.classList.add(`quality-${presentation.indicatorClass}`);
         }
 
         console.log(
-          `分類品質表示更新: ${qualityLevel || "standard"} - 種類${stats.types}, 未分類${stats.unclassifiedPercent.toFixed(1)}%`,
+          `分類品質表示更新: ${presentation.indicatorClass || "standard"} - 種類${stats.types}, 未分類${stats.unclassifiedPercent.toFixed(1)}%`,
         );
       }
 
@@ -14007,11 +14040,10 @@
       // パネル閉じる
       function hideAllPanels() {
         const panel = document.getElementById("statsPanel");
-        const button = document.getElementById("statsToggle");
-
-        panel.classList.remove("visible");
-        button.textContent = "統計情報";
-        statsVisible = false;
+        if (panel) {
+          panel.classList.remove("visible");
+        }
+        resetStatsToggleState();
       }
 
       // 点サイズ更新
@@ -14156,23 +14188,17 @@
 
           // Stop monitoring
           memoryMonitor.stopMonitoring();
+          if (performanceMonitor) {
+            performanceMonitor.disable();
+          }
           abortActiveFileRead();
 
           // Clean up event listeners
           cleanupEventListeners();
 
-          // Dispose Three.js objects
-          if (renderer) {
-            renderer.dispose();
-          }
-
-          if (pointCloud && pointCloud.geometry) {
-            pointCloud.geometry.dispose();
-          }
-
-          if (pointCloud && pointCloud.material) {
-            pointCloud.material.dispose();
-          }
+          // Dispose Three.js objects and handlers
+          clearPointCloud();
+          disposeRendererRuntime();
 
           console.log("クリーンアップ完了");
         } catch (error) {
@@ -14196,10 +14222,18 @@
           },
           parseLASPoints,
           parseLASPointsFromFile,
+          analyzeSelectedFilePreview,
           checkFileSizeLimits,
+          buildLoadProfile,
           getFileReadTimeoutMs,
+          getClassificationStats,
+          hideAllPanels,
+          initThreeJS,
+          normalizeHeightValue,
           readFileAsArrayBuffer,
           readFileIntoWasmHeap,
+          decompressLAZFile,
+          updateEstimations,
         };
       }
 
