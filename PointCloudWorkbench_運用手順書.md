@@ -1,9 +1,9 @@
-# MonoPoint3D 運用手順書
+# PointCloudWorkbench 運用手順書
 
 更新日時: 2026-03-02 11:44:07 JST
 
 ## 1. 目的
-- 対象: `MonoPoint3D.html` の日常運用を担当する利用者、運用担当、検証担当
+- 対象: `PointCloudWorkbench.html` の日常運用を担当する利用者、運用担当、検証担当
 - 目的: 安定運用のための標準操作、警告時の対応、確認観点を明確化する
 
 ## 2. 前提環境
@@ -13,7 +13,7 @@
 - 画面上の上限表示: 最大 2GB
 
 ## 3. 起動手順
-1. `MonoPoint3D.html` をブラウザで開く
+1. `PointCloudWorkbench.html` をブラウザで開く
 2. 初期画面で「ファイル選択」パネルが表示されることを確認する
 3. 必要に応じて右上の言語セレクタ（日本語/English/中文）を選択する
 4. 言語セレクタは `lang` 属性と保存値のみを切替える機能であり、UI文言の自動翻訳は行われないことを理解する
@@ -105,27 +105,27 @@
 
 | 関数 | 行番号リンク | 参照用途 |
 |---|---|---|
-| `loadSampleData` | [MonoPoint3D.html#L6511](MonoPoint3D.html#L6511) | サンプルデータ選択 |
-| `proceedToQualitySelection` | [MonoPoint3D.html#L6570](MonoPoint3D.html#L6570) | 品質設定画面への遷移 |
-| `applyQualitySelection` | [MonoPoint3D.html#L6640](MonoPoint3D.html#L6640) | 品質選択反映 |
-| `startDataLoading` | [MonoPoint3D.html#L6938](MonoPoint3D.html#L6938) | 読み込み開始 |
-| `cancelLoading` | [MonoPoint3D.html#L7061](MonoPoint3D.html#L7061) | 読み込みキャンセル |
-| `loadLASFileActual` | [MonoPoint3D.html#L7315](MonoPoint3D.html#L7315) | 実ファイル読み込み本体 |
-| `completeLoading` | [MonoPoint3D.html#L9140](MonoPoint3D.html#L9140) | 読み込み完了遷移 |
-| `goBackToFileSelect` | [MonoPoint3D.html#L6738](MonoPoint3D.html#L6738) | ファイル選択に戻る |
-| `goHome` | [MonoPoint3D.html#L6923](MonoPoint3D.html#L6923) | ホーム復帰 |
-| `set2DView` | [MonoPoint3D.html#L9096](MonoPoint3D.html#L9096) | 2D表示切替 |
-| `exit2DView` | [MonoPoint3D.html#L9105](MonoPoint3D.html#L9105) | 3D表示へ復帰 |
-| `setColorMode` | [MonoPoint3D.html#L9351](MonoPoint3D.html#L9351) | 色分けモード切替 |
-| `toggleLegendPanel` | [MonoPoint3D.html#L9755](MonoPoint3D.html#L9755) | 凡例表示切替（開発者コンソール/API向け） |
-| `toggleSlicing` | [MonoPoint3D.html#L10083](MonoPoint3D.html#L10083) | スライス表示開始/停止 |
-| `show2DSliceView` | [MonoPoint3D.html#L10659](MonoPoint3D.html#L10659) | 2D断面表示 |
-| `resetSlicing` | [MonoPoint3D.html#L10635](MonoPoint3D.html#L10635) | スライス設定リセット |
-| `toggleCADMode` | [MonoPoint3D.html#L10412](MonoPoint3D.html#L10412) | CADモード切替 |
-| `autoClassify` | [MonoPoint3D.html#L11535](MonoPoint3D.html#L11535) | 自動分類実行 |
-| `toggleStatsPanel` | [MonoPoint3D.html#L12603](MonoPoint3D.html#L12603) | 統計パネル切替 |
-| `toggleControlsPanel` | [MonoPoint3D.html#L12622](MonoPoint3D.html#L12622) | 制御パネル表示切替 |
-| `performFinalCleanup` | [MonoPoint3D.html#L12957](MonoPoint3D.html#L12957) | 緊急クリーンアップ |
+| `loadSampleData` | [PointCloudWorkbench.html#L6511](PointCloudWorkbench.html#L6511) | サンプルデータ選択 |
+| `proceedToQualitySelection` | [PointCloudWorkbench.html#L6570](PointCloudWorkbench.html#L6570) | 品質設定画面への遷移 |
+| `applyQualitySelection` | [PointCloudWorkbench.html#L6640](PointCloudWorkbench.html#L6640) | 品質選択反映 |
+| `startDataLoading` | [PointCloudWorkbench.html#L6938](PointCloudWorkbench.html#L6938) | 読み込み開始 |
+| `cancelLoading` | [PointCloudWorkbench.html#L7061](PointCloudWorkbench.html#L7061) | 読み込みキャンセル |
+| `loadLASFileActual` | [PointCloudWorkbench.html#L7315](PointCloudWorkbench.html#L7315) | 実ファイル読み込み本体 |
+| `completeLoading` | [PointCloudWorkbench.html#L9140](PointCloudWorkbench.html#L9140) | 読み込み完了遷移 |
+| `goBackToFileSelect` | [PointCloudWorkbench.html#L6738](PointCloudWorkbench.html#L6738) | ファイル選択に戻る |
+| `goHome` | [PointCloudWorkbench.html#L6923](PointCloudWorkbench.html#L6923) | ホーム復帰 |
+| `set2DView` | [PointCloudWorkbench.html#L9096](PointCloudWorkbench.html#L9096) | 2D表示切替 |
+| `exit2DView` | [PointCloudWorkbench.html#L9105](PointCloudWorkbench.html#L9105) | 3D表示へ復帰 |
+| `setColorMode` | [PointCloudWorkbench.html#L9351](PointCloudWorkbench.html#L9351) | 色分けモード切替 |
+| `toggleLegendPanel` | [PointCloudWorkbench.html#L9755](PointCloudWorkbench.html#L9755) | 凡例表示切替（開発者コンソール/API向け） |
+| `toggleSlicing` | [PointCloudWorkbench.html#L10083](PointCloudWorkbench.html#L10083) | スライス表示開始/停止 |
+| `show2DSliceView` | [PointCloudWorkbench.html#L10659](PointCloudWorkbench.html#L10659) | 2D断面表示 |
+| `resetSlicing` | [PointCloudWorkbench.html#L10635](PointCloudWorkbench.html#L10635) | スライス設定リセット |
+| `toggleCADMode` | [PointCloudWorkbench.html#L10412](PointCloudWorkbench.html#L10412) | CADモード切替 |
+| `autoClassify` | [PointCloudWorkbench.html#L11535](PointCloudWorkbench.html#L11535) | 自動分類実行 |
+| `toggleStatsPanel` | [PointCloudWorkbench.html#L12603](PointCloudWorkbench.html#L12603) | 統計パネル切替 |
+| `toggleControlsPanel` | [PointCloudWorkbench.html#L12622](PointCloudWorkbench.html#L12622) | 制御パネル表示切替 |
+| `performFinalCleanup` | [PointCloudWorkbench.html#L12957](PointCloudWorkbench.html#L12957) | 緊急クリーンアップ |
 
 ## 12. ユースケース別ガイド（事実ベース）
 
@@ -193,6 +193,6 @@
 - 3D表示と併用して内部構造を追える
 
 ## 13. 事実確認メモ（誤読防止）
-- 行番号リンクは更新日時時点で検証済み。`MonoPoint3D.html` 更新後は再確認が必要。
+- 行番号リンクは更新日時時点で検証済み。`PointCloudWorkbench.html` 更新後は再確認が必要。
 - `toggleLegendPanel()` は公開APIだが、現状UIから直接押すボタンはない。
 - 読み込み中 `ESC` は `cancelLoading()` として機能するが、`complete` ステップでは別動作（パネル閉じなど）になる。

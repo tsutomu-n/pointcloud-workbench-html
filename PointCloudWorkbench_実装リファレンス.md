@@ -1,13 +1,13 @@
-# MonoPoint3D 実装リファレンス
+# PointCloudWorkbench 実装リファレンス
 
 更新日時: 2026-03-02 11:44:07 JST
 
 ## 1. スコープ
-- 対象: `MonoPoint3D.html`（単一ファイル構成）
+- 対象: `PointCloudWorkbench.html`（単一ファイル構成）
 - 目的: 保守・改修時に、関数群と状態遷移を追跡しやすくする
 
 ### 1.1 誤読防止の前提
-- 本書の行番号リンクは更新日時時点で検証済み。`MonoPoint3D.html` 変更後は再確認が必要。
+- 本書の行番号リンクは更新日時時点で検証済み。`PointCloudWorkbench.html` 変更後は再確認が必要。
 - 言語セレクタは `setAppLanguage()` により `document.documentElement.lang` と `localStorage.viewerLanguage` を更新する。UI文言の動的翻訳機構はない。
 - ファイルサイズ拒否条件は `size > 2GB`。`size === 2GB` は `critical` 扱いで継続可能。
 
@@ -229,80 +229,80 @@
 
 | 関数/クラス | 行番号リンク | 役割 |
 |---|---|---|
-| `ErrorTracker` | [MonoPoint3D.html#L4482](MonoPoint3D.html#L4482) | グローバル例外収集と表示 |
-| `MemoryMonitor` | [MonoPoint3D.html#L4753](MonoPoint3D.html#L4753) | メモリ圧監視と自動最適化 |
-| `PerformanceMonitor` | [MonoPoint3D.html#L4929](MonoPoint3D.html#L4929) | FPS監視と性能劣化対応 |
-| `CompatibilityChecker` | [MonoPoint3D.html#L5157](MonoPoint3D.html#L5157) | ブラウザ機能互換チェック |
-| `init` | [MonoPoint3D.html#L5512](MonoPoint3D.html#L5512) | 全体初期化エントリ |
-| `safeInitializeComponents` | [MonoPoint3D.html#L5533](MonoPoint3D.html#L5533) | 初期化タスクの順次実行 |
-| `setupEventListeners` | [MonoPoint3D.html#L5770](MonoPoint3D.html#L5770) | UI/キー/離脱イベント登録 |
-| `cleanupEventListeners` | [MonoPoint3D.html#L6049](MonoPoint3D.html#L6049) | 登録済みイベント一括解除 |
-| `setAppLanguage` | [MonoPoint3D.html#L5452](MonoPoint3D.html#L5452) | 表示言語反映と保存 |
-| `initializeLanguagePreference` | [MonoPoint3D.html#L5470](MonoPoint3D.html#L5470) | 言語設定の復元 |
+| `ErrorTracker` | [PointCloudWorkbench.html#L4482](PointCloudWorkbench.html#L4482) | グローバル例外収集と表示 |
+| `MemoryMonitor` | [PointCloudWorkbench.html#L4753](PointCloudWorkbench.html#L4753) | メモリ圧監視と自動最適化 |
+| `PerformanceMonitor` | [PointCloudWorkbench.html#L4929](PointCloudWorkbench.html#L4929) | FPS監視と性能劣化対応 |
+| `CompatibilityChecker` | [PointCloudWorkbench.html#L5157](PointCloudWorkbench.html#L5157) | ブラウザ機能互換チェック |
+| `init` | [PointCloudWorkbench.html#L5512](PointCloudWorkbench.html#L5512) | 全体初期化エントリ |
+| `safeInitializeComponents` | [PointCloudWorkbench.html#L5533](PointCloudWorkbench.html#L5533) | 初期化タスクの順次実行 |
+| `setupEventListeners` | [PointCloudWorkbench.html#L5770](PointCloudWorkbench.html#L5770) | UI/キー/離脱イベント登録 |
+| `cleanupEventListeners` | [PointCloudWorkbench.html#L6049](PointCloudWorkbench.html#L6049) | 登録済みイベント一括解除 |
+| `setAppLanguage` | [PointCloudWorkbench.html#L5452](PointCloudWorkbench.html#L5452) | 表示言語反映と保存 |
+| `initializeLanguagePreference` | [PointCloudWorkbench.html#L5470](PointCloudWorkbench.html#L5470) | 言語設定の復元 |
 
 ### 18.2 ワークフロー・入力
 
 | 関数 | 行番号リンク | 役割 |
 |---|---|---|
-| `handleFileSelect` | [MonoPoint3D.html#L6079](MonoPoint3D.html#L6079) | ファイル選択ハンドラ |
-| `checkFileSizeLimits` | [MonoPoint3D.html#L6297](MonoPoint3D.html#L6297) | サイズ判定の共通関数 |
-| `updateFileInfo` | [MonoPoint3D.html#L6481](MonoPoint3D.html#L6481) | ファイル情報UI更新 |
-| `proceedToQualitySelection` | [MonoPoint3D.html#L6570](MonoPoint3D.html#L6570) | 品質設定画面遷移 |
-| `applyQualitySelection` | [MonoPoint3D.html#L6640](MonoPoint3D.html#L6640) | 品質状態の正規化反映 |
-| `startDataLoading` | [MonoPoint3D.html#L6938](MonoPoint3D.html#L6938) | 読み込み開始制御 |
-| `updateLoadingInfo` | [MonoPoint3D.html#L7073](MonoPoint3D.html#L7073) | 読み込み情報表示更新 |
-| `updateProgress` | [MonoPoint3D.html#L7262](MonoPoint3D.html#L7262) | 進捗バー・文言更新 |
-| `loadLASFileActual` | [MonoPoint3D.html#L7315](MonoPoint3D.html#L7315) | 実データ読み込み本体 |
-| `completeLoading` | [MonoPoint3D.html#L9140](MonoPoint3D.html#L9140) | 完了状態へ遷移 |
+| `handleFileSelect` | [PointCloudWorkbench.html#L6079](PointCloudWorkbench.html#L6079) | ファイル選択ハンドラ |
+| `checkFileSizeLimits` | [PointCloudWorkbench.html#L6297](PointCloudWorkbench.html#L6297) | サイズ判定の共通関数 |
+| `updateFileInfo` | [PointCloudWorkbench.html#L6481](PointCloudWorkbench.html#L6481) | ファイル情報UI更新 |
+| `proceedToQualitySelection` | [PointCloudWorkbench.html#L6570](PointCloudWorkbench.html#L6570) | 品質設定画面遷移 |
+| `applyQualitySelection` | [PointCloudWorkbench.html#L6640](PointCloudWorkbench.html#L6640) | 品質状態の正規化反映 |
+| `startDataLoading` | [PointCloudWorkbench.html#L6938](PointCloudWorkbench.html#L6938) | 読み込み開始制御 |
+| `updateLoadingInfo` | [PointCloudWorkbench.html#L7073](PointCloudWorkbench.html#L7073) | 読み込み情報表示更新 |
+| `updateProgress` | [PointCloudWorkbench.html#L7262](PointCloudWorkbench.html#L7262) | 進捗バー・文言更新 |
+| `loadLASFileActual` | [PointCloudWorkbench.html#L7315](PointCloudWorkbench.html#L7315) | 実データ読み込み本体 |
+| `completeLoading` | [PointCloudWorkbench.html#L9140](PointCloudWorkbench.html#L9140) | 完了状態へ遷移 |
 
 ### 18.3 データ処理・描画
 
 | 関数 | 行番号リンク | 役割 |
 |---|---|---|
-| `setupPointCloudVisualization` | [MonoPoint3D.html#L7619](MonoPoint3D.html#L7619) | 点群表示セットアップ |
-| `buildPointCloudFromArrayBuffer` | [MonoPoint3D.html#L7638](MonoPoint3D.html#L7638) | 読み込み共通処理入口 |
-| `parsePointsFromArrayBuffer` | [MonoPoint3D.html#L7715](MonoPoint3D.html#L7715) | LAS/LAZ 分岐パーサ |
-| `parseLASHeader` | [MonoPoint3D.html#L7791](MonoPoint3D.html#L7791) | LASヘッダー解析 |
-| `parseLASPoints` | [MonoPoint3D.html#L7917](MonoPoint3D.html#L7917) | LAS点群抽出 |
-| `decompressLAZFile` | [MonoPoint3D.html#L8049](MonoPoint3D.html#L8049) | LAZ解凍処理 |
-| `decodeLAZPoint` | [MonoPoint3D.html#L8343](MonoPoint3D.html#L8343) | LAZ 1点デコード |
-| `createPointCloudFromData` | [MonoPoint3D.html#L8385](MonoPoint3D.html#L8385) | BufferGeometry生成 |
-| `downsamplePointCloud` | [MonoPoint3D.html#L8759](MonoPoint3D.html#L8759) | 点群間引き最適化 |
-| `adjustCameraToData` | [MonoPoint3D.html#L8917](MonoPoint3D.html#L8917) | データ範囲フィット |
-| `animate` | [MonoPoint3D.html#L11552](MonoPoint3D.html#L11552) | メインレンダーループ |
-| `updateStatsDisplay` | [MonoPoint3D.html#L12634](MonoPoint3D.html#L12634) | 統計UI再計算 |
+| `setupPointCloudVisualization` | [PointCloudWorkbench.html#L7619](PointCloudWorkbench.html#L7619) | 点群表示セットアップ |
+| `buildPointCloudFromArrayBuffer` | [PointCloudWorkbench.html#L7638](PointCloudWorkbench.html#L7638) | 読み込み共通処理入口 |
+| `parsePointsFromArrayBuffer` | [PointCloudWorkbench.html#L7715](PointCloudWorkbench.html#L7715) | LAS/LAZ 分岐パーサ |
+| `parseLASHeader` | [PointCloudWorkbench.html#L7791](PointCloudWorkbench.html#L7791) | LASヘッダー解析 |
+| `parseLASPoints` | [PointCloudWorkbench.html#L7917](PointCloudWorkbench.html#L7917) | LAS点群抽出 |
+| `decompressLAZFile` | [PointCloudWorkbench.html#L8049](PointCloudWorkbench.html#L8049) | LAZ解凍処理 |
+| `decodeLAZPoint` | [PointCloudWorkbench.html#L8343](PointCloudWorkbench.html#L8343) | LAZ 1点デコード |
+| `createPointCloudFromData` | [PointCloudWorkbench.html#L8385](PointCloudWorkbench.html#L8385) | BufferGeometry生成 |
+| `downsamplePointCloud` | [PointCloudWorkbench.html#L8759](PointCloudWorkbench.html#L8759) | 点群間引き最適化 |
+| `adjustCameraToData` | [PointCloudWorkbench.html#L8917](PointCloudWorkbench.html#L8917) | データ範囲フィット |
+| `animate` | [PointCloudWorkbench.html#L11552](PointCloudWorkbench.html#L11552) | メインレンダーループ |
+| `updateStatsDisplay` | [PointCloudWorkbench.html#L12634](PointCloudWorkbench.html#L12634) | 統計UI再計算 |
 
 ### 18.4 表示モード・UI補助
 
 | 関数 | 行番号リンク | 役割 |
 |---|---|---|
-| `set2DView` | [MonoPoint3D.html#L9096](MonoPoint3D.html#L9096) | 2Dビュー切替 |
-| `exit2DView` | [MonoPoint3D.html#L9105](MonoPoint3D.html#L9105) | 3Dビュー復帰 |
-| `setColorMode` | [MonoPoint3D.html#L9351](MonoPoint3D.html#L9351) | 色分けモード切替入口 |
-| `executeColorModeChange` | [MonoPoint3D.html#L9372](MonoPoint3D.html#L9372) | 色バッファ再計算 |
-| `updateLegendPanel` | [MonoPoint3D.html#L9765](MonoPoint3D.html#L9765) | 分類凡例の描画 |
-| `determineBestVisualizationMode` | [MonoPoint3D.html#L9870](MonoPoint3D.html#L9870) | 推奨表示モード判定 |
-| `toggleSlicing` | [MonoPoint3D.html#L10083](MonoPoint3D.html#L10083) | スライスUI切替 |
-| `updateSlicing` | [MonoPoint3D.html#L10165](MonoPoint3D.html#L10165) | スライス面更新 |
-| `autoClassify` | [MonoPoint3D.html#L11535](MonoPoint3D.html#L11535) | 自動分類起動 |
-| `detectSystemPerformanceBackground` | [MonoPoint3D.html#L11606](MonoPoint3D.html#L11606) | バックグラウンド性能検出 |
-| `getRecommendationAnalysis` | [MonoPoint3D.html#L11790](MonoPoint3D.html#L11790) | 品質推奨計算 |
-| `updatePerformanceDisplay` | [MonoPoint3D.html#L11877](MonoPoint3D.html#L11877) | 性能情報UI反映 |
-| `showConfirmDialog` | [MonoPoint3D.html#L11955](MonoPoint3D.html#L11955) | 確認ダイアログ |
-| `showToast` | [MonoPoint3D.html#L12066](MonoPoint3D.html#L12066) | 通知表示 |
-| `handleKeyDown` | [MonoPoint3D.html#L12158](MonoPoint3D.html#L12158) | キー入力処理 |
-| `handleKeyUp` | [MonoPoint3D.html#L12280](MonoPoint3D.html#L12280) | キー入力解放処理 |
-| `performFinalCleanup` | [MonoPoint3D.html#L12957](MonoPoint3D.html#L12957) | 終了時クリーンアップ |
+| `set2DView` | [PointCloudWorkbench.html#L9096](PointCloudWorkbench.html#L9096) | 2Dビュー切替 |
+| `exit2DView` | [PointCloudWorkbench.html#L9105](PointCloudWorkbench.html#L9105) | 3Dビュー復帰 |
+| `setColorMode` | [PointCloudWorkbench.html#L9351](PointCloudWorkbench.html#L9351) | 色分けモード切替入口 |
+| `executeColorModeChange` | [PointCloudWorkbench.html#L9372](PointCloudWorkbench.html#L9372) | 色バッファ再計算 |
+| `updateLegendPanel` | [PointCloudWorkbench.html#L9765](PointCloudWorkbench.html#L9765) | 分類凡例の描画 |
+| `determineBestVisualizationMode` | [PointCloudWorkbench.html#L9870](PointCloudWorkbench.html#L9870) | 推奨表示モード判定 |
+| `toggleSlicing` | [PointCloudWorkbench.html#L10083](PointCloudWorkbench.html#L10083) | スライスUI切替 |
+| `updateSlicing` | [PointCloudWorkbench.html#L10165](PointCloudWorkbench.html#L10165) | スライス面更新 |
+| `autoClassify` | [PointCloudWorkbench.html#L11535](PointCloudWorkbench.html#L11535) | 自動分類起動 |
+| `detectSystemPerformanceBackground` | [PointCloudWorkbench.html#L11606](PointCloudWorkbench.html#L11606) | バックグラウンド性能検出 |
+| `getRecommendationAnalysis` | [PointCloudWorkbench.html#L11790](PointCloudWorkbench.html#L11790) | 品質推奨計算 |
+| `updatePerformanceDisplay` | [PointCloudWorkbench.html#L11877](PointCloudWorkbench.html#L11877) | 性能情報UI反映 |
+| `showConfirmDialog` | [PointCloudWorkbench.html#L11955](PointCloudWorkbench.html#L11955) | 確認ダイアログ |
+| `showToast` | [PointCloudWorkbench.html#L12066](PointCloudWorkbench.html#L12066) | 通知表示 |
+| `handleKeyDown` | [PointCloudWorkbench.html#L12158](PointCloudWorkbench.html#L12158) | キー入力処理 |
+| `handleKeyUp` | [PointCloudWorkbench.html#L12280](PointCloudWorkbench.html#L12280) | キー入力解放処理 |
+| `performFinalCleanup` | [PointCloudWorkbench.html#L12957](PointCloudWorkbench.html#L12957) | 終了時クリーンアップ |
 
 ## 19. ユースケース別トレース（事実ベース）
 
 ### 19.1 大容量ファイル（500MB超）を選択したとき
 
 処理経路:
-1. `handleFileSelect` → [MonoPoint3D.html#L6079](MonoPoint3D.html#L6079)
-2. `checkFileSizeLimits` → [MonoPoint3D.html#L6297](MonoPoint3D.html#L6297)
-3. `showFileSizeWarning`（必要時）→ [MonoPoint3D.html#L6400](MonoPoint3D.html#L6400)
-4. `updateFileInfo` → [MonoPoint3D.html#L6481](MonoPoint3D.html#L6481)
+1. `handleFileSelect` → [PointCloudWorkbench.html#L6079](PointCloudWorkbench.html#L6079)
+2. `checkFileSizeLimits` → [PointCloudWorkbench.html#L6297](PointCloudWorkbench.html#L6297)
+3. `showFileSizeWarning`（必要時）→ [PointCloudWorkbench.html#L6400](PointCloudWorkbench.html#L6400)
+4. `updateFileInfo` → [PointCloudWorkbench.html#L6481](PointCloudWorkbench.html#L6481)
 
 ポイント:
 - 閾値は `FILE_SIZE_THRESHOLDS` で一元管理
@@ -311,9 +311,9 @@
 ### 19.2 2GB超を読み込み開始時に防ぐ
 
 処理経路:
-1. `startDataLoading` → [MonoPoint3D.html#L6938](MonoPoint3D.html#L6938)
-2. `loadLASFileActual` → [MonoPoint3D.html#L7315](MonoPoint3D.html#L7315)
-3. `checkFileSizeLimits` 再評価 → [MonoPoint3D.html#L6297](MonoPoint3D.html#L6297)
+1. `startDataLoading` → [PointCloudWorkbench.html#L6938](PointCloudWorkbench.html#L6938)
+2. `loadLASFileActual` → [PointCloudWorkbench.html#L7315](PointCloudWorkbench.html#L7315)
+3. `checkFileSizeLimits` 再評価 → [PointCloudWorkbench.html#L6297](PointCloudWorkbench.html#L6297)
 4. `canProceed=false` なら警告表示して例外終了
 
 ポイント:
@@ -322,13 +322,13 @@
 ### 19.3 通常読み込み（LAS/LAZ）から表示完了まで
 
 処理経路:
-1. `startDataLoading` → [MonoPoint3D.html#L6938](MonoPoint3D.html#L6938)
-2. `loadLASFileActual` → [MonoPoint3D.html#L7315](MonoPoint3D.html#L7315)
-3. `buildPointCloudFromArrayBuffer` → [MonoPoint3D.html#L7638](MonoPoint3D.html#L7638)
-4. `parsePointsFromArrayBuffer` → [MonoPoint3D.html#L7715](MonoPoint3D.html#L7715)
-5. `parseLASPoints` or `decompressLAZFile` → [MonoPoint3D.html#L7917](MonoPoint3D.html#L7917) / [MonoPoint3D.html#L8049](MonoPoint3D.html#L8049)
-6. `createPointCloudFromData` → [MonoPoint3D.html#L8385](MonoPoint3D.html#L8385)
-7. `completeLoading` → [MonoPoint3D.html#L9140](MonoPoint3D.html#L9140)
+1. `startDataLoading` → [PointCloudWorkbench.html#L6938](PointCloudWorkbench.html#L6938)
+2. `loadLASFileActual` → [PointCloudWorkbench.html#L7315](PointCloudWorkbench.html#L7315)
+3. `buildPointCloudFromArrayBuffer` → [PointCloudWorkbench.html#L7638](PointCloudWorkbench.html#L7638)
+4. `parsePointsFromArrayBuffer` → [PointCloudWorkbench.html#L7715](PointCloudWorkbench.html#L7715)
+5. `parseLASPoints` or `decompressLAZFile` → [PointCloudWorkbench.html#L7917](PointCloudWorkbench.html#L7917) / [PointCloudWorkbench.html#L8049](PointCloudWorkbench.html#L8049)
+6. `createPointCloudFromData` → [PointCloudWorkbench.html#L8385](PointCloudWorkbench.html#L8385)
+7. `completeLoading` → [PointCloudWorkbench.html#L9140](PointCloudWorkbench.html#L9140)
 
 ポイント:
 - 点群生成後に `statsData` と分類統計が更新される
@@ -337,9 +337,9 @@
 ### 19.4 分類表示の品質が低いデータ
 
 処理経路:
-1. `setColorMode('classification')` → [MonoPoint3D.html#L9351](MonoPoint3D.html#L9351)
-2. `executeColorModeChange` → [MonoPoint3D.html#L9372](MonoPoint3D.html#L9372)
-3. `getClassificationStats` / `updateLegendPanel` → [MonoPoint3D.html#L9559](MonoPoint3D.html#L9559) / [MonoPoint3D.html#L9765](MonoPoint3D.html#L9765)
+1. `setColorMode('classification')` → [PointCloudWorkbench.html#L9351](PointCloudWorkbench.html#L9351)
+2. `executeColorModeChange` → [PointCloudWorkbench.html#L9372](PointCloudWorkbench.html#L9372)
+3. `getClassificationStats` / `updateLegendPanel` → [PointCloudWorkbench.html#L9559](PointCloudWorkbench.html#L9559) / [PointCloudWorkbench.html#L9765](PointCloudWorkbench.html#L9765)
 
 ポイント:
 - 未分類率や分類種類数に基づいて警告ログとUI指標が更新される
@@ -349,9 +349,9 @@
 ### 19.5 メモリ圧・性能低下時の自動劣化
 
 処理経路:
-1. `MemoryMonitor.checkMemoryUsage`（定期）→ [MonoPoint3D.html#L4753](MonoPoint3D.html#L4753)
-2. `PerformanceMonitor.checkPerformance`（FPS監視）→ [MonoPoint3D.html#L4929](MonoPoint3D.html#L4929)
-3. `downsamplePointCloud` → [MonoPoint3D.html#L8759](MonoPoint3D.html#L8759)
+1. `MemoryMonitor.checkMemoryUsage`（定期）→ [PointCloudWorkbench.html#L4753](PointCloudWorkbench.html#L4753)
+2. `PerformanceMonitor.checkPerformance`（FPS監視）→ [PointCloudWorkbench.html#L4929](PointCloudWorkbench.html#L4929)
+3. `downsamplePointCloud` → [PointCloudWorkbench.html#L8759](PointCloudWorkbench.html#L8759)
 
 ポイント:
 - 条件を満たすと点数間引き・点サイズ調整が行われる
