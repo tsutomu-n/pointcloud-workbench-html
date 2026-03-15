@@ -722,3 +722,301 @@ test("readFileIntoWasmHeap streams file slices into WASM memory", async () => {
   );
   expect(context.__blobReadCalls).toBe(3);
 });
+
+test("decompressLAZFile keeps source point count when sampling down", async () => {
+  const context = createContext();
+
+  const sourceBuffer = new ArrayBuffer(64);
+  const points = [
+    { x: 1, y: 2, z: 3, intensity: 10, classification: 2 },
+    { x: 4, y: 5, z: 6, intensity: 11, classification: 3 },
+    { x: 7, y: 8, z: 9, intensity: 12, classification: 4 },
+    { x: 10, y: 11, z: 12, intensity: 13, classification: 5 },
+  ];
+
+  context.__nextPointer = 0;
+  context.__heap = new Uint8Array(2048);
+  context.createLazPerf = async () => ({
+    _malloc(size) {
+      const pointer = context.__nextPointer;
+      context.__nextPointer += size + 32;
+      return pointer;
+    },
+    _free() {},
+    HEAPU8: context.__heap,
+    LASZip: class {
+      constructor() {
+        this.index = 0;
+      }
+      open() {}
+      getCount() {
+        return points.length;
+      }
+      getPointLength() {
+        return 20;
+      }
+      getPointFormat() {
+        return 1;
+      }
+      getPoint(pointer) {
+        const point = points[this.index];
+        if (!point) {
+          throw new Error("point exhausted");
+        }
+        const view = new DataView(context.__heap.buffer);
+        view.setInt32(pointer, point.x, true);
+        view.setInt32(pointer + 4, point.y, true);
+        view.setInt32(pointer + 8, point.z, true);
+        view.setUint16(pointer + 12, point.intensity, true);
+        view.setUint8(pointer + 15, point.classification);
+        this.index += 1;
+      }
+      delete() {}
+    },
+  });
+
+  const result = await vm.runInContext(
+    'window.__pcwTestApi.decompressLAZFile(__sourceBuffer, { fileName: "sample.laz", quality: "low", maxPoints: 2 })',
+    Object.assign(context, { __sourceBuffer: sourceBuffer }),
+  );
+
+  expect(result.header.numberOfPointRecords).toBe(4);
+  expect(result.points).toHaveLength(2);
+});
+
+test("getClassificationStats counts classes 0 and 1 as unclassified", () => {
+  const context = createContext();
+
+  const stats = vm.runInContext(
+    `
+      statsData.classificationCounts = { 0: 40, 1: 35, 2: 25 };
+      statsData.displayPoints = 100;
+      window.__pcwTestApi.getClassificationStats();
+    `,
+    context,
+  );
+
+  expect(stats.isValid).toBe(true);
+  expect(stats.types).toBe(3);
+  expect(stats.unclassifiedCount).toBe(75);
+  expect(stats.unclassifiedPercent).toBe(75);
+  expect(stats.quality).toBe("limited");
+  expect(stats.recommendedMode).toBe("height");
+});
+
+test("normalizeHeightValue returns a safe midpoint for flat ranges", () => {
+  const context = createContext();
+
+  const normalized = vm.runInContext(
+    "window.__pcwTestApi.normalizeHeightValue(12, 5, 5)",
+    context,
+  );
+
+  expect(normalized).toBe(0.5);
+  expect(Number.isFinite(normalized)).toBe(true);
+});
+
+test("hideAllPanels preserves stats toggle markup", () => {
+  const context = createContext();
+  const label = createMockElement("statsToggleLabel");
+  const button = createMockElement("statsToggle");
+  const panel = createMockElement("statsPanel");
+
+  button.querySelector = (selector) =>
+    selector === ".stats-toggle__label" ? label : null;
+  button.classList = {
+    add() {},
+    remove() {},
+    contains() {
+      return false;
+    },
+  };
+  panel.classList = {
+    add() {},
+    remove() {},
+    contains() {
+      return false;
+    },
+  };
+
+  context.__statsPanel = panel;
+  context.__statsToggle = button;
+
+  vm.runInContext(
+    `
+      statsVisible = true;
+      document.getElementById = (id) => {
+        if (id === "statsPanel") return __statsPanel;
+        if (id === "statsToggle") return __statsToggle;
+        return {
+          classList: { add() {}, remove() {}, contains() { return false; } },
+          querySelector() { return null; },
+          style: {},
+        };
+      };
+      window.__pcwTestApi.hideAllPanels();
+    `,
+    context,
+  );
+
+  expect(label.textContent).toBe("統計情報");
+  expect(button.textContent).toBe("");
+});
+
+test("initThreeJS replaces the previous renderer canvas and binds context listeners", async () => {
+  const context = createContext();
+
+  const container = createMockElement("container");
+  container.children = [];
+  container.getBoundingClientRect = () => ({
+    width: 640,
+    height: 480,
+  });
+  container.appendChild = function appendChild(child) {
+    this.children.push(child);
+    child.parentElement = this;
+    return child;
+  };
+  container.removeChild = function removeChild(child) {
+    this.children = this.children.filter((item) => item !== child);
+  };
+
+  context.__container = container;
+  context.__renderers = [];
+  context.__removedWindowEvents = [];
+
+  context.window.addEventListener = function addEventListener(type, handler) {
+    this.__events = this.__events || {};
+    this.__events[type] = this.__events[type] || [];
+    this.__events[type].push(handler);
+  };
+  context.window.removeEventListener = function removeEventListener(type, handler) {
+    this.__events = this.__events || {};
+    this.__events[type] = (this.__events[type] || []).filter(
+      (registered) => registered !== handler,
+    );
+    context.__removedWindowEvents.push(type);
+  };
+
+  class Vector3 {
+    constructor(x = 0, y = 0, z = 0) {
+      this.x = x;
+      this.y = y;
+      this.z = z;
+    }
+    set(x, y, z) {
+      this.x = x;
+      this.y = y;
+      this.z = z;
+      return this;
+    }
+    copy(other) {
+      this.x = other.x;
+      this.y = other.y;
+      this.z = other.z;
+      return this;
+    }
+    clone() {
+      return new Vector3(this.x, this.y, this.z);
+    }
+  }
+
+  context.THREE.Scene = class {
+    constructor() {
+      this.children = [];
+    }
+    add(child) {
+      this.children.push(child);
+    }
+    remove(child) {
+      this.children = this.children.filter((item) => item !== child);
+    }
+  };
+  context.THREE.Color = class {
+    constructor(value) {
+      this.value = value;
+    }
+  };
+  context.THREE.PerspectiveCamera = class {
+    constructor() {
+      this.position = new Vector3();
+      this.aspect = 1;
+    }
+    updateProjectionMatrix() {}
+  };
+  context.THREE.OrthographicCamera = class {
+    constructor() {
+      this.position = new Vector3();
+      this.up = new Vector3();
+    }
+    updateProjectionMatrix() {}
+  };
+  context.THREE.WebGLRenderer = class {
+    constructor() {
+      this.domElement = createMockElement("canvas");
+      this.domElement.__events = {};
+      this.domElement.addEventListener = (type, handler) => {
+        this.domElement.__events[type] = this.domElement.__events[type] || [];
+        this.domElement.__events[type].push(handler);
+      };
+      this.domElement.removeEventListener = (type, handler) => {
+        this.domElement.__events[type] = (this.domElement.__events[type] || []).filter(
+          (registered) => registered !== handler,
+        );
+      };
+      this.disposeCalls = 0;
+      context.__renderers.push(this);
+    }
+    setSize() {}
+    setPixelRatio() {}
+    dispose() {
+      this.disposeCalls += 1;
+    }
+    render() {}
+  };
+  context.THREE.AmbientLight = class {};
+  context.THREE.DirectionalLight = class {
+    constructor() {
+      this.position = new Vector3();
+    }
+  };
+  context.THREE.GridHelper = class {};
+  context.THREE.AxesHelper = class {};
+  context.THREE.OrbitControls = class {
+    constructor() {
+      this.target = new Vector3();
+    }
+    update() {}
+    dispose() {
+      context.__controlsDisposed = (context.__controlsDisposed || 0) + 1;
+    }
+  };
+
+  vm.runInContext(
+    `
+      updateProgress = () => {};
+      document.getElementById = (id) => {
+        if (id === "container") return __container;
+        return {
+          classList: { add() {}, remove() {}, contains() { return false; } },
+          querySelector() { return null; },
+          style: {},
+          textContent: "",
+        };
+      };
+    `,
+    context,
+  );
+
+  await vm.runInContext("window.__pcwTestApi.initThreeJS()", context);
+  await vm.runInContext("window.__pcwTestApi.initThreeJS()", context);
+
+  expect(context.__renderers).toHaveLength(2);
+  expect(context.__renderers[0].disposeCalls).toBe(1);
+  expect(context.__container.children).toHaveLength(1);
+  expect(
+    Object.keys(context.__renderers[1].domElement.__events).sort(),
+  ).toEqual(["webglcontextlost", "webglcontextrestored"]);
+  expect(context.__controlsDisposed).toBe(1);
+  expect(context.__removedWindowEvents).toContain("resize");
+});

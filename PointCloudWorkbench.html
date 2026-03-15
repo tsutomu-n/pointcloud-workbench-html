@@ -4483,6 +4483,9 @@
         constructor() {
           this.errors = [];
           this.maxErrors = 100;
+          this.webglCanvas = null;
+          this.handleBoundWebGLContextLoss = null;
+          this.handleBoundWebGLContextRestore = null;
           this.setupGlobalErrorHandlers();
         }
 
@@ -4536,20 +4539,74 @@
 
         setupWebGLErrorHandlers() {
           try {
-            // WebGL context lost
-            window.addEventListener("webglcontextlost", (event) => {
-              event.preventDefault();
+            this.handleBoundWebGLContextLoss = (event) => {
+              if (typeof event?.preventDefault === "function") {
+                event.preventDefault();
+              }
               this.logError("WebGL Context Lost", { event });
-              this.handleWebGLContextLoss();
-            });
+              this.handleWebGLContextLoss(event);
+            };
 
-            // WebGL context restored
-            window.addEventListener("webglcontextrestored", (event) => {
+            this.handleBoundWebGLContextRestore = (event) => {
               this.logError("WebGL Context Restored", { event });
-              this.handleWebGLContextRestore();
-            });
+              this.handleWebGLContextRestore(event);
+            };
           } catch (error) {
             console.error("Failed to setup WebGL error handlers:", error);
+          }
+        }
+
+        bindWebGLContextHandlers(canvas) {
+          try {
+            if (!canvas || typeof canvas.addEventListener !== "function") {
+              return;
+            }
+            if (!this.handleBoundWebGLContextLoss || !this.handleBoundWebGLContextRestore) {
+              this.setupWebGLErrorHandlers();
+            }
+            if (this.webglCanvas && this.webglCanvas !== canvas) {
+              this.unbindWebGLContextHandlers();
+            }
+            canvas.addEventListener(
+              "webglcontextlost",
+              this.handleBoundWebGLContextLoss,
+              false,
+            );
+            canvas.addEventListener(
+              "webglcontextrestored",
+              this.handleBoundWebGLContextRestore,
+              false,
+            );
+            this.webglCanvas = canvas;
+          } catch (error) {
+            console.error("Failed to bind WebGL context handlers:", error);
+          }
+        }
+
+        unbindWebGLContextHandlers(canvas = this.webglCanvas) {
+          try {
+            if (!canvas || typeof canvas.removeEventListener !== "function") {
+              return;
+            }
+            if (this.handleBoundWebGLContextLoss) {
+              canvas.removeEventListener(
+                "webglcontextlost",
+                this.handleBoundWebGLContextLoss,
+                false,
+              );
+            }
+            if (this.handleBoundWebGLContextRestore) {
+              canvas.removeEventListener(
+                "webglcontextrestored",
+                this.handleBoundWebGLContextRestore,
+                false,
+              );
+            }
+            if (this.webglCanvas === canvas) {
+              this.webglCanvas = null;
+            }
+          } catch (error) {
+            console.error("Failed to unbind WebGL context handlers:", error);
           }
         }
 
@@ -4628,11 +4685,6 @@
               animationId = null;
             }
 
-            // Clear Three.js objects
-            if (renderer) {
-              renderer.dispose();
-            }
-
             // Show recovery message
             this.showWebGLRecoveryMessage();
           } catch (error) {
@@ -4653,6 +4705,10 @@
 
         showWebGLRecoveryMessage() {
           try {
+            const existing = document.querySelector(".webgl-recovery-message");
+            if (existing) {
+              return;
+            }
             const message = document.createElement("div");
             message.className = "webgl-recovery-message";
             message.innerHTML = `
@@ -4679,7 +4735,9 @@
             }
 
             // Reinitialize the viewer
-            if (typeof initThreeJS === "function") {
+            if (typeof recoverThreeJSContext === "function") {
+              recoverThreeJSContext();
+            } else if (typeof initThreeJS === "function") {
               initThreeJS();
             }
           } catch (error) {
@@ -5313,6 +5371,7 @@
       let currentVisualizationMode = "height";
       let isCADMode = false; // CADモード（Z-up座標系）のフラグ
       let animationId = null;
+      let rendererResizeHandler = null;
 
       // ユーザー設定の記憶 (with validation)
       let userPreferences = {
@@ -5350,11 +5409,13 @@
         fileSize: 0,
         lasVersion: "",
         originalPoints: 0,
+        decodedPoints: 0,
         displayPoints: 0,
         loadStartTime: 0,
         processStartTime: 0,
         header: null,
         classificationCounts: {},
+        classificationSource: "file",
       };
 
       let statsVisible = false;
@@ -5471,6 +5532,173 @@
 
       function getQualityConfig(quality) {
         return qualitySettings[quality] || qualitySettings[DEFAULT_QUALITY];
+      }
+
+      function toSafeNonNegativeNumber(value, fallback = 0) {
+        const num = Number(value);
+        return Number.isFinite(num) && num >= 0 ? num : fallback;
+      }
+
+      function buildPointCountSummary(
+        sourceCount,
+        displayCount,
+        decodedCount = displayCount,
+      ) {
+        const safeSourceCount = Math.max(
+          0,
+          Math.round(toSafeNonNegativeNumber(sourceCount)),
+        );
+        const safeDecodedCount = Math.max(
+          0,
+          Math.round(toSafeNonNegativeNumber(decodedCount)),
+        );
+        const safeDisplayCount = Math.max(
+          0,
+          Math.round(toSafeNonNegativeNumber(displayCount)),
+        );
+        const displayRatio = safeSourceCount > 0
+          ? (safeDisplayCount / safeSourceCount) * 100
+          : 0;
+        const samplingRate = safeSourceCount > 0
+          ? (safeDecodedCount / safeSourceCount) * 100
+          : 0;
+
+        return {
+          sourceCount: safeSourceCount,
+          decodedCount: safeDecodedCount,
+          displayCount: safeDisplayCount,
+          displayRatio,
+          samplingRate,
+        };
+      }
+
+      function applyPointCountSummary(
+        sourceCount,
+        decodedCount,
+        displayCount = decodedCount,
+      ) {
+        const summary = buildPointCountSummary(
+          sourceCount,
+          displayCount,
+          decodedCount,
+        );
+        statsData.originalPoints = summary.sourceCount;
+        statsData.decodedPoints = summary.decodedCount;
+        statsData.displayPoints = summary.displayCount;
+        return summary;
+      }
+
+      function normalizeHeightValue(value, minValue, maxValue) {
+        const safeValue = Number(value);
+        const safeMin = Number(minValue);
+        const safeMax = Number(maxValue);
+        const range = safeMax - safeMin;
+
+        if (
+          !Number.isFinite(safeValue) ||
+          !Number.isFinite(safeMin) ||
+          !Number.isFinite(safeMax) ||
+          range <= 0
+        ) {
+          return 0.5;
+        }
+
+        return Math.max(0, Math.min(1, (safeValue - safeMin) / range));
+      }
+
+      function getHeightGradientColor(normalizedHeight) {
+        const safeNormalized = Math.max(
+          0,
+          Math.min(1, Number.isFinite(normalizedHeight) ? normalizedHeight : 0.5),
+        );
+
+        if (safeNormalized < 0.5) {
+          const t = safeNormalized * 2;
+          return { r: 0, g: t, b: 1 - t };
+        }
+
+        const t = (safeNormalized - 0.5) * 2;
+        return { r: t, g: 1 - t, b: 0 };
+      }
+
+      function calculateAreaSquareMeters(xRange, yRange) {
+        const safeXRange = Number(xRange);
+        const safeYRange = Number(yRange);
+        if (
+          !Number.isFinite(safeXRange) ||
+          !Number.isFinite(safeYRange) ||
+          safeXRange <= 0 ||
+          safeYRange <= 0
+        ) {
+          return 0;
+        }
+        return safeXRange * safeYRange;
+      }
+
+      function calculatePointDensity(displayPoints, areaSquareMeters) {
+        const safeDisplayPoints = toSafeNonNegativeNumber(displayPoints);
+        const safeArea = Number(areaSquareMeters);
+        if (!Number.isFinite(safeArea) || safeArea <= 0) {
+          return null;
+        }
+        return safeDisplayPoints / safeArea;
+      }
+
+      function formatCountWithPercent(count, total) {
+        const safeCount = Math.max(0, Math.round(toSafeNonNegativeNumber(count)));
+        const safeTotal = toSafeNonNegativeNumber(total);
+        const percent = safeTotal > 0 ? (safeCount / safeTotal) * 100 : 0;
+        return `${safeCount.toLocaleString()} (${percent.toFixed(1)}%)`;
+      }
+
+      function getUnclassifiedCount(classificationCounts = {}) {
+        return (
+          toSafeNonNegativeNumber(classificationCounts[0]) +
+          toSafeNonNegativeNumber(classificationCounts[1])
+        );
+      }
+
+      function buildClassificationStats(classificationCounts, totalPoints) {
+        const safeCounts =
+          classificationCounts && typeof classificationCounts === "object"
+            ? classificationCounts
+            : {};
+        const safeTotalPoints = toSafeNonNegativeNumber(totalPoints);
+        const classificationTypes = Object.keys(safeCounts).length;
+
+        if (!classificationTypes || safeTotalPoints <= 0) {
+          return {
+            types: classificationTypes,
+            unclassifiedCount: 0,
+            unclassifiedPercent: 0,
+            quality: "unknown",
+            recommendedMode: "height",
+            isValid: false,
+          };
+        }
+
+        const unclassifiedCount = getUnclassifiedCount(safeCounts);
+        const unclassifiedPercent = (unclassifiedCount / safeTotalPoints) * 100;
+
+        let quality = "standard";
+        let recommendedMode = "height";
+        if (unclassifiedPercent > 90) {
+          quality = "poor";
+        } else if (classificationTypes === 1 || unclassifiedPercent > 70) {
+          quality = "limited";
+        } else if (classificationTypes >= 3 && unclassifiedPercent < 30) {
+          quality = "good";
+          recommendedMode = "classification";
+        }
+
+        return {
+          types: classificationTypes,
+          unclassifiedCount,
+          unclassifiedPercent,
+          quality,
+          recommendedMode,
+          isValid: true,
+        };
       }
 
       function getFileSizeLimitPolicy(file) {
@@ -5870,7 +6098,7 @@
                         <p>アプリケーションの初期化中にエラーが発生しました。</p>
                         <details>
                             <summary>詳細情報</summary>
-                            <pre>${this.escapeHtml(error.message)}</pre>
+                            <pre>${escapeHtml(error.message)}</pre>
                         </details>
                         <div class="error-actions">
                             <button onclick="location.reload()">ページを再読み込み</button>
