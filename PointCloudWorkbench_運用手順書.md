@@ -110,7 +110,7 @@
 
 | 関数 | 行番号リンク | 参照用途 |
 |---|---|---|
-| `loadSampleData` | [PointCloudWorkbench.html#L6580](PointCloudWorkbench.html#L6580) | サンプルデータ選択 |
+| `loadSampleData` | [PointCloudWorkbench.html#L6728](PointCloudWorkbench.html#L6728) | サンプルデータ選択 |
 | `proceedToQualitySelection` | [PointCloudWorkbench.html#L6787](PointCloudWorkbench.html#L6787) | 品質設定画面への遷移 |
 | `applyQualitySelection` | [PointCloudWorkbench.html#L6857](PointCloudWorkbench.html#L6857) | 品質選択反映 |
 | `startDataLoading` | [PointCloudWorkbench.html#L7157](PointCloudWorkbench.html#L7157) | 読み込み開始 |

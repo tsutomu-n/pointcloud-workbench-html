@@ -20,4 +20,8 @@ test("README and guides describe the split LAS/LAZ size ceilings", () => {
   expect(ref).toContain("LAS は `3GB超`、LAZ は `2GB超` を拒否");
   expect(index).toContain("LAS は `3GB超`、LAZ は `2GB超` を拒否");
   expect(html).toContain(".las 最大3GB / .laz 最大2GB");
+  expect(readme).toContain("LAS の chunked 読み込み");
+  expect(readme).toContain("WASM ヒープ直書き");
+  expect(ref).toContain("parseLASPointsFromFile()");
+  expect(ref).toContain("readFileIntoWasmHeap()");
 });
