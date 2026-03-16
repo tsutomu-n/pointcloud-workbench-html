@@ -57,6 +57,12 @@
 - `PointCloudWorkbench_運用手順書.md`
 - `PointCloudWorkbench_実装リファレンス.md`
 
+## Live Demo
+
+- GitHub Pages: `https://tsutomu-n.github.io/pointcloud-workbench-html/`
+- 実アプリ: `https://tsutomu-n.github.io/pointcloud-workbench-html/PointCloudWorkbench.html`
+- デモではアプリ内の `サンプルデータを使用` から同梱 LAS を選ぶか、手元の `.las` / `.laz` を読み込んで確認できます。
+
 ## License
 
 - ライセンスは `MIT` です。詳細は `LICENSE` を参照してください。
@@ -76,6 +82,7 @@
 ## Repository Scope
 
 - 公開の主対象は `PointCloudWorkbench.html` と関連ドキュメントです。
+- GitHub Pages では `index.html` を入口にし、実アプリは `PointCloudWorkbench.html` をそのまま配信します。
 - `scripts/` は開発用の検証資産として公開しています。
 - `test-results/` やローカル補助ツールの生成物は公開対象ではありません。
 
@@ -83,6 +90,7 @@
 
 - 実行時に `three.js` と `laz-perf` を CDN から読み込みます。
 - 通常利用にはネットワーク接続が必要です。CDN に到達できない環境ではアプリが正常に起動しない場合があります。
+- GitHub Pages デモでも同じ CDN 依存があります。
 
 ## 補足
 

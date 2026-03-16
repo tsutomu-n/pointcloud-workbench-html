@@ -1003,6 +1003,65 @@ test("hideAllPanels preserves stats toggle markup", () => {
   expect(button.textContent).toBe("");
 });
 
+test("sample modal includes the bundled Pages demo LAS option", () => {
+  expect(html).toContain("Pages Demo Sample");
+  expect(html).toContain("./demo/pointcloud-demo-sample.las");
+});
+
+test("selectSampleFile keeps bundled sample byte size separate from preview point count", () => {
+  const context = createContext();
+
+  vm.runInContext(
+    `
+      clearSelectedFilePreview = () => {};
+      updateFileInfo = () => {};
+      updateLastFileInfo = () => {};
+      saveLastFileName = () => {};
+      closeSampleFileModal = () => {};
+      workflowState.selectedQuality = "medium";
+      document.getElementById = () => ({
+        disabled: true,
+        style: {},
+      });
+      window.selectSampleFile("./demo/pointcloud-demo-sample.las", "Pages Demo Sample", 114915, 4096);
+    `,
+    context,
+  );
+
+  const selectedSize = vm.runInContext("workflowState.selectedFile.size", context);
+  const previewPointCount = vm.runInContext(
+    "workflowState.previewHeader.numberOfPointRecords",
+    context,
+  );
+
+  expect(selectedSize).toBe(114915);
+  expect(previewPointCount).toBe(4096);
+});
+
+test("bundled Pages demo LAS parses as an uncompressed LAS sample", async () => {
+  const context = createContext();
+  installImmediateBlobReader(context);
+
+  const sampleBuffer = fs.readFileSync(
+    path.join(__dirname, "..", "demo", "pointcloud-demo-sample.las"),
+  );
+  const exactArrayBuffer = sampleBuffer.buffer.slice(
+    sampleBuffer.byteOffset,
+    sampleBuffer.byteOffset + sampleBuffer.byteLength,
+  );
+  context.__file = createChunkedFile(exactArrayBuffer, "pointcloud-demo-sample.las");
+
+  const preview = await vm.runInContext(
+    "window.__pcwTestApi.analyzeSelectedFilePreview(__file)",
+    context,
+  );
+
+  expect(preview.header.numberOfPointRecords).toBe(4096);
+  expect(preview.header.pointDataRecordFormat).toBe(1);
+  expect(preview.header.pointDataRecordLength).toBe(28);
+  expect(preview.profile.strategyKey).toBe("las-chunked");
+});
+
 test("initThreeJS replaces the previous renderer canvas and binds context listeners", async () => {
   const context = createContext();
 

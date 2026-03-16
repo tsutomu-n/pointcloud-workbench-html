@@ -7272,6 +7272,10 @@
                                     <div class="sample-file-title">テスト用小規模モデル</div>
                                     <div class="sample-file-desc">動作確認用の汎用小規模3Dモデルです（5万点）</div>
                                 </div>
+                                <div class="sample-file-item" onclick="selectSampleFile('./demo/pointcloud-demo-sample.las', 'Pages Demo Sample', 114915, 4096)">
+                                    <div class="sample-file-title">Pages Demo Sample</div>
+                                    <div class="sample-file-desc">GitHub Pages で即確認できる軽量な合成 LAS サンプルです（4,096点）</div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -7288,7 +7292,12 @@
         }
       };
 
-      window.selectSampleFile = function (filePath, fileName, fileSize) {
+      window.selectSampleFile = function (
+        filePath,
+        fileName,
+        sizeBytes,
+        previewPointCount = sizeBytes,
+      ) {
         console.log("サンプルファイル選択:", fileName);
         saveLastFileName(fileName);
 
@@ -7296,11 +7305,13 @@
         clearSelectedFilePreview();
         workflowState.selectedFile = {
           name: fileName,
-          size: fileSize,
+          size: sizeBytes,
           isSample: true,
           samplePath: filePath,
         };
-        workflowState.previewHeader = { numberOfPointRecords: fileSize };
+        workflowState.previewHeader = {
+          numberOfPointRecords: previewPointCount,
+        };
         workflowState.previewProfile = buildLoadProfile(
           workflowState.selectedFile,
           workflowState.selectedQuality,
