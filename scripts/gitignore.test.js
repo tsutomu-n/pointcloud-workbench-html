@@ -7,5 +7,6 @@ const gitignore = fs.readFileSync(gitignorePath, "utf8");
 
 test(".gitignore ignores transient test artifacts but keeps scripts tracked", () => {
   expect(gitignore).toContain("/test-results/");
+  expect(gitignore).toContain("/.serena/");
   expect(gitignore).not.toContain("/scripts/");
 });
