@@ -1,330 +1,1220 @@
-<!doctype html>
-<html lang="ja">
+<!DOCTYPE html>
+<html lang="en">
   <head>
-    <meta charset="utf-8" />
+    <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>PointCloudWorkbench Demo</title>
+    <title>PointCloudWorkbench | Native LAS/LAZ Viewer</title>
     <style>
       :root {
-        color-scheme: light;
-        --bg: #f4efe6;
-        --ink: #14213d;
-        --muted: #4a5568;
-        --panel: rgba(255, 252, 247, 0.88);
-        --line: rgba(20, 33, 61, 0.14);
-        --accent: #0f766e;
-        --accent-strong: #0b5d57;
-        --accent-soft: #d7efe8;
-        --shadow: 0 24px 60px rgba(20, 33, 61, 0.14);
+        color-scheme: dark;
+        --color-void: oklch(0.12 0.01 250);
+        --color-surface: oklch(0.16 0.01 250);
+        --color-panel: oklch(0.19 0.01 250);
+        --color-ink: oklch(0.08 0.01 250);
+        --color-bone: oklch(0.96 0.01 250);
+        --color-muted: oklch(0.65 0.01 250);
+        --color-laser: oklch(0.75 0.2 150);
+        --color-warn: oklch(0.8 0.18 70);
+        --space-huge: clamp(6rem, 15vw, 15rem);
+        --space-lg: clamp(4rem, 8vw, 10rem);
+        --space-md: clamp(2rem, 5vw, 5rem);
+        --font-display:
+          "Helvetica Neue", "Arial Black", "Avenir Next Condensed",
+          "Hiragino Sans", "Hiragino Kaku Gothic ProN", sans-serif;
+        --font-copy:
+          "Avenir Next", "Helvetica Neue", "Noto Sans JP", "Hiragino Sans",
+          sans-serif;
+        --font-mono:
+          "Space Mono", "SF Mono", "Menlo", "Consolas", monospace;
       }
 
       * {
         box-sizing: border-box;
       }
 
+      html {
+        scroll-behavior: smooth;
+      }
+
       body {
         margin: 0;
         min-height: 100vh;
-        font-family: "Avenir Next", "Segoe UI", "Hiragino Sans", sans-serif;
-        color: var(--ink);
+        color: var(--color-bone);
+        font-family: var(--font-copy);
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
         background:
-          radial-gradient(circle at top left, rgba(15, 118, 110, 0.18), transparent 34%),
-          radial-gradient(circle at bottom right, rgba(219, 39, 119, 0.12), transparent 28%),
-          linear-gradient(180deg, #faf6ef 0%, var(--bg) 100%);
+          radial-gradient(circle at 12% 8%, rgba(117, 240, 150, 0.18), transparent 24%),
+          radial-gradient(circle at 88% 18%, rgba(255, 208, 84, 0.08), transparent 20%),
+          radial-gradient(circle at 80% 78%, rgba(117, 240, 150, 0.1), transparent 28%),
+          radial-gradient(oklch(0.4 0.01 250) 1px, transparent 1px),
+          linear-gradient(180deg, oklch(0.15 0.01 250), var(--color-void));
+        background-size: auto, auto, auto, 24px 24px, auto;
+        background-attachment: scroll, scroll, scroll, fixed, scroll;
+      }
+
+      ::selection {
+        color: var(--color-void);
+        background: var(--color-laser);
       }
 
       a {
         color: inherit;
       }
 
-      .shell {
-        width: min(1120px, calc(100% - 32px));
+      code {
+        padding: 0.2em 0.45em;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: var(--color-bone);
+        font-size: 0.85em;
+        font-family: var(--font-mono);
+        background: rgba(255, 255, 255, 0.05);
+      }
+
+      .viewport-canvas {
+        position: relative;
+        width: min(1440px, calc(100% - 24px));
         margin: 0 auto;
-        padding: 28px 0 40px;
+        padding: 0 4vw 4vw;
       }
 
-      .hero {
+      .grid-x {
         display: grid;
-        grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.9fr);
-        gap: 24px;
-        align-items: stretch;
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        gap: var(--space-md);
       }
 
-      .card {
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: 28px;
-        box-shadow: var(--shadow);
-        backdrop-filter: blur(18px);
+      .y-axis-line {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 4vw;
+        width: 1px;
+        opacity: 0.1;
+        background: var(--color-bone);
       }
 
-      .hero-copy {
-        padding: 36px;
+      .landing-toolbar {
+        display: flex;
+        justify-content: flex-end;
+        padding-top: 1.5rem;
       }
 
-      .eyebrow {
+      .landing-language {
         display: inline-flex;
         align-items: center;
-        gap: 8px;
-        padding: 8px 14px;
-        border-radius: 999px;
-        background: rgba(20, 33, 61, 0.06);
-        color: var(--muted);
-        font-size: 13px;
+        gap: 0.75rem;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.03);
+        padding: 0.65rem 0.85rem;
+        font-size: 0.78rem;
+        font-family: var(--font-mono);
         letter-spacing: 0.08em;
+        text-transform: uppercase;
+        backdrop-filter: blur(8px);
+      }
+
+      .landing-language__label {
+        color: var(--color-muted);
+      }
+
+      .landing-language__select {
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        color: var(--color-bone);
+        background: rgba(7, 10, 17, 0.92);
+        padding: 0.45rem 2rem 0.45rem 0.7rem;
+        font-size: 0.78rem;
+        font-family: var(--font-mono);
+        letter-spacing: 0.06em;
+      }
+
+      .badge-mono {
+        display: inline-block;
+        padding: 0.45rem 0.9rem;
+        border: 1px solid var(--color-laser);
+        color: var(--color-laser);
+        font-size: 0.75rem;
+        font-family: var(--font-mono);
+        letter-spacing: 0.15em;
         text-transform: uppercase;
       }
 
-      h1 {
-        margin: 18px 0 14px;
-        font-size: clamp(2.4rem, 5vw, 4.6rem);
-        line-height: 0.95;
-        letter-spacing: -0.05em;
-      }
-
-      .lead {
-        max-width: 44rem;
+      .section-label {
+        grid-column: 1 / 13;
         margin: 0;
-        color: var(--muted);
-        font-size: 1.05rem;
-        line-height: 1.8;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        color: var(--color-laser);
+        font-size: 0.85rem;
+        font-family: var(--font-mono);
+        letter-spacing: 0.1em;
       }
 
-      .cta-row {
+      .reveal {
+        opacity: 1;
+      }
+
+      @supports (animation-timeline: view()) {
+        @keyframes scrollReveal {
+          0% {
+            opacity: 0;
+            filter: blur(4px);
+            transform: translateY(5vh);
+          }
+
+          100% {
+            opacity: 1;
+            filter: blur(0);
+            transform: translateY(0);
+          }
+        }
+
+        .reveal {
+          animation: scrollReveal linear both;
+          animation-timeline: view();
+          animation-range: entry 5% cover 25%;
+          will-change: transform, opacity;
+        }
+      }
+
+      .hero-domain {
+        min-height: calc(92vh - 4rem);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding-top: 8vh;
+      }
+
+      .hero-meta {
+        grid-column: 1 / 13;
         display: flex;
         flex-wrap: wrap;
-        gap: 12px;
-        margin-top: 28px;
+        gap: 0.75rem;
       }
 
-      .button {
+      .hero-meta span {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.55rem;
+        color: var(--color-muted);
+        font-size: 0.82rem;
+        font-family: var(--font-mono);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .hero-meta span::before {
+        content: "";
+        width: 0.55rem;
+        height: 0.55rem;
+        border-radius: 999px;
+        background: var(--color-laser);
+        box-shadow: 0 0 12px rgba(117, 240, 150, 0.45);
+      }
+
+      .massive-headline {
+        margin: 2rem 0 var(--space-md);
+        font-size: clamp(3.4rem, 11vw, 9.5rem);
+        font-weight: 900;
+        line-height: 0.9;
+        letter-spacing: -0.05em;
+        font-family: var(--font-display);
+        text-transform: uppercase;
+        word-break: break-word;
+      }
+
+      .headline-stroke {
+        color: transparent;
+        -webkit-text-stroke: 1.5px var(--color-bone);
+      }
+
+      .hero-lead {
+        grid-column: 1 / 9;
+        margin: 0;
+        color: var(--color-bone);
+        font-size: clamp(1.05rem, 2vw, 1.35rem);
+        font-weight: 600;
+      }
+
+      .hero-desc {
+        grid-column: 1 / 8;
+        margin: 1rem 0 0;
+        color: var(--color-muted);
+        font-size: 1rem;
+      }
+
+      .hero-slab {
+        grid-column: 9 / 13;
+        align-self: end;
+        padding: 1.25rem 1.35rem;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0)),
+          rgba(255, 255, 255, 0.02);
+        backdrop-filter: blur(4px);
+      }
+
+      .hero-slab-label {
+        margin: 0 0 0.5rem;
+        color: var(--color-laser);
+        font-size: 0.78rem;
+        font-family: var(--font-mono);
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      .hero-slab strong {
+        display: block;
+        font-size: clamp(1.8rem, 3vw, 2.75rem);
+        line-height: 1;
+      }
+
+      .hero-slab span {
+        display: block;
+        margin-top: 0.7rem;
+        color: var(--color-muted);
+        font-size: 0.9rem;
+      }
+
+      .trigger-matrix {
+        grid-column: 1 / 13;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        margin-top: 3rem;
+      }
+
+      .terminal-btn {
+        position: relative;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        min-height: 48px;
-        padding: 0 18px;
-        border-radius: 999px;
-        border: 1px solid transparent;
-        font-weight: 700;
+        overflow: hidden;
+        padding: 1.2rem 2rem;
+        color: var(--color-ink);
         text-decoration: none;
-        transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
+        font-size: 0.85rem;
+        font-weight: 700;
+        font-family: var(--font-mono);
+        letter-spacing: 0.05em;
+        transition: color 0.3s ease, transform 0.3s ease;
+        background: var(--color-bone);
       }
 
-      .button:hover {
-        transform: translateY(-1px);
+      .terminal-btn.primary {
+        background: var(--color-laser);
       }
 
-      .button-primary {
-        background: var(--accent);
-        color: #f7fffd;
-        box-shadow: 0 14px 34px rgba(15, 118, 110, 0.22);
+      .terminal-btn.ghost {
+        border: 1px solid var(--color-muted);
+        color: var(--color-bone);
+        background: transparent;
       }
 
-      .button-primary:hover {
-        background: var(--accent-strong);
+      .terminal-btn::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        background: var(--color-laser);
+        transform: scaleY(0);
+        transform-origin: bottom;
+        transition: transform 0.3s cubic-bezier(0.19, 1, 0.22, 1);
       }
 
-      .button-secondary {
-        border-color: var(--line);
-        background: rgba(255, 255, 255, 0.52);
+      .terminal-btn.ghost::after {
+        background: var(--color-bone);
       }
 
-      .stats-card {
-        padding: 28px;
+      .terminal-btn:hover {
+        transform: translateY(-2px);
+      }
+
+      .terminal-btn:hover::after {
+        transform: scaleY(1);
+        transform-origin: top;
+      }
+
+      .terminal-btn.ghost:hover {
+        color: var(--color-ink);
+      }
+
+      .terminal-btn span {
+        position: relative;
+        z-index: 2;
+      }
+
+      .metrics-domain {
+        position: relative;
+        padding: var(--space-huge) 0;
+      }
+
+      .stats-matrix {
+        grid-column: 1 / 13;
         display: grid;
-        gap: 14px;
-        align-content: start;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: clamp(2rem, 4vw, 4rem);
+        margin-top: var(--space-md);
       }
 
-      .stat-grid {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 12px;
-      }
-
-      .stat {
-        padding: 16px;
-        border-radius: 20px;
-        background: rgba(255, 255, 255, 0.78);
-        border: 1px solid rgba(20, 33, 61, 0.08);
-      }
-
-      .stat strong {
-        display: block;
-        font-size: 1.4rem;
-        letter-spacing: -0.04em;
-      }
-
-      .stat span {
-        color: var(--muted);
-        font-size: 0.92rem;
-      }
-
-      .sections {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 18px;
-        margin-top: 22px;
-      }
-
-      .section-card {
-        padding: 24px;
-      }
-
-      h2 {
-        margin: 0 0 12px;
-        font-size: 1.15rem;
-        letter-spacing: -0.03em;
-      }
-
-      ul,
-      ol {
-        margin: 0;
-        padding-left: 1.2rem;
-        color: var(--muted);
-        line-height: 1.75;
-      }
-
-      .small {
-        color: var(--muted);
-        font-size: 0.95rem;
-        line-height: 1.75;
-      }
-
-      .footer {
+      .stat-node {
         display: flex;
-        flex-wrap: wrap;
-        gap: 12px;
-        align-items: center;
-        justify-content: space-between;
-        margin-top: 24px;
-        padding: 0 4px;
-        color: var(--muted);
-        font-size: 0.92rem;
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      .tech-tag {
+        width: fit-content;
+        padding: 0.25rem 0.65rem;
+        color: var(--color-laser);
+        font-size: 0.75rem;
+        font-family: var(--font-mono);
+        background: rgba(117, 240, 150, 0.1);
+      }
+
+      .stat-head {
+        margin: 0;
+        color: var(--color-bone);
+        font-size: 1.55rem;
+        font-weight: 800;
+        line-height: 1.2;
+        letter-spacing: -0.02em;
+      }
+
+      .stat-desc {
+        margin: 0;
+        color: var(--color-muted);
+        font-size: 0.97rem;
+        line-height: 1.7;
+      }
+
+      .system-domain {
+        padding: 0 0 var(--space-huge);
+      }
+
+      .specs-grid {
+        grid-column: 1 / 13;
+        display: grid;
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        gap: var(--space-md);
+        margin-top: var(--space-md);
+      }
+
+      .spec-card {
+        grid-column: span 6;
+        position: relative;
+        overflow: hidden;
+        padding: 3rem;
+        border-top: 2px solid var(--color-muted);
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0)),
+          var(--color-surface);
+      }
+
+      .spec-card::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(135deg, rgba(117, 240, 150, 0.05), transparent 45%);
+        pointer-events: none;
+      }
+
+      .spec-card.warn {
+        border-top-color: var(--color-warn);
+      }
+
+      .spec-card.warn::after {
+        background: linear-gradient(135deg, rgba(255, 208, 84, 0.06), transparent 45%);
+      }
+
+      .spec-title {
+        position: relative;
+        z-index: 1;
+        margin: 0 0 1.5rem;
+        color: var(--color-bone);
+        font-size: 1.2rem;
+        font-weight: 700;
+        font-family: var(--font-mono);
+        text-transform: uppercase;
+      }
+
+      .spec-card.warn .spec-title {
+        color: var(--color-warn);
+      }
+
+      .spec-list {
+        position: relative;
+        z-index: 1;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        color: var(--color-muted);
+        font-size: 0.95rem;
+        line-height: 1.8;
+      }
+
+      .spec-list li {
+        position: relative;
+        margin-bottom: 0.8rem;
+        padding-left: 1.5rem;
+      }
+
+      .spec-list li::before {
+        content: "›";
+        position: absolute;
+        left: 0;
+        top: 0;
+        color: var(--color-laser);
+        font-size: 1.2rem;
+        line-height: 1;
+        font-family: var(--font-mono);
+      }
+
+      .spec-card.warn .spec-list li::before {
+        content: "!";
+        color: var(--color-warn);
+      }
+
+      .docs-matrix {
+        grid-column: 1 / 13;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 2rem;
+        margin-top: var(--space-md);
+      }
+
+      .doc-item {
+        padding: 1.3rem 1.15rem;
+        border-left: 1px solid var(--color-muted);
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0)),
+          rgba(255, 255, 255, 0.015);
+        font-family: var(--font-mono);
+      }
+
+      .doc-item strong {
+        display: block;
+        color: var(--color-bone);
+        font-weight: 400;
+      }
+
+      .doc-item span {
+        display: block;
+        margin-top: 0.55rem;
+        color: var(--color-muted);
+        font-size: 0.78rem;
+        font-family: var(--font-copy);
+      }
+
+      .docs-note {
+        grid-column: 1 / 13;
+        margin: 2rem 0 0;
+        color: var(--color-muted);
+        font-size: 0.8rem;
+        font-family: var(--font-mono);
+      }
+
+      .footer-domain {
+        padding: var(--space-md) 0 4vw;
+        border-top: 1px solid var(--color-muted);
+      }
+
+      .footer-matrix {
+        grid-column: 1 / 13;
+        display: flex;
+        flex-direction: column;
+        gap: 2rem;
+        color: var(--color-muted);
+        font-size: 0.85rem;
+        font-family: var(--font-mono);
+        text-transform: uppercase;
       }
 
       .footer-links {
         display: flex;
         flex-wrap: wrap;
-        gap: 14px;
+        gap: 1.5rem;
       }
 
-      .footer a {
-        text-decoration-thickness: 0.08em;
-        text-underline-offset: 0.18em;
+      .footer-links a {
+        position: relative;
+        color: var(--color-bone);
+        text-decoration: none;
       }
 
-      @media (max-width: 920px) {
-        .hero,
-        .sections {
+      .footer-links a::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        bottom: -4px;
+        width: 100%;
+        height: 1px;
+        transform: scaleX(0);
+        transform-origin: right;
+        background: var(--color-laser);
+        transition: transform 0.3s ease;
+      }
+
+      .footer-links a:hover::after {
+        transform: scaleX(1);
+        transform-origin: left;
+      }
+
+      @media (max-width: 980px) {
+        body {
+          background-attachment: scroll;
+        }
+
+        .grid-x {
+          display: flex;
+          flex-direction: column;
+          gap: var(--space-md);
+        }
+
+        .y-axis-line {
+          display: none;
+        }
+
+        .landing-toolbar {
+          justify-content: flex-start;
+        }
+
+        .landing-language {
+          flex-wrap: wrap;
+        }
+
+        .hero-lead,
+        .hero-desc,
+        .hero-slab {
+          grid-column: 1 / -1;
+        }
+
+        .hero-slab {
+          align-self: stretch;
+        }
+
+        .specs-grid {
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+        }
+
+        .spec-card {
+          padding: 2rem;
+        }
+
+        .docs-matrix {
           grid-template-columns: 1fr;
         }
+      }
 
-        .hero-copy,
-        .stats-card,
-        .section-card {
-          padding: 24px;
+      @media (min-width: 981px) {
+        .footer-matrix {
+          flex-direction: row;
+          align-items: center;
+          justify-content: space-between;
         }
       }
 
-      @media (max-width: 640px) {
-        .shell {
-          width: min(100% - 20px, 1120px);
-          padding-top: 16px;
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
         }
 
-        .stat-grid {
-          grid-template-columns: 1fr;
-        }
-
-        h1 {
-          font-size: clamp(2rem, 11vw, 3rem);
+        *,
+        *::before,
+        *::after {
+          animation: none !important;
+          transition: none !important;
         }
       }
     </style>
   </head>
   <body>
-    <main class="shell">
-      <section class="hero">
-        <article class="card hero-copy">
-          <div class="eyebrow">Live Demo / Single HTML Viewer</div>
-          <h1>PointCloudWorkbench</h1>
-          <p class="lead">
-            LAS / LAZ をブラウザだけで確認できる単一HTML点群ワークベンチです。
-            GitHub Pages では概要確認と軽い体験導線を提供し、実アプリ本体は既存の
-            <code>PointCloudWorkbench.html</code> をそのまま配信しています。
-          </p>
-          <div class="cta-row">
-            <a class="button button-primary" href="./PointCloudWorkbench.html">Open Demo</a>
-            <a class="button button-secondary" href="./demo/pointcloud-demo-sample.las">Download Sample LAS</a>
-            <a class="button button-secondary" href="https://github.com/tsutomu-n/pointcloud-workbench-html">View Repository</a>
-          </div>
-        </article>
+    <div class="viewport-canvas">
+      <div class="y-axis-line"></div>
 
-        <aside class="card stats-card">
-          <h2>Quick Facts</h2>
-          <div class="stat-grid">
-            <div class="stat">
-              <strong>Single File</strong>
-              <span>ビルド不要の HTML 配布</span>
-            </div>
-            <div class="stat">
-              <strong>LAS / LAZ</strong>
-              <span>ローカル読込とサンプル導線</span>
-            </div>
-            <div class="stat">
-              <strong>GitHub Pages</strong>
-              <span>そのままURL共有できるデモ</span>
-            </div>
-            <div class="stat">
-              <strong>Bundled Sample</strong>
-              <span>小規模の合成 LAS を同梱</span>
-            </div>
+      <div class="landing-toolbar">
+        <div class="landing-language">
+          <span class="landing-language__label" id="landingLanguageLabel">Language</span>
+          <select
+            id="landingLanguageSelector"
+            class="landing-language__select"
+            aria-label="Landing page language"
+          >
+            <option value="en">English</option>
+            <option value="ja">日本語</option>
+            <option value="zh">中文</option>
+          </select>
+        </div>
+      </div>
+
+      <header class="hero-domain">
+        <div class="grid-x reveal">
+          <div style="grid-column: 1 / 13">
+            <div class="badge-mono" id="badgeMono">Native HTML Application</div>
+            <h1 class="massive-headline">
+              <div>PointCloud</div>
+              <div class="headline-stroke">Workbench.</div>
+            </h1>
           </div>
-          <p class="small">
-            実アプリ内では <strong>サンプルデータを使用</strong> から同梱 LAS と合成サンプルを選べます。
-            自分の `.las` / `.laz` をドラッグ&ドロップして使うこともできます。
+
+          <div class="hero-meta">
+            <span id="heroMetaOne">Single HTML Delivery</span>
+            <span id="heroMetaTwo">LAS / LAZ Ready</span>
+            <span id="heroMetaThree">GitHub Pages Demo</span>
+          </div>
+
+          <p class="hero-lead" id="heroLead">
+            Browser-native LAS/LAZ point cloud workbench delivered as a single HTML
+            file.
           </p>
-        </aside>
+          <p class="hero-desc" id="heroDesc">
+            Open the GitHub Pages landing page, launch the real app, and inspect
+            point clouds in 3D/2D without a build step. The runtime artifact stays
+            in <code>PointCloudWorkbench.html</code>.
+          </p>
+
+          <aside class="hero-slab">
+            <p class="hero-slab-label" id="heroSlabLabel">Demo Payload</p>
+            <strong id="heroSlabPoints">4096 pts</strong>
+            <span id="heroSlabDesc">
+              Bundled LAS sample included for fast first-run validation.
+            </span>
+          </aside>
+
+          <nav class="trigger-matrix">
+            <a class="terminal-btn primary" href="./PointCloudWorkbench.html">
+              <span id="ctaLaunch">[ EXECUTE // OPEN APP ]</span>
+            </a>
+            <a class="terminal-btn ghost" href="./demo/pointcloud-demo-sample.las">
+              <span id="ctaSample">DATA // SAMPLE LAS</span>
+            </a>
+            <a
+              class="terminal-btn ghost"
+              href="https://github.com/tsutomu-n/pointcloud-workbench-html"
+              rel="noopener noreferrer"
+            >
+              <span id="ctaRepository">REPOSITORY // GITHUB</span>
+            </a>
+          </nav>
+        </div>
+      </header>
+
+      <section class="metrics-domain grid-x reveal">
+        <h2 class="section-label" id="sectionCapabilities">01 // SYSTEM CAPABILITIES</h2>
+
+        <div class="stats-matrix">
+          <article class="stat-node">
+            <span class="tech-tag" id="capOneTag">Chunked Processing</span>
+            <h3 class="stat-head" id="capOneTitle">Large-file pressure smoothing</h3>
+            <p class="stat-desc" id="capOneDesc">
+              Chunked LAS reads and LAZ chunk transfer into WASM heap reduce load
+              spikes and unnecessary memory duplication.
+            </p>
+          </article>
+          <article class="stat-node">
+            <span class="tech-tag" id="capTwoTag">Pre-Flight Evaluation</span>
+            <h3 class="stat-head" id="capTwoTitle">Pre-load risk and quality review</h3>
+            <p class="stat-desc" id="capTwoDesc">
+              Header-first inspection exposes load path, risk level, source point
+              count, and estimated render ratio before you commit to import.
+            </p>
+          </article>
+          <article class="stat-node">
+            <span class="tech-tag" id="capThreeTag">Multi-Dimensional Viz</span>
+            <h3 class="stat-head" id="capThreeTitle">3D, 2D, slice, stats</h3>
+            <p class="stat-desc" id="capThreeDesc">
+              Switch between 3D and 2D, inspect slices, review classification output,
+              and validate results with the statistics panel in one browser tool.
+            </p>
+          </article>
+        </div>
       </section>
 
-      <section class="sections">
-        <article class="card section-card">
-          <h2>How To Try</h2>
-          <ol>
-            <li><code>Open Demo</code> でアプリ本体を開く</li>
-            <li><code>サンプルデータを使用</code> から Pages 用サンプルを選ぶ</li>
-            <li>品質を選んで 3D / 2D 表示や統計を確認する</li>
-          </ol>
-        </article>
+      <section class="system-domain grid-x reveal">
+        <h2 class="section-label" id="sectionRequirements">
+          02 // CONSTRAINTS &amp; REQUIREMENTS
+        </h2>
 
-        <article class="card section-card">
-          <h2>Browser Notes</h2>
-          <ul>
-            <li>Chrome / Edge / Firefox の最新版を想定</li>
-            <li>WebGL と File API が必要</li>
-            <li>実行時に `three.js` と `laz-perf` を CDN から読み込む</li>
-          </ul>
-        </article>
+        <div class="specs-grid">
+          <article class="spec-card">
+            <h3 class="spec-title" id="reqTitle">Requirements</h3>
+            <ul class="spec-list" id="reqList">
+              <li><strong>Recommended:</strong> latest Chrome / Edge / Firefox</li>
+              <li><strong>Required APIs:</strong> WebGL / File API / ArrayBuffer</li>
+              <li><strong>Accepted formats:</strong> <code>.las</code> / <code>.laz</code></li>
+              <li>
+                <strong>Network:</strong> runtime loads <code>three.js</code> and
+                <code>laz-perf</code> from CDNs
+              </li>
+            </ul>
+          </article>
 
-        <article class="card section-card">
-          <h2>Demo Constraints</h2>
-          <ul>
-            <li>同梱サンプルは軽量な合成 LAS です</li>
-            <li>LAZ はアプリ本体内でローカル読込の確認ができます</li>
-            <li>ネットワーク未接続では初期化に失敗する場合があります</li>
-          </ul>
-        </article>
+          <article class="spec-card warn">
+            <h3 class="spec-title" id="limitsTitle">System Limits</h3>
+            <ul class="spec-list" id="limitsList">
+              <li>
+                <strong>LAS ceiling:</strong> <code>above 3GB</code> is rejected.
+                <code>2GB to 3GB</code> should start from <code>LOW</code>.
+              </li>
+              <li>
+                <strong>LAZ ceiling:</strong> decoder overhead narrows the safe range.
+                <code>above 2GB</code> is rejected.
+              </li>
+              <li>
+                <strong>Auto classification:</strong> assistive only. It is not a
+                survey-grade classification guarantee.
+              </li>
+              <li>
+                URL loading and some compatibility paths may still use full
+                <code>ArrayBuffer</code> reads.
+              </li>
+            </ul>
+          </article>
+        </div>
       </section>
 
-      <footer class="footer">
-        <div>Public demo for the PointCloudWorkbench repository.</div>
-        <div class="footer-links">
-          <a href="./PointCloudWorkbench.html">Application</a>
-          <a href="https://github.com/tsutomu-n/pointcloud-workbench-html/blob/main/README.md">README</a>
-          <a href="https://github.com/tsutomu-n/pointcloud-workbench-html">GitHub</a>
+      <section class="system-domain grid-x reveal" style="padding-top: 0">
+        <h2 class="section-label" id="sectionDocs">03 // ARCHITECTURE &amp; DOCS</h2>
+
+        <div class="docs-matrix">
+          <div class="doc-item">
+            <strong id="docOneTitle">PointCloudWorkbench.html</strong>
+            <span id="docOneDesc">Single-file runtime artifact. No build step.</span>
+          </div>
+          <div class="doc-item">
+            <strong id="docTwoTitle">demo/pointcloud-demo-sample.las</strong>
+            <span id="docTwoDesc">
+              Bundled LAS sample for quick first-run validation on GitHub Pages.
+            </span>
+          </div>
+          <div class="doc-item">
+            <strong id="docThreeTitle">README.md</strong>
+            <span id="docThreeDesc">
+              Public entry document with live demo links, constraints, and workflow
+              summary.
+            </span>
+          </div>
+          <div class="doc-item">
+            <strong id="docFourTitle">scripts/*.test.js</strong>
+            <span id="docFourDesc">
+              Regression coverage for runtime behavior, repo metadata, and public
+              presentation.
+            </span>
+          </div>
+        </div>
+
+        <p class="docs-note" id="docsNote">
+          &gt; test commands: <code>bun test scripts/*.test.js</code> |
+          <code>bun scripts/check-readme.js</code>
+        </p>
+      </section>
+
+      <footer class="footer-domain grid-x">
+        <div class="footer-matrix">
+          <div id="footerLicense">LICENSE // MIT. SYSTEM DISTRIBUTED AS SINGLE HTML.</div>
+          <nav class="footer-links">
+            <a href="./PointCloudWorkbench.html">EXECUTE_APP</a>
+            <a href="./demo/pointcloud-demo-sample.las">SAMPLE_LAS</a>
+            <a
+              href="https://github.com/tsutomu-n/pointcloud-workbench-html/blob/main/README.md"
+              rel="noopener noreferrer"
+              >README</a
+            >
+            <a
+              href="https://github.com/tsutomu-n/pointcloud-workbench-html"
+              rel="noopener noreferrer"
+              >GITHUB</a
+            >
+          </nav>
         </div>
       </footer>
-    </main>
+    </div>
+
+    <script>
+      const LANDING_SUPPORTED_LANGUAGES = ["ja", "en", "zh"];
+      const LANDING_STORAGE_KEY = "pcwLandingLanguage";
+
+      const LANDING_TRANSLATIONS = {
+        en: {
+          title: "PointCloudWorkbench | Native LAS/LAZ Viewer",
+          languageLabel: "Language",
+          languageAriaLabel: "Landing page language",
+          badge: "Native HTML Application",
+          heroMetaOne: "Single HTML Delivery",
+          heroMetaTwo: "LAS / LAZ Ready",
+          heroMetaThree: "GitHub Pages Demo",
+          heroLead:
+            "Browser-native LAS/LAZ point cloud workbench delivered as a single HTML file.",
+          heroDesc:
+            "Open the GitHub Pages landing page, launch the real app, and inspect point clouds in 3D/2D without a build step. The runtime artifact stays in <code>PointCloudWorkbench.html</code>.",
+          heroSlabLabel: "Demo Payload",
+          heroSlabPoints: "4096 pts",
+          heroSlabDesc: "Bundled LAS sample included for fast first-run validation.",
+          ctaLaunch: "[ EXECUTE // OPEN APP ]",
+          ctaSample: "DATA // SAMPLE LAS",
+          ctaRepository: "REPOSITORY // GITHUB",
+          sectionCapabilities: "01 // SYSTEM CAPABILITIES",
+          capOneTag: "Chunked Processing",
+          capOneTitle: "Large-file pressure smoothing",
+          capOneDesc:
+            "Chunked LAS reads and LAZ chunk transfer into WASM heap reduce load spikes and unnecessary memory duplication.",
+          capTwoTag: "Pre-Flight Evaluation",
+          capTwoTitle: "Pre-load risk and quality review",
+          capTwoDesc:
+            "Header-first inspection exposes load path, risk level, source point count, and estimated render ratio before you commit to import.",
+          capThreeTag: "Multi-Dimensional Viz",
+          capThreeTitle: "3D, 2D, slice, stats",
+          capThreeDesc:
+            "Switch between 3D and 2D, inspect slices, review classification output, and validate results with the statistics panel in one browser tool.",
+          sectionRequirements: "02 // CONSTRAINTS &amp; REQUIREMENTS",
+          reqTitle: "Requirements",
+          reqList: [
+            "<strong>Recommended:</strong> latest Chrome / Edge / Firefox",
+            "<strong>Required APIs:</strong> WebGL / File API / ArrayBuffer",
+            "<strong>Accepted formats:</strong> <code>.las</code> / <code>.laz</code>",
+            "<strong>Network:</strong> runtime loads <code>three.js</code> and <code>laz-perf</code> from CDNs",
+          ],
+          limitsTitle: "System Limits",
+          limitsList: [
+            "<strong>LAS ceiling:</strong> <code>above 3GB</code> is rejected. <code>2GB to 3GB</code> should start from <code>LOW</code>.",
+            "<strong>LAZ ceiling:</strong> decoder overhead narrows the safe range. <code>above 2GB</code> is rejected.",
+            "<strong>Auto classification:</strong> assistive only. It is not a survey-grade classification guarantee.",
+            "URL loading and some compatibility paths may still use full <code>ArrayBuffer</code> reads.",
+          ],
+          sectionDocs: "03 // ARCHITECTURE &amp; DOCS",
+          docOneTitle: "PointCloudWorkbench.html",
+          docOneDesc: "Single-file runtime artifact. No build step.",
+          docTwoTitle: "demo/pointcloud-demo-sample.las",
+          docTwoDesc:
+            "Bundled LAS sample for quick first-run validation on GitHub Pages.",
+          docThreeTitle: "README.md",
+          docThreeDesc:
+            "Public entry document with live demo links, constraints, and workflow summary.",
+          docFourTitle: "scripts/*.test.js",
+          docFourDesc:
+            "Regression coverage for runtime behavior, repo metadata, and public presentation.",
+          docsNote:
+            "&gt; test commands: <code>bun test scripts/*.test.js</code> | <code>bun scripts/check-readme.js</code>",
+          footerLicense: "LICENSE // MIT. SYSTEM DISTRIBUTED AS SINGLE HTML.",
+        },
+        ja: {
+          title: "PointCloudWorkbench | ブラウザ点群ビューアー",
+          languageLabel: "言語",
+          languageAriaLabel: "ランディングページの表示言語",
+          badge: "単一HTMLアプリケーション",
+          heroMetaOne: "単一 HTML 配布",
+          heroMetaTwo: "LAS / LAZ 対応",
+          heroMetaThree: "GitHub Pages デモ",
+          heroLead:
+            "ブラウザで動く、LAS/LAZ 対応の単一 HTML 点群ワークベンチです。",
+          heroDesc:
+            "GitHub Pages の入口からそのまま実アプリを起動し、ビルドなしで 3D / 2D の点群確認に入れます。実行本体は <code>PointCloudWorkbench.html</code> のままです。",
+          heroSlabLabel: "デモ内容",
+          heroSlabPoints: "4096 点",
+          heroSlabDesc: "初回確認用に軽量な同梱 LAS サンプルを用意しています。",
+          ctaLaunch: "[ EXECUTE // 実アプリを起動 ]",
+          ctaSample: "DATA // SAMPLE LAS",
+          ctaRepository: "REPOSITORY // GITHUB",
+          sectionCapabilities: "01 // 主な機能",
+          capOneTag: "Chunked Processing",
+          capOneTitle: "大容量負荷の平準化",
+          capOneDesc:
+            "LAS のチャンク読み込みと LAZ の WASM ヒープ直書きで、負荷の集中とメモリ重複を抑えます。",
+          capTwoTag: "Pre-Flight Evaluation",
+          capTwoTitle: "読込前の危険度と品質確認",
+          capTwoDesc:
+            "ヘッダー先読みで、読込経路、危険度、元点数、推定表示率を読み込み前に確認できます。",
+          capThreeTag: "Multi-Dimensional Viz",
+          capThreeTitle: "3D / 2D / スライス / 統計",
+          capThreeDesc:
+            "3D と 2D を切り替え、断面確認、分類確認、統計検証までブラウザ内で完結します。",
+          sectionRequirements: "02 // 動作条件と制約",
+          reqTitle: "動作条件",
+          reqList: [
+            "<strong>推奨環境:</strong> Chrome / Edge / Firefox の最新版",
+            "<strong>必須 API:</strong> WebGL / File API / ArrayBuffer",
+            "<strong>対応形式:</strong> <code>.las</code> / <code>.laz</code>",
+            "<strong>ネットワーク:</strong> 実行時に <code>three.js</code> と <code>laz-perf</code> を CDN から読み込みます",
+          ],
+          limitsTitle: "システム制約",
+          limitsList: [
+            "<strong>LAS 制限:</strong> <code>3GB超</code> は拒否します。<code>2GB〜3GB</code> 帯は <code>LOW</code> から開始してください。",
+            "<strong>LAZ 制限:</strong> デコーダの追加メモリ消費があるため、<code>2GB超</code> は拒否します。",
+            "<strong>自動分類:</strong> 補助機能であり、測量級の厳密な分類保証ではありません。",
+            "URL 読込や一部互換経路では全量 <code>ArrayBuffer</code> を使う場合があります。",
+          ],
+          sectionDocs: "03 // ファイル構成と文書",
+          docOneTitle: "PointCloudWorkbench.html",
+          docOneDesc: "単一 HTML の実行本体。ビルド工程はありません。",
+          docTwoTitle: "demo/pointcloud-demo-sample.las",
+          docTwoDesc: "GitHub Pages で初回確認しやすい軽量な同梱 LAS サンプルです。",
+          docThreeTitle: "README.md",
+          docThreeDesc: "公開向けの入口文書。Live Demo、制約、開発情報をまとめています。",
+          docFourTitle: "scripts/*.test.js",
+          docFourDesc: "挙動回帰、公開面、リポジトリ整合性を Bun で検証します。",
+          docsNote:
+            "&gt; test commands: <code>bun test scripts/*.test.js</code> | <code>bun scripts/check-readme.js</code>",
+          footerLicense: "LICENSE // MIT. 単一 HTML 配布モデル。",
+        },
+        zh: {
+          title: "PointCloudWorkbench | 浏览器点云查看器",
+          languageLabel: "语言",
+          languageAriaLabel: "着陆页语言",
+          badge: "单文件 HTML 应用",
+          heroMetaOne: "单 HTML 交付",
+          heroMetaTwo: "支持 LAS / LAZ",
+          heroMetaThree: "GitHub Pages 演示",
+          heroLead:
+            "这是一个在浏览器中运行、以单一 HTML 文件交付的 LAS/LAZ 点云工作台。",
+          heroDesc:
+            "从 GitHub Pages 入口即可启动真实应用，无需构建步骤，就能进入 3D / 2D 点云检查流程。运行主体保持为 <code>PointCloudWorkbench.html</code>。",
+          heroSlabLabel: "演示载荷",
+          heroSlabPoints: "4096 点",
+          heroSlabDesc: "内置轻量 LAS 样本，便于首次快速验证。",
+          ctaLaunch: "[ EXECUTE // 打开应用 ]",
+          ctaSample: "DATA // SAMPLE LAS",
+          ctaRepository: "REPOSITORY // GITHUB",
+          sectionCapabilities: "01 // 核心能力",
+          capOneTag: "Chunked Processing",
+          capOneTitle: "大文件压力平滑",
+          capOneDesc:
+            "LAS 分块读取与 LAZ 写入 WASM 堆相结合，可减少加载高峰和重复内存占用。",
+          capTwoTag: "Pre-Flight Evaluation",
+          capTwoTitle: "加载前风险与质量确认",
+          capTwoDesc:
+            "通过预读头信息，在正式导入前查看加载路径、风险级别、源点数和预计显示比例。",
+          capThreeTag: "Multi-Dimensional Viz",
+          capThreeTitle: "3D / 2D / 切片 / 统计",
+          capThreeDesc:
+            "在浏览器中切换 3D 与 2D，查看切片断面、分类结果，并结合统计面板进行验证。",
+          sectionRequirements: "02 // 条件与限制",
+          reqTitle: "运行条件",
+          reqList: [
+            "<strong>推荐环境:</strong> 最新版 Chrome / Edge / Firefox",
+            "<strong>必需 API:</strong> WebGL / File API / ArrayBuffer",
+            "<strong>支持格式:</strong> <code>.las</code> / <code>.laz</code>",
+            "<strong>网络:</strong> 运行时需要从 CDN 加载 <code>three.js</code> 与 <code>laz-perf</code>",
+          ],
+          limitsTitle: "系统限制",
+          limitsList: [
+            "<strong>LAS 上限:</strong> <code>超过 3GB</code> 将被拒绝，<code>2GB 到 3GB</code> 建议从 <code>LOW</code> 开始。",
+            "<strong>LAZ 上限:</strong> 解码器会额外占用内存，因此 <code>超过 2GB</code> 将被拒绝。",
+            "<strong>自动分类:</strong> 仅为辅助能力，不保证测绘级分类精度。",
+            "URL 加载和部分兼容路径仍可能使用完整 <code>ArrayBuffer</code> 读取。",
+          ],
+          sectionDocs: "03 // 架构与文档",
+          docOneTitle: "PointCloudWorkbench.html",
+          docOneDesc: "单文件运行主体，无需构建。",
+          docTwoTitle: "demo/pointcloud-demo-sample.las",
+          docTwoDesc: "用于 GitHub Pages 首次体验的内置轻量 LAS 样本。",
+          docThreeTitle: "README.md",
+          docThreeDesc: "公共入口文档，汇总 Live Demo、限制与开发说明。",
+          docFourTitle: "scripts/*.test.js",
+          docFourDesc: "使用 Bun 验证运行行为、仓库元数据与公开展示面。",
+          docsNote:
+            "&gt; test commands: <code>bun test scripts/*.test.js</code> | <code>bun scripts/check-readme.js</code>",
+          footerLicense: "LICENSE // MIT. 以单 HTML 形式分发。",
+        },
+      };
+
+      function normalizeLandingLanguageTag(value) {
+        if (typeof value !== "string") return null;
+        const normalized = value.trim().toLowerCase();
+        if (!normalized) return null;
+        if (normalized.startsWith("ja")) return "ja";
+        if (normalized.startsWith("en")) return "en";
+        if (normalized.startsWith("zh")) return "zh";
+        return null;
+      }
+
+      function getLandingQueryOverride() {
+        try {
+          const queryLanguage = new URLSearchParams(window.location.search).get("lang");
+          return normalizeLandingLanguageTag(queryLanguage);
+        } catch (error) {
+          console.warn("Landing query language read failed:", error);
+          return null;
+        }
+      }
+
+      function getStoredLandingLanguage() {
+        try {
+          return normalizeLandingLanguageTag(
+            localStorage.getItem("pcwLandingLanguage"),
+          );
+        } catch (error) {
+          console.warn("Landing language storage read failed:", error);
+          return null;
+        }
+      }
+
+      function detectNavigatorLandingLanguage() {
+        const candidates = Array.isArray(navigator.languages)
+          ? navigator.languages
+          : [];
+
+        for (const candidate of candidates) {
+          const normalized = normalizeLandingLanguageTag(candidate);
+          if (normalized && LANDING_SUPPORTED_LANGUAGES.includes(normalized)) {
+            return normalized;
+          }
+        }
+
+        const fallback = normalizeLandingLanguageTag(navigator.language);
+        if (fallback && LANDING_SUPPORTED_LANGUAGES.includes(fallback)) {
+          return fallback;
+        }
+
+        return null;
+      }
+
+      function resolveInitialLandingLanguage() {
+        const queryLanguage = getLandingQueryOverride();
+        if (queryLanguage) {
+          return { language: queryLanguage, source: "query" };
+        }
+
+        const storedLanguage = getStoredLandingLanguage();
+        if (storedLanguage) {
+          return { language: storedLanguage, source: "storage" };
+        }
+
+        const navigatorLanguage = detectNavigatorLandingLanguage();
+        if (navigatorLanguage) {
+          return { language: navigatorLanguage, source: "navigator" };
+        }
+
+        return { language: "en", source: "default" };
+      }
+
+      function setLandingText(id, text) {
+        const element = document.getElementById(id);
+        if (element) {
+          element.textContent = text;
+        }
+      }
+
+      function setLandingHtml(id, html) {
+        const element = document.getElementById(id);
+        if (element) {
+          element.innerHTML = html;
+        }
+      }
+
+      function setLandingList(id, items) {
+        const element = document.getElementById(id);
+        if (element) {
+          element.innerHTML = items.map((item) => `<li>${item}</li>`).join("");
+        }
+      }
+
+      function applyLandingLanguage(language, options = { persist: false }) {
+        const normalized =
+          normalizeLandingLanguageTag(language) && LANDING_TRANSLATIONS[language]
+            ? language
+            : normalizeLandingLanguageTag(language) || "en";
+        const copy = LANDING_TRANSLATIONS[normalized] || LANDING_TRANSLATIONS.en;
+
+        document.documentElement.lang = normalized;
+        document.title = copy.title;
+
+        setLandingText("landingLanguageLabel", copy.languageLabel);
+        setLandingText("badgeMono", copy.badge);
+        setLandingText("heroMetaOne", copy.heroMetaOne);
+        setLandingText("heroMetaTwo", copy.heroMetaTwo);
+        setLandingText("heroMetaThree", copy.heroMetaThree);
+        setLandingText("heroLead", copy.heroLead);
+        setLandingHtml("heroDesc", copy.heroDesc);
+        setLandingText("heroSlabLabel", copy.heroSlabLabel);
+        setLandingText("heroSlabPoints", copy.heroSlabPoints);
+        setLandingText("heroSlabDesc", copy.heroSlabDesc);
+        setLandingText("ctaLaunch", copy.ctaLaunch);
+        setLandingText("ctaSample", copy.ctaSample);
+        setLandingText("ctaRepository", copy.ctaRepository);
+        setLandingHtml("sectionCapabilities", copy.sectionCapabilities);
+        setLandingText("capOneTag", copy.capOneTag);
+        setLandingText("capOneTitle", copy.capOneTitle);
+        setLandingText("capOneDesc", copy.capOneDesc);
+        setLandingText("capTwoTag", copy.capTwoTag);
+        setLandingText("capTwoTitle", copy.capTwoTitle);
+        setLandingText("capTwoDesc", copy.capTwoDesc);
+        setLandingText("capThreeTag", copy.capThreeTag);
+        setLandingText("capThreeTitle", copy.capThreeTitle);
+        setLandingText("capThreeDesc", copy.capThreeDesc);
+        setLandingHtml("sectionRequirements", copy.sectionRequirements);
+        setLandingText("reqTitle", copy.reqTitle);
+        setLandingList("reqList", copy.reqList);
+        setLandingText("limitsTitle", copy.limitsTitle);
+        setLandingList("limitsList", copy.limitsList);
+        setLandingHtml("sectionDocs", copy.sectionDocs);
+        setLandingText("docOneTitle", copy.docOneTitle);
+        setLandingText("docOneDesc", copy.docOneDesc);
+        setLandingText("docTwoTitle", copy.docTwoTitle);
+        setLandingText("docTwoDesc", copy.docTwoDesc);
+        setLandingText("docThreeTitle", copy.docThreeTitle);
+        setLandingText("docThreeDesc", copy.docThreeDesc);
+        setLandingText("docFourTitle", copy.docFourTitle);
+        setLandingText("docFourDesc", copy.docFourDesc);
+        setLandingHtml("docsNote", copy.docsNote);
+        setLandingText("footerLicense", copy.footerLicense);
+
+        const selector = document.getElementById("landingLanguageSelector");
+        if (selector) {
+          selector.value = normalized;
+          selector.setAttribute("aria-label", copy.languageAriaLabel);
+        }
+
+        if (options.persist) {
+          try {
+            localStorage.setItem("pcwLandingLanguage", normalized);
+          } catch (error) {
+            console.warn("Landing language storage write failed:", error);
+          }
+        }
+
+        return normalized;
+      }
+
+      function handleLandingLanguageSelection(event) {
+        const nextLanguage = event?.target?.value;
+        applyLandingLanguage(nextLanguage, { persist: true });
+      }
+
+      function initializeLandingLanguage() {
+        const initial = resolveInitialLandingLanguage();
+        applyLandingLanguage(initial.language, { persist: false });
+
+        const selector = document.getElementById("landingLanguageSelector");
+        if (selector && typeof selector.addEventListener === "function") {
+          selector.addEventListener("change", handleLandingLanguageSelection);
+        }
+      }
+
+      if (typeof window !== "undefined") {
+        window.__pcwLandingTestApi = {
+          normalizeLandingLanguageTag,
+          getLandingQueryOverride,
+          getStoredLandingLanguage,
+          detectNavigatorLandingLanguage,
+          resolveInitialLandingLanguage,
+          applyLandingLanguage,
+        };
+      }
+
+      document.addEventListener("DOMContentLoaded", initializeLandingLanguage);
+
+      window.addEventListener("languagechange", () => {
+        if (getLandingQueryOverride() || getStoredLandingLanguage()) {
+          return;
+        }
+
+        const nextLanguage = detectNavigatorLandingLanguage();
+        if (nextLanguage) {
+          applyLandingLanguage(nextLanguage, { persist: false });
+        }
+      });
+    </script>
   </body>
 </html>

@@ -1,97 +1,111 @@
 # PointCloudWorkbench
 
-ブラウザで動く、LAS/LAZ対応の単一HTML点群ワークベンチです。3D/2D表示、スライス、分類、統計確認に対応します。
+Browser-native LAS/LAZ point cloud workbench delivered as a single HTML file.
 
-## 主な機能
-
-- LAS/LAZ ファイルの読込
-- LAS の chunked 読み込みによる大容量ファイル負荷の平準化
-- LAZ の chunked 読込 + WASM ヒープ直書きによるメモリ重複の抑制
-- ファイル選択直後のヘッダー先読みと、品質画面での正確な表示率プレビュー
-- 読込前の読込経路表示と、推定ピークRAMベースの危険度表示
-- 読込前の品質選択（LOW / MEDIUM / HIGH / MAX）
-- 3D表示と 2D表示の切替
-- 標高・分類による色分け表示
-- スライス表示と 2D 断面確認
-- 自動分類と分類品質の確認
-- 統計パネルによる点数、分類内訳、処理時間の確認
-- 大容量ファイル向けのサイズ警告と性能配慮
-
-## 使い方
-
-1. `PointCloudWorkbench.html` を Chrome / Edge / Firefox で開きます。
-2. LAS/LAZ ファイルをドラッグ&ドロップするか、ファイル選択から読み込みます。
-3. 品質画面で表示率、読込経路、危険度を確認してから読み込みを開始します。
-4. 読み込み完了後、視点切替、色分け、スライス、自動分類、統計表示を必要に応じて使います。
-
-補足:
-- `PointCloudWorkbench.html` は単一HTMLで動作します。
-- `three.js` と `laz-perf` は CDN から読み込むため、通常はネットワーク接続が必要です。
-
-## 動作条件
-
-- 推奨ブラウザ: Chrome / Edge / Firefox の最新版
-- 必須機能: WebGL、File API、ArrayBuffer
-- 対応入力: `.las`, `.laz`
-- 実装上のファイルサイズ上限: LAS は 3GB超、LAZ は 2GB超で読み込み不可
-
-## 制約
-
-- `three.js` と `laz-perf` は CDN から読み込むため、通常はネットワーク接続が必要です。
-- LAS の `2GB超〜3GB以下` は実験運用帯です。`LOW` 品質から開始し、メモリと応答性を確認してください。
-- LAZ は内部で追加メモリを消費するため、LAS より安全域が狭く、`2GB超` は拒否されます。
-- ローカル `LAS` はヘッダー先読込 + chunked 点データ読込、ローカル `LAZ` は chunked で WASM ヒープへ転送します。`URL` 読込や一部互換経路では従来どおり全量 `ArrayBuffer` を使う場合があります。
-- 読込上限を拡張しても、実際の表示点数は品質設定の上限に従います。品質画面と統計パネルで `元点数 / 表示点数 / 表示率` を確認してください。
-- 自動分類は高さベースの簡易補助機能であり、厳密な測量級分類を保証するものではありません。
-
-## ファイル構成
-
-- `PointCloudWorkbench.html`: アプリ本体
-- `PointCloudWorkbench_ドキュメント索引.md`: 文書の入口
-- `PointCloudWorkbench_運用手順書.md`: 利用者向けの運用ガイド
-- `PointCloudWorkbench_実装リファレンス.md`: 開発者向けの実装ガイド
-
-## 関連ドキュメント
-
-- `PointCloudWorkbench_ドキュメント索引.md`
-- `PointCloudWorkbench_運用手順書.md`
-- `PointCloudWorkbench_実装リファレンス.md`
+No install. No build. Open the live demo, load a bundled sample LAS, and inspect point clouds in 3D/2D with slice, classification, and statistics tools.
 
 ## Live Demo
 
-- GitHub Pages: `https://tsutomu-n.github.io/pointcloud-workbench-html/`
-- 実アプリ: `https://tsutomu-n.github.io/pointcloud-workbench-html/PointCloudWorkbench.html`
-- デモではアプリ内の `サンプルデータを使用` から同梱 LAS を選ぶか、手元の `.las` / `.laz` を読み込んで確認できます。
+- Landing Page: `https://tsutomu-n.github.io/pointcloud-workbench-html/`
+- Launch App Directly: `https://tsutomu-n.github.io/pointcloud-workbench-html/PointCloudWorkbench.html`
+- Bundled Sample LAS: `https://tsutomu-n.github.io/pointcloud-workbench-html/demo/pointcloud-demo-sample.las`
+- The landing page can adapt to your browser language (`ja` / `en` / `zh`) and still exposes a manual language switcher.
+
+## Visual Tour
+
+- Planned screenshot assets live under `assets/`.
+- `assets/landing-hero.png`: Full-width GitHub Pages landing-page hero showing the dark terminal-like visual identity, oversized `PointCloudWorkbench.` typography, and the three CTA buttons for app launch, sample LAS download, and repository access.
+- `assets/preflight-panel.png`: App state immediately after selecting the bundled sample, with the pre-flight panel visible and enough detail to read the load path, risk indicator, file size, source point count, estimated display ratio, and quality presets.
+- `assets/workspace-3d.png`: Main 3D workspace after load, showing a point cloud rendered with visible depth and density, the primary control panels, and a viewpoint that makes the browser-native single-file experience feel production-ready rather than experimental.
+- `assets/workspace-2d-slice-stats.png`: 2D or slice-oriented inspection state with the statistics panel open, making it obvious that the tool supports cross-section inspection, classification review, and quantitative validation in addition to 3D viewing.
+- Detailed image briefs for future screenshots are documented in [`assets/README.md`](./assets/README.md).
+
+## Japanese README
+
+- Japanese README: [`./docs/README.ja.md`](./docs/README.ja.md)
+
+## Why PointCloudWorkbench
+
+- Single HTML delivery. The main application is `PointCloudWorkbench.html` with no build step.
+- Browser-native workflow. Open the file in Chrome / Edge / Firefox and start loading `.las` or `.laz`.
+- Landing-page copy can adapt to browser language while keeping explicit user override.
+- Fast evaluation before full load. The app previews headers, load path, risk level, and estimated display ratio before import.
+- Practical inspection workflow. Switch between 3D and 2D, inspect slices, review classifications, and check statistics in one tool.
+- Public demo included. GitHub Pages ships `index.html` as the landing page and the bundled sample LAS for quick validation.
+
+## Try It In 60 Seconds
+
+1. Open the GitHub Pages landing page or launch the app directly.
+2. In the app, choose `サンプルデータを使用` and select the bundled Pages sample, or load your own `.las` / `.laz`.
+3. Review the pre-flight panel for load path, risk level, and estimated display ratio.
+4. Inspect the cloud in 3D / 2D, try slice mode, and review statistics and classification output.
+
+## Key Capabilities
+
+- LAS/LAZ loading
+- Chunked LAS loading for large-file pressure smoothing
+- LAZ chunked reads with WASM heap writes to reduce duplicate memory use
+- Header-first preview and accurate display-ratio preview before import
+- Load-path visibility and estimated peak RAM risk display before import
+- Load quality selection (`LOW` / `MEDIUM` / `HIGH` / `MAX`)
+- 3D and 2D view switching
+- Elevation and classification color modes
+- Slice view and 2D cross-section inspection
+- Automatic classification assistance and classification quality review
+- Statistics panel for point counts, class breakdowns, and processing time
+
+## Browser / Runtime Requirements
+
+- Recommended browsers: Chrome / Edge / Firefox latest versions
+- Required APIs: WebGL, File API, ArrayBuffer
+- Accepted inputs: `.las`, `.laz`
+- Implementation ceiling: LAS files above 3GB and LAZ files above 2GB are rejected
+
+## Constraints
+
+- `three.js` and `laz-perf` are loaded from CDNs, so normal operation requires network access.
+- LAS files in the `2GB to 3GB` range are experimental. Start from `LOW` quality and verify memory use and responsiveness.
+- LAZ has a narrower safety margin because the decoder consumes extra memory. Files above `2GB` are rejected.
+- Local LAS uses header-first preview plus chunked point-data reads. Local LAZ uses chunked transfers into WASM. URL loading and some compatibility paths may still use full `ArrayBuffer` reads.
+- Raising file-size acceptance does not change the actual render cap. Confirm `source points / rendered points / render ratio` in the quality screen and statistics panel.
+- Automatic classification is a height-based assist feature, not a survey-grade classification guarantee.
+
+## Repository Layout
+
+- `index.html`: GitHub Pages landing page for the public demo
+- `PointCloudWorkbench.html`: single-file application
+- `assets/`: screenshot and visual asset directory for README / Pages presentation
+- `demo/pointcloud-demo-sample.las`: bundled LAS sample for Pages demo
+- `scripts/`: regression tests and README consistency checks
+- `PointCloudWorkbench_ドキュメント索引.md`: Japanese document entry point
+- `PointCloudWorkbench_運用手順書.md`: Japanese operations guide
+- `PointCloudWorkbench_実装リファレンス.md`: Japanese implementation reference
 
 ## License
 
-- ライセンスは `MIT` です。詳細は `LICENSE` を参照してください。
+- Licensed under `MIT`. See `LICENSE`.
 
 ## Development
 
-- 配布モデルは単一HTMLです。実行本体は `PointCloudWorkbench.html` で、ビルド工程はありません。
-- JavaScript/TypeScript の実行とテストは `bun` を前提にしています。
-- `scripts/` は開発用の回帰テストと README 整合チェックであり、アプリ本体の実行には不要です。
-- 実装変更時は、関連する運用文書と実装文書もあわせて更新してください。
+- Distribution stays single-file. `PointCloudWorkbench.html` is the runtime artifact and there is no build pipeline.
+- JavaScript/TypeScript execution and tests assume `bun`.
+- `scripts/` is for development-time regression tests and README checks, not for running the app.
+- Update the related operation and implementation documents when behavior changes.
 
 ## Testing
 
-- `bun test scripts/pointcloud-workbench.test.js scripts/documentation-consistency.test.js scripts/gitignore.test.js scripts/repository-metadata.test.js scripts/public-repo-readiness.test.js`
+- `bun test scripts/pointcloud-workbench.test.js scripts/documentation-consistency.test.js scripts/gitignore.test.js scripts/repository-metadata.test.js scripts/public-repo-readiness.test.js scripts/landing-page-i18n.test.js`
 - `bun scripts/check-readme.js`
 
 ## Repository Scope
 
-- 公開の主対象は `PointCloudWorkbench.html` と関連ドキュメントです。
-- GitHub Pages では `index.html` を入口にし、実アプリは `PointCloudWorkbench.html` をそのまま配信します。
-- `scripts/` は開発用の検証資産として公開しています。
-- `test-results/` やローカル補助ツールの生成物は公開対象ではありません。
+- The main public deliverable is `PointCloudWorkbench.html` plus the related documentation.
+- GitHub Pages uses `index.html` as the landing page and serves `PointCloudWorkbench.html` directly as the actual app.
+- `scripts/` is published as verification assets for development and maintenance.
+- `test-results/` and local helper-tool outputs are not part of the public deliverable.
 
 ## CDN / Network Notes
 
-- 実行時に `three.js` と `laz-perf` を CDN から読み込みます。
-- 通常利用にはネットワーク接続が必要です。CDN に到達できない環境ではアプリが正常に起動しない場合があります。
-- GitHub Pages デモでも同じ CDN 依存があります。
-
-## 補足
-
-- 言語セレクタは `lang` 属性と保存値を切り替えますが、UI文言の自動翻訳は行いません。
+- Runtime depends on `three.js` and `laz-perf` served from CDNs.
+- Normal usage requires network access. If the CDN is unreachable, the app may fail to initialize.
+- The GitHub Pages demo has the same CDN dependency.
