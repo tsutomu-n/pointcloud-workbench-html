@@ -57,7 +57,33 @@
 - `PointCloudWorkbench_運用手順書.md`
 - `PointCloudWorkbench_実装リファレンス.md`
 
+## License
+
+- ライセンスは `MIT` です。詳細は `LICENSE` を参照してください。
+
+## Development
+
+- 配布モデルは単一HTMLです。実行本体は `PointCloudWorkbench.html` で、ビルド工程はありません。
+- JavaScript/TypeScript の実行とテストは `bun` を前提にしています。
+- `scripts/` は開発用の回帰テストと README 整合チェックであり、アプリ本体の実行には不要です。
+- 実装変更時は、関連する運用文書と実装文書もあわせて更新してください。
+
+## Testing
+
+- `bun test scripts/pointcloud-workbench.test.js scripts/documentation-consistency.test.js scripts/gitignore.test.js scripts/repository-metadata.test.js scripts/public-repo-readiness.test.js`
+- `bun scripts/check-readme.js`
+
+## Repository Scope
+
+- 公開の主対象は `PointCloudWorkbench.html` と関連ドキュメントです。
+- `scripts/` は開発用の検証資産として公開しています。
+- `test-results/` やローカル補助ツールの生成物は公開対象ではありません。
+
+## CDN / Network Notes
+
+- 実行時に `three.js` と `laz-perf` を CDN から読み込みます。
+- 通常利用にはネットワーク接続が必要です。CDN に到達できない環境ではアプリが正常に起動しない場合があります。
+
 ## 補足
 
 - 言語セレクタは `lang` 属性と保存値を切り替えますが、UI文言の自動翻訳は行いません。
-- 実装変更時は、関連する運用文書と実装文書もあわせて更新してください。
