@@ -64,6 +64,7 @@ test("Pages demo assets and deployment workflow are present", () => {
   expect(workflow).toContain("bun scripts/check-readme.js");
   expect(workflow).toContain("actions/upload-pages-artifact@v3");
   expect(workflow).toContain("actions/deploy-pages@v4");
+  expect(workflow).toContain("name: ${{ 'github-pages' }}");
   expect(workflow).toContain("pointcloud-demo-sample.las");
   expect(workflow).toContain(".nojekyll");
 });
