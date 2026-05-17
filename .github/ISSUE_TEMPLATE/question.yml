@@ -1,0 +1,19 @@
+name: 質問
+description: 使い方や仕様に関する質問
+title: "[Question]: "
+labels: ["question"]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: 質問内容
+      placeholder: "何について知りたいですか？"
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: ブラウザー
+      placeholder: "Chrome / Edge"
+    validations:
+      required: false

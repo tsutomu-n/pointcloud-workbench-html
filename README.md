@@ -23,6 +23,12 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 ## Japanese README
 
 - Japanese README: [`./docs/README.ja.md`](./docs/README.ja.md)
+- Quickstart: [`./docs/quickstart.ja.md`](./docs/quickstart.ja.md)
+- Junior engineer guide: [`./docs/for-junior-se.ja.md`](./docs/for-junior-se.ja.md)
+- Runtime model: [`./docs/runtime-model.ja.md`](./docs/runtime-model.ja.md)
+- Troubleshooting: [`./docs/troubleshooting.ja.md`](./docs/troubleshooting.ja.md)
+- FAQ: [`./docs/faq.ja.md`](./docs/faq.ja.md)
+- Glossary: [`./docs/glossary.ja.md`](./docs/glossary.ja.md)
 
 ## Why PointCloudWorkbench
 
@@ -95,6 +101,9 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 - JavaScript/TypeScript execution and tests assume `bun`.
 - `scripts/` is for development-time regression tests and README checks, not for running the app.
 - Update the related operation and implementation documents when behavior changes.
+- Contribution guidelines: [`CONTRIBUTING.md`](./CONTRIBUTING.md)
+- Security policy: [`SECURITY.md`](./SECURITY.md)
+- Code of conduct: [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md)
 
 ## Testing
 

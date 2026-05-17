@@ -12,9 +12,29 @@ test("README documents public repo development and runtime constraints", () => {
   const readme = read("README.md");
   const readmeJaPath = path.join(rootDir, "docs", "README.ja.md");
   const assetsGuidePath = path.join(rootDir, "assets", "README.md");
+  const ossDocPaths = [
+    "CONTRIBUTING.md",
+    "SECURITY.md",
+    "CODE_OF_CONDUCT.md",
+    "docs/quickstart.ja.md",
+    "docs/for-junior-se.ja.md",
+    "docs/runtime-model.ja.md",
+    "docs/cloudflare-pages-static-only.ja.md",
+    "docs/architecture-client-max.ja.md",
+    "docs/troubleshooting.ja.md",
+    "docs/faq.ja.md",
+    "docs/glossary.ja.md",
+    ".github/ISSUE_TEMPLATE/bug_report.yml",
+    ".github/ISSUE_TEMPLATE/feature_request.yml",
+    ".github/ISSUE_TEMPLATE/question.yml",
+    ".github/PULL_REQUEST_TEMPLATE.md",
+  ];
 
   expect(fs.existsSync(readmeJaPath)).toBe(true);
   expect(fs.existsSync(assetsGuidePath)).toBe(true);
+  for (const relativePath of ossDocPaths) {
+    expect(fs.existsSync(path.join(rootDir, relativePath))).toBe(true);
+  }
   expect(readme).toContain("Browser-native LAS/LAZ point cloud workbench");
   expect(readme).toContain("No install. No build.");
   expect(readme).toContain("Client-Max / Server-Zero");
@@ -26,6 +46,15 @@ test("README documents public repo development and runtime constraints", () => {
   expect(readme).toContain("## Why PointCloudWorkbench");
   expect(readme).toContain("## Try It In 60 Seconds");
   expect(readme).toContain("## Japanese README");
+  expect(readme).toContain("./docs/quickstart.ja.md");
+  expect(readme).toContain("./docs/for-junior-se.ja.md");
+  expect(readme).toContain("./docs/runtime-model.ja.md");
+  expect(readme).toContain("./docs/troubleshooting.ja.md");
+  expect(readme).toContain("./docs/faq.ja.md");
+  expect(readme).toContain("./docs/glossary.ja.md");
+  expect(readme).toContain("CONTRIBUTING.md");
+  expect(readme).toContain("SECURITY.md");
+  expect(readme).toContain("CODE_OF_CONDUCT.md");
   expect(readme).toContain("browser language");
   expect(readme).toContain("./docs/README.ja.md");
   expect(readme).toContain("assets/landing-hero.png");
@@ -41,6 +70,25 @@ test("README documents public repo development and runtime constraints", () => {
   expect(readme).toContain("bun");
   expect(readme).toContain("scripts/");
   expect(readme).toContain("https://tsutomu-n.github.io/pointcloud-workbench-html/");
+});
+
+test("OSS contributor docs describe server-zero contribution boundaries", () => {
+  const contributing = read("CONTRIBUTING.md");
+  const security = read("SECURITY.md");
+  const quickstart = read("docs/quickstart.ja.md");
+  const junior = read("docs/for-junior-se.ja.md");
+  const runtime = read("docs/runtime-model.ja.md");
+  const cloudflare = read("docs/cloudflare-pages-static-only.ja.md");
+  const bugTemplate = read(".github/ISSUE_TEMPLATE/bug_report.yml");
+
+  expect(contributing).toContain("点群ファイルをサーバーへ送信する");
+  expect(contributing).toContain("bun scripts/check-server-zero.js");
+  expect(security).toContain("サーバーへアップロードしません");
+  expect(quickstart).toContain("Safari、Firefox、古いブラウザーは対応対象外");
+  expect(junior).toContain("Client-Max / Server-Zero");
+  expect(runtime).toContain("サーバーにやらせないこと");
+  expect(cloudflare).toContain("Cloudflare Pagesには1ファイル25MiBの制限");
+  expect(bugTemplate).toContain("点群ファイル本体は添付しないでください");
 });
 
 test("GitHub Actions CI runs Bun tests and README checks on main push and pull_request", () => {

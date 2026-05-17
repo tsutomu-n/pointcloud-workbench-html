@@ -1,0 +1,61 @@
+name: バグ報告
+description: PointCloudWorkbenchの不具合を報告する
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        報告ありがとうございます。再現手順をできるだけ具体的に書いてください。
+  - type: input
+    id: browser
+    attributes:
+      label: ブラウザー
+      description: Chrome / Edge のバージョン
+      placeholder: "Chrome 126 / Edge 126"
+    validations:
+      required: true
+  - type: input
+    id: file_type
+    attributes:
+      label: ファイル形式
+      placeholder: ".las / .laz"
+    validations:
+      required: true
+  - type: input
+    id: file_size
+    attributes:
+      label: ファイルサイズ
+      placeholder: "例: 512MB"
+    validations:
+      required: false
+  - type: textarea
+    id: steps
+    attributes:
+      label: 再現手順
+      placeholder: |
+        1. ファイルを選択
+        2. MEDIUM品質を選択
+        3. 読み込み開始
+        4. エラー発生
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期待した動作
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 実際の動作
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: エラー表示・診断情報
+      description: 点群ファイル本体は添付しないでください。
+    validations:
+      required: false

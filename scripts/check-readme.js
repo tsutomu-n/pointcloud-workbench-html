@@ -21,6 +21,12 @@ const requiredSnippets = [
   "## Visual Tour",
   "## Japanese README",
   "./docs/README.ja.md",
+  "./docs/quickstart.ja.md",
+  "./docs/for-junior-se.ja.md",
+  "./docs/runtime-model.ja.md",
+  "./docs/troubleshooting.ja.md",
+  "./docs/faq.ja.md",
+  "./docs/glossary.ja.md",
   "browser language",
   "assets/landing-hero.png",
   "assets/preflight-panel.png",
@@ -47,6 +53,9 @@ const requiredSnippets = [
   "PointCloudWorkbench_ドキュメント索引.md",
   "PointCloudWorkbench_運用手順書.md",
   "PointCloudWorkbench_実装リファレンス.md",
+  "CONTRIBUTING.md",
+  "SECURITY.md",
+  "CODE_OF_CONDUCT.md",
 ];
 
 for (const snippet of requiredSnippets) {

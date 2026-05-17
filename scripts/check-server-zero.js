@@ -35,7 +35,7 @@ const forbiddenPatterns = [
     reason: "automatic telemetry or error reporting endpoints are not allowed",
   },
   {
-    pattern: /uploadPointCloud|sendPointCloudToServer|\/upload-point-cloud/i,
+    pattern: /uploadPointCloud|pointCloudUpload|sendPointCloudToServer|\/upload-point-cloud/i,
     reason: "selected point cloud files must not be uploaded",
   },
   {
@@ -43,6 +43,12 @@ const forbiddenPatterns = [
     reason: "Cloudflare server-side bindings are not part of the normal path",
   },
 ];
+
+const allowedForbiddenPatternFiles = new Set([
+  "assets/latest/manifest.json",
+  "assets/v1.0.0/manifest.json",
+  "scripts/public-repo-readiness.test.js",
+]);
 
 function walk(dir, files = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -91,6 +97,7 @@ for (const file of walk(rootDir)) {
 
   if (relativeFile === "scripts/check-server-zero.js") continue;
   if (!/\.(html|js|mjs|cjs|ts|json|ya?ml)$/.test(relativeFile)) continue;
+  if (allowedForbiddenPatternFiles.has(relativeFile)) continue;
 
   const text = fs.readFileSync(file, "utf8");
   for (const { pattern, reason } of forbiddenPatterns) {

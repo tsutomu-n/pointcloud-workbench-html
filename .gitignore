@@ -1,9 +1,41 @@
-/bk0302.zip
-/PointCloudWorkbench_bk_0302.html
-/PointCloudWorkbench_bk_0315.html
-.plan/
-/AGENTS.md
+# Local backups and exported packages
+/*.bak
+/*.backup
+/*.zip
+/*_bk_*.html
+/bk*.html
+
+# Local-only agent and planning state
 /.ai_memory/
-/test-results/
 /.serena/
 /.tmp/
+.plan/
+/AGENTS.md
+
+# Test and coverage output
+/test-results/
+/coverage/
+/.nyc_output/
+
+# JavaScript/Bun dependencies and caches
+/node_modules/
+/.bun/
+/.turbo/
+/.vite/
+
+# Logs and runtime dumps
+*.log
+*.pid
+*.seed
+*.pid.lock
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+bun-debug.log*
+
+# OS and editor noise
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~

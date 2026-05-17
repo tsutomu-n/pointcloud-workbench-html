@@ -1,0 +1,35 @@
+name: 機能要望
+description: 新機能や改善提案
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 解決したい問題
+      placeholder: "どんな作業で困っていますか？"
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 提案する解決策
+      placeholder: "どのような機能があるとよいですか？"
+    validations:
+      required: true
+  - type: dropdown
+    id: server_load
+    attributes:
+      label: サーバー負荷は増えますか？
+      options:
+        - "増えない"
+        - "分からない"
+        - "増える可能性がある"
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 代替案
+    validations:
+      required: false
