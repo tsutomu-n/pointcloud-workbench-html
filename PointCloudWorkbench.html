@@ -2645,6 +2645,48 @@
         margin-top: 4px;
         opacity: 0.7;
       }
+      .runtime-status {
+        margin-top: 18px;
+        border: 1px solid var(--ec-border);
+        border-radius: 8px;
+        background: rgba(15, 23, 42, 0.55);
+        padding: 14px;
+        text-align: left;
+      }
+      .runtime-status__head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 10px;
+      }
+      .runtime-status__title {
+        color: var(--ec-text);
+        font-size: 13px;
+        font-weight: 700;
+      }
+      .runtime-status__mode {
+        color: var(--ec-accent);
+        font-size: 12px;
+        font-family: var(--font-mono);
+      }
+      .runtime-status__grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+      .runtime-status__item {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        color: var(--ec-muted);
+        font-size: 12px;
+      }
+      .runtime-status__value {
+        color: var(--ec-text);
+        font-family: var(--font-mono);
+        white-space: nowrap;
+      }
       .file-input-hidden {
         position: absolute;
         width: 1px;
@@ -3319,6 +3361,37 @@
                 aria-label="LASまたはLAZファイルを選択"
                 aria-describedby="dropzoneTitle dropzoneSub dropzoneHint"
               />
+            </div>
+
+            <div
+              class="runtime-status"
+              id="runtimeStatusPanel"
+              aria-label="Runtime mode"
+            >
+              <div class="runtime-status__head">
+                <div class="runtime-status__title">Runtime Mode</div>
+                <div class="runtime-status__mode" id="runtimeModeLabel">
+                  検出中
+                </div>
+              </div>
+              <div class="runtime-status__grid">
+                <div class="runtime-status__item">
+                  <span>Browser</span>
+                  <span class="runtime-status__value" id="runtimeBrowser">-</span>
+                </div>
+                <div class="runtime-status__item">
+                  <span>Renderer</span>
+                  <span class="runtime-status__value" id="runtimeRenderer">-</span>
+                </div>
+                <div class="runtime-status__item">
+                  <span>Worker</span>
+                  <span class="runtime-status__value" id="runtimeWorker">-</span>
+                </div>
+                <div class="runtime-status__item">
+                  <span>Isolation</span>
+                  <span class="runtime-status__value" id="runtimeIsolation">-</span>
+                </div>
+              </div>
             </div>
 
             <div class="file-info" id="fileInfo" style="display: none">
@@ -5406,6 +5479,126 @@
       // Initialize compatibility checker
       const compatibilityChecker = new CompatibilityChecker();
 
+      function detectWebGL2Support() {
+        try {
+          const canvas = document.createElement("canvas");
+          return !!canvas.getContext("webgl2");
+        } catch (error) {
+          return false;
+        }
+      }
+
+      function getRuntimeCapabilityProfile() {
+        const browser = compatibilityChecker.detectBrowserSupport();
+        const href = String(window.location?.href || "");
+        let protocol = String(window.location?.protocol || "");
+        if (!protocol && href) {
+          try {
+            protocol = new URL(href).protocol;
+          } catch (error) {
+            protocol = "";
+          }
+        }
+        const isFile = protocol === "file:";
+        const isHosted = protocol === "http:" || protocol === "https:";
+        const webgpu = !!(window.navigator && window.navigator.gpu);
+        const webgl2 = detectWebGL2Support();
+        const worker =
+          typeof window.Worker === "function" || typeof Worker === "function";
+        const moduleWorker = worker && !isFile;
+        const blobWorker =
+          worker &&
+          typeof window.Blob === "function" &&
+          typeof window.URL === "function";
+        const wasm = typeof WebAssembly === "object";
+        const sharedArrayBuffer = typeof SharedArrayBuffer === "function";
+        const isolated = !!window.crossOriginIsolated;
+
+        return {
+          browser,
+          location: {
+            isHosted,
+            isFile,
+            isSecureContext: !!window.isSecureContext,
+          },
+          gpu: {
+            webgpu,
+            webgl2,
+          },
+          worker: {
+            worker,
+            moduleWorker,
+            blobWorker,
+          },
+          wasm: {
+            available: wasm,
+          },
+          security: {
+            crossOriginIsolated: isolated,
+            sharedArrayBuffer,
+          },
+        };
+      }
+
+      function selectRuntimeMode(profile = getRuntimeCapabilityProfile()) {
+        if (!profile.browser.supported) return "unsupported";
+        if (!profile.gpu.webgpu && !profile.gpu.webgl2) return "unsupported";
+
+        if (
+          profile.location.isHosted &&
+          profile.security.crossOriginIsolated &&
+          profile.gpu.webgpu
+        ) {
+          return "hosted-high-performance";
+        }
+
+        if (profile.location.isHosted) return "hosted-normal";
+        if (profile.location.isFile && profile.gpu.webgpu) {
+          return "portable-online-webgpu";
+        }
+        if (profile.location.isFile && profile.gpu.webgl2) {
+          return "portable-online-webgl2";
+        }
+
+        return "hosted-normal";
+      }
+
+      function buildRuntimeStatus(profile = getRuntimeCapabilityProfile()) {
+        const mode = selectRuntimeMode(profile);
+        const renderer = profile.gpu.webgpu
+          ? "WebGPU"
+          : profile.gpu.webgl2
+            ? "WebGL2"
+            : "Unavailable";
+
+        return {
+          mode,
+          browser: profile.browser.browser,
+          renderer,
+          worker: profile.worker.worker ? "Available" : "Unavailable",
+          isolation: profile.security.crossOriginIsolated ? "COOP/COEP" : "Normal",
+          sharedArrayBuffer: profile.security.sharedArrayBuffer,
+          webgpu: profile.gpu.webgpu,
+          webgl2: profile.gpu.webgl2,
+        };
+      }
+
+      function updateRuntimeStatusPanel() {
+        const status = buildRuntimeStatus();
+        const setText = (id, value) => {
+          const element = document.getElementById(id);
+          if (element) element.textContent = value;
+        };
+
+        setText("runtimeModeLabel", status.mode);
+        setText("runtimeBrowser", status.browser);
+        setText("runtimeRenderer", status.renderer);
+        setText("runtimeWorker", status.worker);
+        setText("runtimeIsolation", status.isolation);
+
+        return status;
+      }
+
       // Three.js 基本変数 (with null safety)
       let scene = null,
         camera = null,
@@ -5868,6 +6061,77 @@
           label: "ArrayBuffer 全量読込",
           detail: "互換経路のためファイル全体を一度に読み込みます。",
         };
+      }
+
+      function createPointCloudReaderRegistry() {
+        const readers = new Map();
+
+        return {
+          register(reader) {
+            if (!reader || !reader.extension || typeof reader.load !== "function") {
+              throw new Error("ReaderRegistry: reader definition is invalid");
+            }
+            readers.set(reader.extension, reader);
+          },
+          get(extension) {
+            return readers.get(String(extension || "").toLowerCase()) || null;
+          },
+          list() {
+            return Array.from(readers.values()).map((reader) => ({
+              extension: reader.extension,
+              label: reader.label,
+              localChunked: reader.localChunked === true,
+            }));
+          },
+        };
+      }
+
+      const pointCloudReaderRegistry = createPointCloudReaderRegistry();
+
+      function registerDefaultPointCloudReaders() {
+        pointCloudReaderRegistry.register({
+          extension: "las",
+          label: "LAS local chunked reader",
+          localChunked: true,
+          async load(file) {
+            if (typeof file?.slice === "function") {
+              await buildPointCloudFromLASFile(file);
+              return;
+            }
+            const arrayBuffer = await readFileAsArrayBuffer(file);
+            await buildPointCloudFromArrayBuffer(
+              arrayBuffer,
+              file?.name || "scan.las",
+              file?.size ?? null,
+            );
+          },
+        });
+
+        pointCloudReaderRegistry.register({
+          extension: "laz",
+          label: "LAZ local WASM heap reader",
+          localChunked: true,
+          async load(file) {
+            if (typeof file?.slice === "function") {
+              await buildPointCloudFromLAZFile(file);
+              return;
+            }
+            const arrayBuffer = await readFileAsArrayBuffer(file);
+            await buildPointCloudFromArrayBuffer(
+              arrayBuffer,
+              file?.name || "scan.laz",
+              file?.size ?? null,
+            );
+          },
+        });
+      }
+
+      registerDefaultPointCloudReaders();
+
+      function resolvePointCloudReader(fileOrName) {
+        const fileName =
+          typeof fileOrName === "string" ? fileOrName : fileOrName?.name || "";
+        return pointCloudReaderRegistry.get(resolveFileExtension(fileName));
       }
 
       function getEstimatedMemoryBudgetMB() {
@@ -8303,12 +8567,10 @@
 
           updateProgress(20, "ファイル読み込み中...");
 
-          const extension = resolveFileExtension(file.name);
+          const reader = resolvePointCloudReader(file);
 
-          if (extension === "las" && typeof file.slice === "function") {
-            await buildPointCloudFromLASFile(file);
-          } else if (extension === "laz" && typeof file.slice === "function") {
-            await buildPointCloudFromLAZFile(file);
+          if (reader) {
+            await reader.load(file);
           } else {
             let arrayBuffer;
             try {
@@ -14163,6 +14425,7 @@
       document.addEventListener("DOMContentLoaded", () => {
         console.log("段階的ビューアー起動");
         init();
+        updateRuntimeStatusPanel();
         updateLastFileInfo();
         setViewerVisibility(false);
 
@@ -14292,6 +14555,14 @@
           updateEstimations,
           detectBrowserSupport() {
             return compatibilityChecker.detectBrowserSupport();
+          },
+          getRuntimeCapabilityProfile,
+          selectRuntimeMode,
+          buildRuntimeStatus,
+          updateRuntimeStatusPanel,
+          resolvePointCloudReader,
+          getRegisteredPointCloudReaders() {
+            return pointCloudReaderRegistry.list();
           },
         };
       }

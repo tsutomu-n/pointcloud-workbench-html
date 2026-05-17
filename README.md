@@ -50,10 +50,12 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 ## Key Capabilities
 
 - LAS/LAZ loading
+- ReaderRegistry dispatch for LAS and LAZ local readers
 - Chunked LAS loading for large-file pressure smoothing
 - LAZ chunked reads with WASM heap writes to reduce duplicate memory use
 - Header-first preview and accurate display-ratio preview before import
 - Load-path visibility and estimated peak RAM risk display before import
+- Runtime mode summary for Hosted / Portable / renderer / isolation capabilities
 - Load quality selection (`LOW` / `MEDIUM` / `HIGH` / `MAX`)
 - 3D and 2D view switching
 - Elevation and classification color modes

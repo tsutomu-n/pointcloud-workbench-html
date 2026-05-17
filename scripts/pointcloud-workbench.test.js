@@ -82,7 +82,17 @@ function createMockElement(id = "") {
   };
 }
 
-function createContext({ userAgent = "bun-test", userAgentData = undefined } = {}) {
+function createContext({
+  userAgent = "bun-test",
+  userAgentData = undefined,
+  href = "http://localhost/",
+  protocol = "",
+  hasWebGpu = false,
+  hasWorker = false,
+  crossOriginIsolated = false,
+  isSecureContext = true,
+  webgl2 = true,
+} = {}) {
   const elements = new Map();
   const documentEvents = new Map();
   const windowEvents = new Map();
@@ -106,6 +116,10 @@ function createContext({ userAgent = "bun-test", userAgentData = undefined } = {
       if (tag === "canvas") {
         el.width = 0;
         el.height = 0;
+        el.getContext = (type) => {
+          if (type === "webgl2") return webgl2 ? {} : null;
+          return {};
+        };
       }
       return el;
     },
@@ -137,9 +151,12 @@ function createContext({ userAgent = "bun-test", userAgentData = undefined } = {
   const windowObject = {
     __PCW_ENABLE_TEST_API__: true,
     location: {
-      href: "http://localhost/",
+      href,
+      protocol,
       reload() {},
     },
+    isSecureContext,
+    crossOriginIsolated,
     screen: {
       width: 1920,
       height: 1080,
@@ -180,6 +197,7 @@ function createContext({ userAgent = "bun-test", userAgentData = undefined } = {
     FileReader: function FileReader() {},
     FileList: function FileList() {},
     Blob: function Blob() {},
+    URL,
     ArrayBuffer,
     DataView,
     Promise,
@@ -277,6 +295,20 @@ function createContext({ userAgent = "bun-test", userAgentData = undefined } = {
       },
     }),
   };
+
+  if (hasWorker) {
+    windowObject.Worker = function Worker() {};
+  }
+  if (hasWebGpu) {
+    windowObject.navigator = {
+      hardwareConcurrency: 8,
+      userAgent,
+      userAgentData,
+      language: "ja-JP",
+      gpu: {},
+    };
+    context.navigator = windowObject.navigator;
+  }
 
   windowObject.document = document;
   windowObject.window = windowObject;
@@ -480,6 +512,100 @@ test("browser support policy allows Chrome and Edge only", () => {
     supported: false,
     browser: "unsupported",
   });
+});
+
+test("runtime mode selection distinguishes hosted, portable, and unsupported modes", () => {
+  const hostedHighPerformance = createContext({
+    userAgent:
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    href: "https://example.test/PointCloudWorkbench.html",
+    protocol: "https:",
+    hasWebGpu: true,
+    hasWorker: true,
+    crossOriginIsolated: true,
+  });
+  expect(
+    vm.runInContext("window.__pcwTestApi.buildRuntimeStatus()", hostedHighPerformance),
+  ).toMatchObject({
+    mode: "hosted-high-performance",
+    browser: "chrome",
+    renderer: "WebGPU",
+    worker: "Available",
+    isolation: "COOP/COEP",
+  });
+
+  const portableWebgl = createContext({
+    userAgent:
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    href: "file:///tmp/PointCloudWorkbench.html",
+    protocol: "file:",
+    hasWorker: true,
+  });
+  expect(vm.runInContext("window.__pcwTestApi.selectRuntimeMode()", portableWebgl)).toBe(
+    "portable-online-webgl2",
+  );
+
+  const unsupported = createContext({
+    userAgent:
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 14.0; rv:125.0) Gecko/20100101 Firefox/125.0",
+    href: "https://example.test/PointCloudWorkbench.html",
+    protocol: "https:",
+    webgl2: true,
+  });
+  expect(vm.runInContext("window.__pcwTestApi.selectRuntimeMode()", unsupported)).toBe(
+    "unsupported",
+  );
+});
+
+test("runtime status panel writes the detected capability summary", () => {
+  const context = createContext({
+    userAgent:
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36 Edg/125.0.0.0",
+    href: "https://example.test/PointCloudWorkbench.html",
+    protocol: "https:",
+    hasWorker: true,
+  });
+
+  const status = vm.runInContext("window.__pcwTestApi.updateRuntimeStatusPanel()", context);
+  expect(status.mode).toBe("hosted-normal");
+  expect(context.document.getElementById("runtimeModeLabel").textContent).toBe(
+    "hosted-normal",
+  );
+  expect(context.document.getElementById("runtimeBrowser").textContent).toBe("edge");
+  expect(context.document.getElementById("runtimeRenderer").textContent).toBe("WebGL2");
+  expect(context.document.getElementById("runtimeWorker").textContent).toBe("Available");
+  expect(context.document.getElementById("runtimeIsolation").textContent).toBe("Normal");
+});
+
+test("ReaderRegistry exposes LAS and LAZ local readers", () => {
+  const context = createContext();
+
+  const readers = vm.runInContext(
+    "window.__pcwTestApi.getRegisteredPointCloudReaders()",
+    context,
+  );
+
+  expect(readers).toEqual([
+    {
+      extension: "las",
+      label: "LAS local chunked reader",
+      localChunked: true,
+    },
+    {
+      extension: "laz",
+      label: "LAZ local WASM heap reader",
+      localChunked: true,
+    },
+  ]);
+  expect(
+    vm.runInContext('window.__pcwTestApi.resolvePointCloudReader("scan.las").label', context),
+  ).toBe("LAS local chunked reader");
+  expect(
+    vm.runInContext('window.__pcwTestApi.resolvePointCloudReader("scan.laz").label', context),
+  ).toBe("LAZ local WASM heap reader");
+  expect(
+    vm.runInContext('window.__pcwTestApi.resolvePointCloudReader("scan.ply")', context),
+  ).toBeNull();
 });
 
 test("startDataLoading restarts memory monitoring before load", async () => {

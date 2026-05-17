@@ -41,6 +41,8 @@ test("README documents public repo development and runtime constraints", () => {
   expect(readme).toContain("Chrome / Edge only");
   expect(readme).toContain("Safari and Firefox are intentionally unsupported");
   expect(readme).toContain("Selected LAS/LAZ files are processed locally in the browser and are not uploaded");
+  expect(readme).toContain("Runtime mode summary");
+  expect(readme).toContain("ReaderRegistry dispatch");
   expect(readme).toContain("## Live Demo");
   expect(readme).toContain("## Visual Tour");
   expect(readme).toContain("## Why PointCloudWorkbench");
@@ -88,7 +90,9 @@ test("OSS contributor docs describe server-zero contribution boundaries", () => 
   expect(security).toContain("telemetry endpointなし");
   expect(quickstart).toContain("Safari、Firefox、古いブラウザーは対応対象外");
   expect(junior).toContain("Client-Max / Server-Zero");
+  expect(junior).toContain("ReaderRegistry");
   expect(runtime).toContain("サーバーにやらせないこと");
+  expect(runtime).toContain("現在のRuntime Mode");
   expect(cloudflare).toContain("Cloudflare Pagesには1ファイル25MiBの制限");
   expect(cloudflare).toContain("今後WorkerやRendererを分割する場合のstatic-only構成案");
   expect(bugTemplate).toContain("点群ファイル本体は添付しないでください");
@@ -189,4 +193,17 @@ test("Server-Zero static assets and PR template document the operating policy", 
   expect(prTemplate).toContain("What Changed");
   expect(prTemplate).toContain("Server Load");
   expect(prTemplate).toContain("Selected LAS/LAZ files are not uploaded");
+});
+
+test("app exposes runtime mode summary UI and test hooks", () => {
+  const app = read("PointCloudWorkbench.html");
+
+  expect(app).toContain('id="runtimeStatusPanel"');
+  expect(app).toContain('id="runtimeModeLabel"');
+  expect(app).toContain('id="runtimeRenderer"');
+  expect(app).toContain("function getRuntimeCapabilityProfile()");
+  expect(app).toContain("function selectRuntimeMode(");
+  expect(app).toContain("function updateRuntimeStatusPanel()");
+  expect(app).toContain("function createPointCloudReaderRegistry()");
+  expect(app).toContain("LAS local chunked reader");
 });
