@@ -608,6 +608,53 @@ test("ReaderRegistry exposes LAS and LAZ local readers", () => {
   ).toBeNull();
 });
 
+test("PointCloudData summarizes counts, bounds, and coordinate basis", () => {
+  const context = createContext();
+  context.__header = {
+    numberOfPointRecords: 4,
+    xScaleFactor: 0.01,
+    yScaleFactor: 0.02,
+    zScaleFactor: 0.03,
+    xOffset: 100,
+    yOffset: 200,
+    zOffset: 300,
+  };
+  context.__points = [
+    { x: 10, y: 5, z: 1 },
+    { x: 20, y: 15, z: 9 },
+  ];
+
+  const data = vm.runInContext(
+    `
+      window.__pcwTestApi.createPointCloudData({
+        header: __header,
+        points: __points,
+        fileName: "scan.las",
+        fileSize: 256,
+      })
+    `,
+    context,
+  );
+
+  expect(data.kind).toBe("PointCloudData");
+  expect(data.pointCounts).toMatchObject({
+    sourceCount: 4,
+    decodedCount: 2,
+    displayCount: 2,
+    displayRatio: 50,
+  });
+  expect(data.bounds).toEqual({
+    minX: 10,
+    maxX: 20,
+    minY: 5,
+    maxY: 15,
+    minZ: 1,
+    maxZ: 9,
+  });
+  expect(data.coordinateBasis.scale).toEqual({ x: 0.01, y: 0.02, z: 0.03 });
+  expect(data.coordinateBasis.offset).toEqual({ x: 100, y: 200, z: 300 });
+});
+
 test("startDataLoading restarts memory monitoring before load", async () => {
   const context = createContext();
 

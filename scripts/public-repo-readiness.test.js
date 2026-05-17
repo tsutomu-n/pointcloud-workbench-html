@@ -43,6 +43,7 @@ test("README documents public repo development and runtime constraints", () => {
   expect(readme).toContain("Selected LAS/LAZ files are processed locally in the browser and are not uploaded");
   expect(readme).toContain("Runtime mode summary");
   expect(readme).toContain("ReaderRegistry dispatch");
+  expect(readme).toContain("PointCloudData summary");
   expect(readme).toContain("## Live Demo");
   expect(readme).toContain("## Visual Tour");
   expect(readme).toContain("## Why PointCloudWorkbench");
@@ -205,5 +206,6 @@ test("app exposes runtime mode summary UI and test hooks", () => {
   expect(app).toContain("function selectRuntimeMode(");
   expect(app).toContain("function updateRuntimeStatusPanel()");
   expect(app).toContain("function createPointCloudReaderRegistry()");
+  expect(app).toContain("function createPointCloudData(");
   expect(app).toContain("LAS local chunked reader");
 });

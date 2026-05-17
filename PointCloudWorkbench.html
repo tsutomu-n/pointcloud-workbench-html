@@ -2687,6 +2687,11 @@
         font-family: var(--font-mono);
         white-space: nowrap;
       }
+      .runtime-status__actions {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 12px;
+      }
       .file-input-hidden {
         position: absolute;
         width: 1px;
@@ -4556,6 +4561,15 @@
                   <span class="stats-value" id="memoryUsage">-</span>
                 </div>
               </div>
+              <div class="runtime-status__actions">
+                <button
+                  class="ec-button ec-button--secondary ec-button--sm"
+                  type="button"
+                  onclick="copyManualDiagnosticReport()"
+                >
+                  診断情報をコピー
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -5662,6 +5676,7 @@
         loadStrategy: "-",
         estimatedPeakMemoryMB: 0,
         loadRiskLevel: "ok",
+        pointCloudData: null,
       };
 
       let statsVisible = false;
@@ -5827,6 +5842,78 @@
           displayCount: safeDisplayCount,
           displayRatio,
           samplingRate,
+        };
+      }
+
+      function calculatePointBounds(points = []) {
+        const bounds = {
+          minX: Number.POSITIVE_INFINITY,
+          maxX: Number.NEGATIVE_INFINITY,
+          minY: Number.POSITIVE_INFINITY,
+          maxY: Number.NEGATIVE_INFINITY,
+          minZ: Number.POSITIVE_INFINITY,
+          maxZ: Number.NEGATIVE_INFINITY,
+        };
+
+        for (const point of points) {
+          if (!point) continue;
+          const { x, y, z } = point;
+          if (
+            !Number.isFinite(x) ||
+            !Number.isFinite(y) ||
+            !Number.isFinite(z)
+          ) {
+            continue;
+          }
+          bounds.minX = Math.min(bounds.minX, x);
+          bounds.maxX = Math.max(bounds.maxX, x);
+          bounds.minY = Math.min(bounds.minY, y);
+          bounds.maxY = Math.max(bounds.maxY, y);
+          bounds.minZ = Math.min(bounds.minZ, z);
+          bounds.maxZ = Math.max(bounds.maxZ, z);
+        }
+
+        return Number.isFinite(bounds.minX) ? bounds : null;
+      }
+
+      function createPointCloudData({
+        header,
+        points,
+        fileName,
+        fileSize = null,
+      }) {
+        const safePoints = Array.isArray(points) ? points : [];
+        const sourceCount =
+          header?.sourcePointCount ??
+          header?.numberOfPointRecords ??
+          safePoints.length;
+        const pointCounts = buildPointCountSummary(
+          sourceCount,
+          safePoints.length,
+          safePoints.length,
+        );
+
+        return {
+          kind: "PointCloudData",
+          version: 1,
+          fileName: fileName || "不明なファイル",
+          fileSize,
+          header,
+          points: safePoints,
+          pointCounts,
+          bounds: calculatePointBounds(safePoints),
+          coordinateBasis: {
+            scale: {
+              x: header?.xScaleFactor ?? null,
+              y: header?.yScaleFactor ?? null,
+              z: header?.zScaleFactor ?? null,
+            },
+            offset: {
+              x: header?.xOffset ?? null,
+              y: header?.yOffset ?? null,
+              z: header?.zOffset ?? null,
+            },
+          },
         };
       }
 
@@ -9174,8 +9261,13 @@
           header,
         );
 
-        const headerPointCount =
-          header.sourcePointCount ?? header.numberOfPointRecords ?? points.length;
+        const pointCloudData = createPointCloudData({
+          header,
+          points,
+          fileName: resolvedName,
+          fileSize,
+        });
+        const headerPointCount = pointCloudData.pointCounts.sourceCount;
         console.log(`ヘッダー解析成功: ${headerPointCount.toLocaleString()}点`);
 
         if (!headerPointCount || headerPointCount <= 0) {
@@ -9195,6 +9287,7 @@
           statsData.loadStrategy = profile.strategyLabel;
           statsData.estimatedPeakMemoryMB = profile.estimatedPeakMemoryMB;
           statsData.loadRiskLevel = profile.riskLevel;
+          statsData.pointCloudData = pointCloudData;
         } catch (statsError) {
           console.warn("統計情報の更新に失敗（処理続行）:", statsError);
         }
@@ -9219,7 +9312,11 @@
         updateProgress(70, "点群生成中...");
 
         try {
-          setupPointCloudVisualization(points, header, resolvedName);
+          setupPointCloudVisualization(
+            pointCloudData.points,
+            pointCloudData.header,
+            pointCloudData.fileName,
+          );
         } catch (renderError) {
           throw new Error(`3D表示の作成に失敗: ${renderError.message}`);
         }
@@ -14561,6 +14658,8 @@
           buildRuntimeStatus,
           updateRuntimeStatusPanel,
           resolvePointCloudReader,
+          createPointCloudData,
+          calculatePointBounds,
           getRegisteredPointCloudReaders() {
             return pointCloudReaderRegistry.list();
           },

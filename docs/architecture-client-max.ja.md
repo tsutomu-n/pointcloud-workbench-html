@@ -35,6 +35,7 @@ Cloudflare側の禁止事項:
 - ファイル選択
 - LAS/LAZ読込
 - ReaderRegistryによる形式別Reader選択
+- PointCloudDataによる点数、bounds、scale/offset基準の整理
 - Preflight
 - Worker解析
 - WebAssembly LAZ展開

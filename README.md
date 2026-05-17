@@ -51,6 +51,7 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 
 - LAS/LAZ loading
 - ReaderRegistry dispatch for LAS and LAZ local readers
+- PointCloudData summary for counts, bounds, and LAS scale/offset basis
 - Chunked LAS loading for large-file pressure smoothing
 - LAZ chunked reads with WASM heap writes to reduce duplicate memory use
 - Header-first preview and accurate display-ratio preview before import
