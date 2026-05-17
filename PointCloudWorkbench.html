@@ -5697,6 +5697,86 @@
       let loadSessionSequence = 0;
       let activeLoadSessionId = 0;
       let activeFileReader = null;
+
+      function summarizeDiagnosticError(errorEntry) {
+        const details = errorEntry?.details || {};
+        const rawMessage =
+          details.message ||
+          details.reason?.message ||
+          (typeof details.reason === "string" ? details.reason : "") ||
+          "";
+        const message = String(rawMessage || "").slice(0, 240);
+
+        return {
+          timestamp: errorEntry?.timestamp || "",
+          type: errorEntry?.type || "Unknown",
+          message,
+        };
+      }
+
+      function buildManualDiagnosticReport() {
+        const runtime = buildRuntimeStatus();
+        const selectedFile = workflowState.selectedFile || null;
+        const selectedFileName = selectedFile?.name || statsData.fileName || "";
+        const fileSize = Number(selectedFile?.size || statsData.fileSize || 0);
+        const pointCloudSummary = statsData.pointCloudData?.pointCounts || null;
+        const recentErrors = (errorTracker.errors || [])
+          .slice(-5)
+          .map(summarizeDiagnosticError);
+
+        const report = {
+          generatedAt: new Date().toISOString(),
+          app: "PointCloudWorkbench",
+          privacy: {
+            manualCopyOnly: true,
+            telemetry: false,
+            pointCloudUpload: false,
+            includesPointCloudData: false,
+            includesFileName: false,
+          },
+          runtime,
+          file: {
+            extension: resolveFileExtension(selectedFileName),
+            sizeBytes: fileSize,
+          },
+          workflow: {
+            step: workflowState.step,
+            selectedQuality: workflowState.selectedQuality,
+            loadStrategy: statsData.loadStrategy,
+            loadRiskLevel: statsData.loadRiskLevel,
+          },
+          points: {
+            originalPoints: Number(statsData.originalPoints || 0),
+            decodedPoints: Number(statsData.decodedPoints || 0),
+            displayPoints: Number(statsData.displayPoints || 0),
+            displayRatio: Number(statsData.displayRatio || 0),
+            pointCloudSummary,
+          },
+          recentErrors,
+        };
+
+        return JSON.stringify(report, null, 2);
+      }
+
+      async function copyManualDiagnosticReport() {
+        const report = buildManualDiagnosticReport();
+        try {
+          if (!navigator.clipboard?.writeText) {
+            throw new Error("Clipboard API unavailable");
+          }
+          await navigator.clipboard.writeText(report);
+          showToast("診断情報をコピーしました。Issueに貼り付けできます。", "success");
+          return { ok: true, report };
+        } catch (error) {
+          console.warn("Manual diagnostic copy failed:", error);
+          showToast("診断情報のコピーに失敗しました。ブラウザー設定を確認してください。", "warning");
+          return {
+            ok: false,
+            report,
+            reason: error?.message || "Clipboard copy failed",
+          };
+        }
+      }
       let filePreviewSequence = 0;
       let autoAdvanceAfterFileSelect = false;
       let progressAnnouncementState = {
@@ -14657,6 +14737,8 @@
           selectRuntimeMode,
           buildRuntimeStatus,
           updateRuntimeStatusPanel,
+          buildManualDiagnosticReport,
+          copyManualDiagnosticReport,
           resolvePointCloudReader,
           createPointCloudData,
           calculatePointBounds,

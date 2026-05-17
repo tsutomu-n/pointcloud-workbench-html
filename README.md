@@ -57,6 +57,7 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 - Header-first preview and accurate display-ratio preview before import
 - Load-path visibility and estimated peak RAM risk display before import
 - Runtime mode summary for Hosted / Portable / renderer / isolation capabilities
+- Manual diagnostic report copy with no telemetry, no LAS/LAZ upload, and no file name included
 - Load quality selection (`LOW` / `MEDIUM` / `HIGH` / `MAX`)
 - 3D and 2D view switching
 - Elevation and classification color modes

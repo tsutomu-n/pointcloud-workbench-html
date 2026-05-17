@@ -205,6 +205,8 @@ test("app exposes runtime mode summary UI and test hooks", () => {
   expect(app).toContain("function getRuntimeCapabilityProfile()");
   expect(app).toContain("function selectRuntimeMode(");
   expect(app).toContain("function updateRuntimeStatusPanel()");
+  expect(app).toContain("function buildManualDiagnosticReport()");
+  expect(app).toContain("manualCopyOnly");
   expect(app).toContain("function createPointCloudReaderRegistry()");
   expect(app).toContain("function createPointCloudData(");
   expect(app).toContain("LAS local chunked reader");

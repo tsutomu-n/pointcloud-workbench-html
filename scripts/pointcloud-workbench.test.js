@@ -577,6 +577,55 @@ test("runtime status panel writes the detected capability summary", () => {
   expect(context.document.getElementById("runtimeIsolation").textContent).toBe("Normal");
 });
 
+test("manual diagnostic report omits point cloud payloads and file names", () => {
+  const context = createContext({
+    userAgent:
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    href: "https://example.test/PointCloudWorkbench.html",
+    protocol: "https:",
+    hasWorker: true,
+  });
+
+  context.__selectedFile = {
+    name: "private-site-survey.las",
+    size: 123456,
+  };
+  vm.runInContext(
+    `
+      window.__pcwTestApi.setWorkflowState({
+        step: "quality-select",
+        selectedQuality: "low",
+        selectedFile: __selectedFile,
+      });
+    `,
+    context,
+  );
+
+  const reportText = vm.runInContext(
+    "window.__pcwTestApi.buildManualDiagnosticReport()",
+    context,
+  );
+  const report = JSON.parse(reportText);
+
+  expect(report.privacy).toMatchObject({
+    manualCopyOnly: true,
+    telemetry: false,
+    pointCloudUpload: false,
+    includesPointCloudData: false,
+    includesFileName: false,
+  });
+  expect(report.file).toEqual({
+    extension: "las",
+    sizeBytes: 123456,
+  });
+  expect(report.workflow).toMatchObject({
+    step: "quality-select",
+    selectedQuality: "low",
+  });
+  expect(reportText).not.toContain("private-site-survey");
+  expect(reportText).not.toContain("points\":[");
+});
+
 test("ReaderRegistry exposes LAS and LAZ local readers", () => {
   const context = createContext();
 

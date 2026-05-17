@@ -32,4 +32,6 @@ PointCloudWorkbenchは、ユーザーが選択したLAS/LAZファイルをサー
 - 自動telemetryなし
 - telemetry endpointなし
 - error report自動送信なし
+- 診断情報はユーザーが手動コピーした場合だけIssue等へ貼り付ける
+- 手動診断情報にはLAS/LAZファイル本体とファイル名を含めない
 - Cloudflare / Pagesは静的配信中心
