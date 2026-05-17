@@ -44,6 +44,7 @@ test("README documents public repo development and runtime constraints", () => {
   expect(readme).toContain("Runtime mode summary");
   expect(readme).toContain("ReaderRegistry dispatch");
   expect(readme).toContain("PointCloudData summary");
+  expect(readme).toContain("Manual diagnostic report copy");
   expect(readme).toContain("## Live Demo");
   expect(readme).toContain("## Visual Tour");
   expect(readme).toContain("## Why PointCloudWorkbench");
@@ -89,6 +90,8 @@ test("OSS contributor docs describe server-zero contribution boundaries", () => 
   expect(security).toContain("サーバーへアップロードしません");
   expect(security).toContain("自動telemetryなし");
   expect(security).toContain("telemetry endpointなし");
+  expect(security).toContain("手動コピー");
+  expect(security).toContain("ファイル名を含めない");
   expect(quickstart).toContain("Safari、Firefox、古いブラウザーは対応対象外");
   expect(junior).toContain("Client-Max / Server-Zero");
   expect(junior).toContain("ReaderRegistry");

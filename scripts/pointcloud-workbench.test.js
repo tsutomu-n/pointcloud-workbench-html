@@ -610,7 +610,7 @@ test("manual diagnostic report omits point cloud payloads and file names", () =>
   expect(report.privacy).toMatchObject({
     manualCopyOnly: true,
     telemetry: false,
-    pointCloudUpload: false,
+    sendsPointCloudFile: false,
     includesPointCloudData: false,
     includesFileName: false,
   });
