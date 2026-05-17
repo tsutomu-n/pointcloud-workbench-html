@@ -4,7 +4,10 @@
 
 Cloudflare無料制限を超えないことを最優先し、サーバー側は静的ファイル配信だけにします。
 
-## 推奨構成
+## 将来の推奨構成
+
+現状の実行本体は `PointCloudWorkbench.html` の単一HTMLです。
+以下は、今後WorkerやRendererを分割する場合のstatic-only構成案です。
 
 ```txt
 Cloudflare Pages

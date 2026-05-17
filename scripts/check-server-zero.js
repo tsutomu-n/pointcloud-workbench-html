@@ -44,9 +44,12 @@ const forbiddenPatterns = [
   },
 ];
 
-const allowedForbiddenPatternFiles = new Set([
+const manifestPolicyFiles = new Set([
   "assets/latest/manifest.json",
   "assets/v1.0.0/manifest.json",
+]);
+
+const allowedForbiddenPatternFiles = new Set([
   "scripts/public-repo-readiness.test.js",
 ]);
 
@@ -68,6 +71,40 @@ function toRelative(absolutePath) {
   return path.relative(rootDir, absolutePath).split(path.sep).join("/");
 }
 
+function validateStaticManifest(relativeFile) {
+  const absolutePath = path.join(rootDir, relativeFile);
+  let manifest;
+
+  try {
+    manifest = JSON.parse(fs.readFileSync(absolutePath, "utf8"));
+  } catch (error) {
+    console.error(`[server-zero] Static manifest is not valid JSON: ${relativeFile}`);
+    return false;
+  }
+
+  const runtime = manifest.runtime || {};
+  const requiredFalseFlags = ["serverProcessing", "pointCloudUpload", "telemetry"];
+  let valid = true;
+
+  for (const flag of requiredFalseFlags) {
+    if (runtime[flag] !== false) {
+      console.error(
+        `[server-zero] Static manifest must set runtime.${flag} to false: ${relativeFile}`,
+      );
+      valid = false;
+    }
+  }
+
+  if (runtime.model !== "client-max-server-zero") {
+    console.error(
+      `[server-zero] Static manifest must declare client-max-server-zero model: ${relativeFile}`,
+    );
+    valid = false;
+  }
+
+  return valid;
+}
+
 let failed = false;
 
 for (const relativeDir of forbiddenDirs) {
@@ -80,6 +117,17 @@ for (const relativeDir of forbiddenDirs) {
 for (const relativeFile of forbiddenRootFiles) {
   if (fs.existsSync(path.join(rootDir, relativeFile))) {
     console.error(`[server-zero] Forbidden Worker entry exists: ${relativeFile}`);
+    failed = true;
+  }
+}
+
+for (const relativeFile of manifestPolicyFiles) {
+  if (!fs.existsSync(path.join(rootDir, relativeFile))) {
+    console.error(`[server-zero] Static manifest is missing: ${relativeFile}`);
+    failed = true;
+    continue;
+  }
+  if (!validateStaticManifest(relativeFile)) {
     failed = true;
   }
 }
@@ -97,6 +145,7 @@ for (const file of walk(rootDir)) {
 
   if (relativeFile === "scripts/check-server-zero.js") continue;
   if (!/\.(html|js|mjs|cjs|ts|json|ya?ml)$/.test(relativeFile)) continue;
+  if (manifestPolicyFiles.has(relativeFile)) continue;
   if (allowedForbiddenPatternFiles.has(relativeFile)) continue;
 
   const text = fs.readFileSync(file, "utf8");

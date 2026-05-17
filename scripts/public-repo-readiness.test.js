@@ -84,10 +84,13 @@ test("OSS contributor docs describe server-zero contribution boundaries", () => 
   expect(contributing).toContain("点群ファイルをサーバーへ送信する");
   expect(contributing).toContain("bun scripts/check-server-zero.js");
   expect(security).toContain("サーバーへアップロードしません");
+  expect(security).toContain("自動telemetryなし");
+  expect(security).toContain("telemetry endpointなし");
   expect(quickstart).toContain("Safari、Firefox、古いブラウザーは対応対象外");
   expect(junior).toContain("Client-Max / Server-Zero");
   expect(runtime).toContain("サーバーにやらせないこと");
   expect(cloudflare).toContain("Cloudflare Pagesには1ファイル25MiBの制限");
+  expect(cloudflare).toContain("今後WorkerやRendererを分割する場合のstatic-only構成案");
   expect(bugTemplate).toContain("点群ファイル本体は添付しないでください");
 });
 
@@ -181,6 +184,8 @@ test("Server-Zero static assets and PR template document the operating policy", 
   expect(manifest.runtime.serverProcessing).toBe(false);
   expect(manifest.runtime.pointCloudUpload).toBe(false);
   expect(manifest.runtime.telemetry).toBe(false);
+  expect(read("scripts/check-server-zero.js")).toContain("validateStaticManifest");
+  expect(read("scripts/check-server-zero.js")).toContain('runtime.${flag} to false');
   expect(prTemplate).toContain("What Changed");
   expect(prTemplate).toContain("Server Load");
   expect(prTemplate).toContain("Selected LAS/LAZ files are not uploaded");

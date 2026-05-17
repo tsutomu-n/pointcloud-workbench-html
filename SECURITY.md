@@ -29,6 +29,7 @@ PointCloudWorkbenchは、ユーザーが選択したLAS/LAZファイルをサー
 
 - 点群ファイルはローカル処理
 - サーバーアップロードなし
-- telemetry初期OFF
+- 自動telemetryなし
+- telemetry endpointなし
 - error report自動送信なし
 - Cloudflare / Pagesは静的配信中心
