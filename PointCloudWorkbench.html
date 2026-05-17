@@ -5236,6 +5236,15 @@
 
         checkCompatibility() {
           try {
+            const browserSupport = this.detectBrowserSupport();
+            if (!browserSupport.supported) {
+              this.issues.push({
+                type: "critical",
+                message:
+                  "このアプリは最新のGoogle ChromeまたはMicrosoft Edge専用です。Safari、Firefox、古いブラウザーは対応対象外です。",
+              });
+            }
+
             // Check WebGL support
             if (!this.checkWebGL()) {
               this.issues.push({
@@ -5349,7 +5358,7 @@
             }
 
             content +=
-              "<p>最新のブラウザ（Chrome、Firefox、Edge）を使用することを推奨します。</p>";
+              "<p>最新のGoogle ChromeまたはMicrosoft Edgeを使用してください。Safari、Firefox、古いブラウザーは対応対象外です。</p>";
             content +=
               '<button onclick="this.parentElement.parentElement.remove()">理解しました</button>';
             content += "</div>";
@@ -5367,6 +5376,29 @@
           const div = document.createElement("div");
           div.textContent = text;
           return div.innerHTML;
+        }
+
+        detectBrowserSupport() {
+          const nav = window.navigator || navigator || {};
+          const ua = String(nav.userAgent || "");
+          const brands = Array.isArray(nav.userAgentData?.brands)
+            ? nav.userAgentData.brands
+            : [];
+          const brandNames = brands.map((brand) => brand.brand || "").join(" ");
+          const isEdge = /\bEdg\//.test(ua) || /Microsoft Edge/i.test(brandNames);
+          const isChrome =
+            !isEdge &&
+            /\bChrome\//.test(ua) &&
+            !/\b(OPR|Firefox|FxiOS|CriOS|SamsungBrowser)\//.test(ua);
+          const isChromiumBrand =
+            !isEdge &&
+            /Google Chrome|Chromium/i.test(brandNames) &&
+            !/Opera|Samsung/i.test(brandNames);
+
+          return {
+            supported: isEdge || isChrome || isChromiumBrand,
+            browser: isEdge ? "edge" : isChrome || isChromiumBrand ? "chrome" : "unsupported",
+          };
         }
       }
 
@@ -14257,6 +14289,9 @@
           readFileIntoWasmHeap,
           decompressLAZFile,
           updateEstimations,
+          detectBrowserSupport() {
+            return compatibilityChecker.detectBrowserSupport();
+          },
         };
       }
 

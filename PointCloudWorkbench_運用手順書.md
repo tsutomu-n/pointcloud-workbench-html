@@ -7,11 +7,14 @@
 - 目的: 安定運用のための標準操作、警告時の対応、確認観点を明確化する
 
 ## 2. 前提環境
-- 推奨ブラウザ: Chrome / Edge / Firefox の最新版
+- 推奨ブラウザ: Chrome / Edge の最新版のみ対応
+- 非対応ブラウザ: Safari、Firefox、古いブラウザー
 - 必須機能: WebGL、File API、ArrayBuffer
 - 取り扱い対象: `.las`, `.laz`
 - 画面上の上限表示: `.las` 最大 3GB / `.laz` 最大 2GB
 - 実装上の上限: LAS は 3GB超、LAZ は 2GB超で読み込み不可
+- 選択した LAS/LAZ ファイルはブラウザー内で処理し、アプリケーションサーバーへアップロードしない
+- Cloudflare / Pages は静的配信を基本とし、通常経路で Workers、Pages Functions、API、telemetry、DB、サーバー側点群処理を使わない
 
 ## 3. 起動手順
 1. `PointCloudWorkbench.html` をブラウザで開く

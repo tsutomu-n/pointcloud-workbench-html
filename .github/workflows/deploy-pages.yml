@@ -36,14 +36,21 @@ jobs:
       - name: Check README
         run: bun scripts/check-readme.js
 
+      - name: Check Server-Zero policy
+        run: bun scripts/check-server-zero.js
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
       - name: Prepare site artifact
         run: |
-          mkdir -p site/demo
+          mkdir -p site/assets/latest site/assets/v1.0.0 site/demo
           cp index.html site/index.html
           cp PointCloudWorkbench.html site/PointCloudWorkbench.html
+          cp _headers site/_headers
+          cp _redirects site/_redirects
+          cp assets/latest/manifest.json site/assets/latest/manifest.json
+          cp assets/v1.0.0/manifest.json site/assets/v1.0.0/manifest.json
           cp demo/pointcloud-demo-sample.las site/demo/pointcloud-demo-sample.las
           touch site/.nojekyll
 

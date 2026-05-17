@@ -33,7 +33,7 @@
 
 ## 使い方
 
-1. `PointCloudWorkbench.html` を Chrome / Edge / Firefox で開きます。
+1. `PointCloudWorkbench.html` を Chrome / Edge の最新版で開きます。
 2. LAS/LAZ ファイルをドラッグ&ドロップするか、ファイル選択から読み込みます。
 3. 品質画面で表示率、読込経路、危険度を確認してから読み込みを開始します。
 4. 読み込み完了後、視点切替、色分け、スライス、自動分類、統計表示を必要に応じて使います。
@@ -44,7 +44,8 @@
 
 ## 動作条件
 
-- 推奨ブラウザ: Chrome / Edge / Firefox の最新版
+- 対応ブラウザ: Chrome / Edge の最新版のみ対応
+- 非対応ブラウザ: Safari、Firefox、古いブラウザーは対応対象外
 - 必須機能: WebGL、File API、ArrayBuffer
 - 対応入力: `.las`, `.laz`
 - 実装上のファイルサイズ上限: LAS は 3GB超、LAZ は 2GB超で読み込み不可
@@ -52,6 +53,8 @@
 ## 制約
 
 - `three.js` と `laz-perf` は CDN から読み込むため、通常はネットワーク接続が必要です。
+- 選択した LAS/LAZ ファイルはブラウザー内で処理され、アプリケーションサーバーへアップロードされません。
+- Cloudflare / Pages 側は静的配信を基本とし、通常経路で Workers、Pages Functions、API、telemetry、DB、サーバー側点群処理を使いません。
 - LAS の `2GB超〜3GB以下` は実験運用帯です。`LOW` 品質から開始し、メモリと応答性を確認してください。
 - LAZ は内部で追加メモリを消費するため、LAS より安全域が狭く、`2GB超` は拒否されます。
 - ローカル `LAS` はヘッダー先読込 + chunked 点データ読込、ローカル `LAZ` は chunked で WASM ヒープへ転送します。`URL` 読込や一部互換経路では従来どおり全量 `ArrayBuffer` を使う場合があります。

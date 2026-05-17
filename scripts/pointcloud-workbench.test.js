@@ -82,7 +82,7 @@ function createMockElement(id = "") {
   };
 }
 
-function createContext() {
+function createContext({ userAgent = "bun-test", userAgentData = undefined } = {}) {
   const elements = new Map();
   const documentEvents = new Map();
   const windowEvents = new Map();
@@ -217,7 +217,8 @@ function createContext() {
     localStorage: windowObject.localStorage,
     navigator: {
       hardwareConcurrency: 8,
-      userAgent: "bun-test",
+      userAgent,
+      userAgentData,
       language: "ja-JP",
     },
     screen: windowObject.screen,
@@ -450,6 +451,35 @@ test("parseLASPoints propagates timeout instead of swallowing it", async () => {
   await expect(
     vm.runInContext("window.__pcwTestApi.parseLASPoints(__buffer, __header, 1)", context),
   ).rejects.toThrow(/タイムアウト/);
+});
+
+test("browser support policy allows Chrome and Edge only", () => {
+  const chrome = createContext({
+    userAgent:
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+  });
+  expect(vm.runInContext("window.__pcwTestApi.detectBrowserSupport()", chrome)).toEqual({
+    supported: true,
+    browser: "chrome",
+  });
+
+  const edge = createContext({
+    userAgent:
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36 Edg/125.0.0.0",
+  });
+  expect(vm.runInContext("window.__pcwTestApi.detectBrowserSupport()", edge)).toEqual({
+    supported: true,
+    browser: "edge",
+  });
+
+  const firefox = createContext({
+    userAgent:
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 14.0; rv:125.0) Gecko/20100101 Firefox/125.0",
+  });
+  expect(vm.runInContext("window.__pcwTestApi.detectBrowserSupport()", firefox)).toEqual({
+    supported: false,
+    browser: "unsupported",
+  });
 });
 
 test("startDataLoading restarts memory monitoring before load", async () => {

@@ -18,8 +18,13 @@ test("README and guides describe the split LAS/LAZ size ceilings", () => {
   const html = read("PointCloudWorkbench.html");
 
   expect(readme).toContain("LAS files above 3GB and LAZ files above 2GB are rejected");
+  expect(readme).toContain("Chrome / Edge only");
+  expect(readme).toContain("Safari and Firefox are intentionally unsupported");
   expect(readmeJa).toContain("LAS は 3GB超、LAZ は 2GB超で読み込み不可");
+  expect(readmeJa).toContain("Chrome / Edge の最新版のみ対応");
+  expect(readmeJa).toContain("Safari、Firefox、古いブラウザーは対応対象外");
   expect(ops).toContain("LAS は 3GB超、LAZ は 2GB超で読み込み不可");
+  expect(ops).toContain("Chrome / Edge の最新版のみ対応");
   expect(ref).toContain("LAS は `3GB超`、LAZ は `2GB超` を拒否");
   expect(index).toContain("LAS は `3GB超`、LAZ は `2GB超` を拒否");
   expect(html).toContain(".las 最大3GB / .laz 最大2GB");

@@ -1,0 +1,19 @@
+{
+  "name": "PointCloudWorkbench",
+  "version": "1.0.0",
+  "runtime": {
+    "model": "client-max-server-zero",
+    "supportedBrowsers": ["chrome-latest", "edge-latest"],
+    "unsupportedBrowsers": ["safari", "firefox", "old-browsers"],
+    "networkRequired": true,
+    "serverProcessing": false,
+    "pointCloudUpload": false,
+    "telemetry": false
+  },
+  "app": {
+    "html": "/PointCloudWorkbench.html"
+  },
+  "assets": {
+    "versionedManifest": "/assets/v1.0.0/manifest.json"
+  }
+}
