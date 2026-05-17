@@ -12,16 +12,53 @@ test("README documents public repo development and runtime constraints", () => {
   const readme = read("README.md");
   const readmeJaPath = path.join(rootDir, "docs", "README.ja.md");
   const assetsGuidePath = path.join(rootDir, "assets", "README.md");
+  const ossDocPaths = [
+    "CONTRIBUTING.md",
+    "SECURITY.md",
+    "CODE_OF_CONDUCT.md",
+    "docs/quickstart.ja.md",
+    "docs/for-junior-se.ja.md",
+    "docs/runtime-model.ja.md",
+    "docs/cloudflare-pages-static-only.ja.md",
+    "docs/architecture-client-max.ja.md",
+    "docs/troubleshooting.ja.md",
+    "docs/faq.ja.md",
+    "docs/glossary.ja.md",
+    ".github/ISSUE_TEMPLATE/bug_report.yml",
+    ".github/ISSUE_TEMPLATE/feature_request.yml",
+    ".github/ISSUE_TEMPLATE/question.yml",
+    ".github/PULL_REQUEST_TEMPLATE.md",
+  ];
 
   expect(fs.existsSync(readmeJaPath)).toBe(true);
   expect(fs.existsSync(assetsGuidePath)).toBe(true);
+  for (const relativePath of ossDocPaths) {
+    expect(fs.existsSync(path.join(rootDir, relativePath))).toBe(true);
+  }
   expect(readme).toContain("Browser-native LAS/LAZ point cloud workbench");
   expect(readme).toContain("No install. No build.");
+  expect(readme).toContain("Client-Max / Server-Zero");
+  expect(readme).toContain("Chrome / Edge only");
+  expect(readme).toContain("Safari and Firefox are intentionally unsupported");
+  expect(readme).toContain("Selected LAS/LAZ files are processed locally in the browser and are not uploaded");
+  expect(readme).toContain("Runtime mode summary");
+  expect(readme).toContain("ReaderRegistry dispatch");
+  expect(readme).toContain("PointCloudData summary");
+  expect(readme).toContain("Manual diagnostic report copy");
   expect(readme).toContain("## Live Demo");
   expect(readme).toContain("## Visual Tour");
   expect(readme).toContain("## Why PointCloudWorkbench");
   expect(readme).toContain("## Try It In 60 Seconds");
   expect(readme).toContain("## Japanese README");
+  expect(readme).toContain("./docs/quickstart.ja.md");
+  expect(readme).toContain("./docs/for-junior-se.ja.md");
+  expect(readme).toContain("./docs/runtime-model.ja.md");
+  expect(readme).toContain("./docs/troubleshooting.ja.md");
+  expect(readme).toContain("./docs/faq.ja.md");
+  expect(readme).toContain("./docs/glossary.ja.md");
+  expect(readme).toContain("CONTRIBUTING.md");
+  expect(readme).toContain("SECURITY.md");
+  expect(readme).toContain("CODE_OF_CONDUCT.md");
   expect(readme).toContain("browser language");
   expect(readme).toContain("./docs/README.ja.md");
   expect(readme).toContain("assets/landing-hero.png");
@@ -37,6 +74,32 @@ test("README documents public repo development and runtime constraints", () => {
   expect(readme).toContain("bun");
   expect(readme).toContain("scripts/");
   expect(readme).toContain("https://tsutomu-n.github.io/pointcloud-workbench-html/");
+});
+
+test("OSS contributor docs describe server-zero contribution boundaries", () => {
+  const contributing = read("CONTRIBUTING.md");
+  const security = read("SECURITY.md");
+  const quickstart = read("docs/quickstart.ja.md");
+  const junior = read("docs/for-junior-se.ja.md");
+  const runtime = read("docs/runtime-model.ja.md");
+  const cloudflare = read("docs/cloudflare-pages-static-only.ja.md");
+  const bugTemplate = read(".github/ISSUE_TEMPLATE/bug_report.yml");
+
+  expect(contributing).toContain("点群ファイルをサーバーへ送信する");
+  expect(contributing).toContain("bun scripts/check-server-zero.js");
+  expect(security).toContain("サーバーへアップロードしません");
+  expect(security).toContain("自動telemetryなし");
+  expect(security).toContain("telemetry endpointなし");
+  expect(security).toContain("手動コピー");
+  expect(security).toContain("ファイル名を含めない");
+  expect(quickstart).toContain("Safari、Firefox、古いブラウザーは対応対象外");
+  expect(junior).toContain("Client-Max / Server-Zero");
+  expect(junior).toContain("ReaderRegistry");
+  expect(runtime).toContain("サーバーにやらせないこと");
+  expect(runtime).toContain("現在のRuntime Mode");
+  expect(cloudflare).toContain("Cloudflare Pagesには1ファイル25MiBの制限");
+  expect(cloudflare).toContain("今後WorkerやRendererを分割する場合のstatic-only構成案");
+  expect(bugTemplate).toContain("点群ファイル本体は添付しないでください");
 });
 
 test("GitHub Actions CI runs Bun tests and README checks on main push and pull_request", () => {
@@ -57,15 +120,20 @@ test("GitHub Actions CI runs Bun tests and README checks on main push and pull_r
     "bun test scripts/pointcloud-workbench.test.js scripts/documentation-consistency.test.js scripts/gitignore.test.js scripts/repository-metadata.test.js scripts/public-repo-readiness.test.js scripts/landing-page-i18n.test.js"
   );
   expect(workflow).toContain("bun scripts/check-readme.js");
+  expect(workflow).toContain("bun scripts/check-server-zero.js");
 });
 
 test("Pages demo assets and deployment workflow are present", () => {
   const indexPath = path.join(rootDir, "index.html");
   const samplePath = path.join(rootDir, "demo", "pointcloud-demo-sample.las");
+  const headersPath = path.join(rootDir, "_headers");
+  const latestManifestPath = path.join(rootDir, "assets", "latest", "manifest.json");
   const workflowPath = path.join(rootDir, ".github", "workflows", "deploy-pages.yml");
 
   expect(fs.existsSync(indexPath)).toBe(true);
   expect(fs.existsSync(samplePath)).toBe(true);
+  expect(fs.existsSync(headersPath)).toBe(true);
+  expect(fs.existsSync(latestManifestPath)).toBe(true);
   expect(fs.readFileSync(samplePath).subarray(0, 4).toString("utf8")).toBe("LASF");
 
   const index = fs.readFileSync(indexPath, "utf8");
@@ -76,6 +144,8 @@ test("Pages demo assets and deployment workflow are present", () => {
   expect(index).toContain("02 // CONSTRAINTS &amp; REQUIREMENTS");
   expect(index).toContain("03 // ARCHITECTURE &amp; DOCS");
   expect(index).toContain("DATA // SAMPLE LAS");
+  expect(index).toContain("Chrome / Edge only");
+  expect(index).toContain("Firefox and Safari are not supported");
   expect(index).toContain("LICENSE // MIT. SYSTEM DISTRIBUTED AS SINGLE HTML.");
   expect(index).toContain('id="landingLanguageSelector"');
   expect(index).toContain('const LANDING_SUPPORTED_LANGUAGES = ["ja", "en", "zh"]');
@@ -99,9 +169,48 @@ test("Pages demo assets and deployment workflow are present", () => {
     "bun test scripts/pointcloud-workbench.test.js scripts/documentation-consistency.test.js scripts/gitignore.test.js scripts/repository-metadata.test.js scripts/public-repo-readiness.test.js scripts/landing-page-i18n.test.js"
   );
   expect(workflow).toContain("bun scripts/check-readme.js");
+  expect(workflow).toContain("bun scripts/check-server-zero.js");
   expect(workflow).toContain("actions/upload-pages-artifact@v4");
   expect(workflow).toContain("actions/deploy-pages@v4");
   expect(workflow).toContain("name: ${{ 'github-pages' }}");
+  expect(workflow).toContain("cp _headers site/_headers");
+  expect(workflow).toContain("cp assets/latest/manifest.json site/assets/latest/manifest.json");
   expect(workflow).toContain("pointcloud-demo-sample.las");
   expect(workflow).toContain(".nojekyll");
+});
+
+test("Server-Zero static assets and PR template document the operating policy", () => {
+  const headers = read("_headers");
+  const manifest = JSON.parse(read("assets/latest/manifest.json"));
+  const prTemplate = read(".github/PULL_REQUEST_TEMPLATE.md");
+
+  expect(headers).toContain("/assets/v*");
+  expect(headers).toContain("Cache-Control: public, max-age=31536000, immutable");
+  expect(headers).toContain("Cross-Origin-Opener-Policy: same-origin");
+  expect(headers).toContain("Cross-Origin-Embedder-Policy: require-corp");
+  expect(manifest.runtime.model).toBe("client-max-server-zero");
+  expect(manifest.runtime.serverProcessing).toBe(false);
+  expect(manifest.runtime.pointCloudUpload).toBe(false);
+  expect(manifest.runtime.telemetry).toBe(false);
+  expect(read("scripts/check-server-zero.js")).toContain("validateStaticManifest");
+  expect(read("scripts/check-server-zero.js")).toContain('runtime.${flag} to false');
+  expect(prTemplate).toContain("What Changed");
+  expect(prTemplate).toContain("Server Load");
+  expect(prTemplate).toContain("Selected LAS/LAZ files are not uploaded");
+});
+
+test("app exposes runtime mode summary UI and test hooks", () => {
+  const app = read("PointCloudWorkbench.html");
+
+  expect(app).toContain('id="runtimeStatusPanel"');
+  expect(app).toContain('id="runtimeModeLabel"');
+  expect(app).toContain('id="runtimeRenderer"');
+  expect(app).toContain("function getRuntimeCapabilityProfile()");
+  expect(app).toContain("function selectRuntimeMode(");
+  expect(app).toContain("function updateRuntimeStatusPanel()");
+  expect(app).toContain("function buildManualDiagnosticReport()");
+  expect(app).toContain("manualCopyOnly");
+  expect(app).toContain("function createPointCloudReaderRegistry()");
+  expect(app).toContain("function createPointCloudData(");
+  expect(app).toContain("LAS local chunked reader");
 });

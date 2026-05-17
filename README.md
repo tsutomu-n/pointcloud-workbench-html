@@ -23,11 +23,18 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 ## Japanese README
 
 - Japanese README: [`./docs/README.ja.md`](./docs/README.ja.md)
+- Quickstart: [`./docs/quickstart.ja.md`](./docs/quickstart.ja.md)
+- Junior engineer guide: [`./docs/for-junior-se.ja.md`](./docs/for-junior-se.ja.md)
+- Runtime model: [`./docs/runtime-model.ja.md`](./docs/runtime-model.ja.md)
+- Troubleshooting: [`./docs/troubleshooting.ja.md`](./docs/troubleshooting.ja.md)
+- FAQ: [`./docs/faq.ja.md`](./docs/faq.ja.md)
+- Glossary: [`./docs/glossary.ja.md`](./docs/glossary.ja.md)
 
 ## Why PointCloudWorkbench
 
 - Single HTML delivery. The main application is `PointCloudWorkbench.html` with no build step.
-- Browser-native workflow. Open the file in Chrome / Edge / Firefox and start loading `.las` or `.laz`.
+- Client-Max / Server-Zero workflow. Open the file in Chrome / Edge only and start loading `.las` or `.laz`.
+- Selected LAS/LAZ files are processed locally in the browser and are not uploaded to the application server.
 - Landing-page copy can adapt to browser language while keeping explicit user override.
 - Fast evaluation before full load. The app previews headers, load path, risk level, and estimated display ratio before import.
 - Practical inspection workflow. Switch between 3D and 2D, inspect slices, review classifications, and check statistics in one tool.
@@ -43,10 +50,14 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 ## Key Capabilities
 
 - LAS/LAZ loading
+- ReaderRegistry dispatch for LAS and LAZ local readers
+- PointCloudData summary for counts, bounds, and LAS scale/offset basis
 - Chunked LAS loading for large-file pressure smoothing
 - LAZ chunked reads with WASM heap writes to reduce duplicate memory use
 - Header-first preview and accurate display-ratio preview before import
 - Load-path visibility and estimated peak RAM risk display before import
+- Runtime mode summary for Hosted / Portable / renderer / isolation capabilities
+- Manual diagnostic report copy with no telemetry, no LAS/LAZ upload, and no file name included
 - Load quality selection (`LOW` / `MEDIUM` / `HIGH` / `MAX`)
 - 3D and 2D view switching
 - Elevation and classification color modes
@@ -56,7 +67,8 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 
 ## Browser / Runtime Requirements
 
-- Recommended browsers: Chrome / Edge / Firefox latest versions
+- Supported browsers: Chrome / Edge only, latest versions
+- Unsupported browsers: Safari and Firefox are intentionally unsupported, as are old browsers
 - Required APIs: WebGL, File API, ArrayBuffer
 - Accepted inputs: `.las`, `.laz`
 - Implementation ceiling: LAS files above 3GB and LAZ files above 2GB are rejected
@@ -64,6 +76,8 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 ## Constraints
 
 - `three.js` and `laz-perf` are loaded from CDNs, so normal operation requires network access.
+- The server path is static-only. It must not add Workers, Pages Functions, APIs, telemetry, DB writes, or server-side point cloud processing.
+- Selected point cloud files stay on the user's device. Network access is for application assets and optional map tiles, not LAS/LAZ upload.
 - LAS files in the `2GB to 3GB` range are experimental. Start from `LOW` quality and verify memory use and responsiveness.
 - LAZ has a narrower safety margin because the decoder consumes extra memory. Files above `2GB` are rejected.
 - Local LAS uses header-first preview plus chunked point-data reads. Local LAZ uses chunked transfers into WASM. URL loading and some compatibility paths may still use full `ArrayBuffer` reads.
@@ -91,6 +105,9 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 - JavaScript/TypeScript execution and tests assume `bun`.
 - `scripts/` is for development-time regression tests and README checks, not for running the app.
 - Update the related operation and implementation documents when behavior changes.
+- Contribution guidelines: [`CONTRIBUTING.md`](./CONTRIBUTING.md)
+- Security policy: [`SECURITY.md`](./SECURITY.md)
+- Code of conduct: [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md)
 
 ## Testing
 
@@ -101,6 +118,7 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 
 - The main public deliverable is `PointCloudWorkbench.html` plus the related documentation.
 - GitHub Pages uses `index.html` as the landing page and serves `PointCloudWorkbench.html` directly as the actual app.
+- Cloudflare Pages deployment is expected to stay static-only using `_headers`, `_redirects`, and static manifests under `assets/`.
 - `scripts/` is published as verification assets for development and maintenance.
 - `test-results/` and local helper-tool outputs are not part of the public deliverable.
 

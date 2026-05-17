@@ -82,7 +82,17 @@ function createMockElement(id = "") {
   };
 }
 
-function createContext() {
+function createContext({
+  userAgent = "bun-test",
+  userAgentData = undefined,
+  href = "http://localhost/",
+  protocol = "",
+  hasWebGpu = false,
+  hasWorker = false,
+  crossOriginIsolated = false,
+  isSecureContext = true,
+  webgl2 = true,
+} = {}) {
   const elements = new Map();
   const documentEvents = new Map();
   const windowEvents = new Map();
@@ -106,6 +116,10 @@ function createContext() {
       if (tag === "canvas") {
         el.width = 0;
         el.height = 0;
+        el.getContext = (type) => {
+          if (type === "webgl2") return webgl2 ? {} : null;
+          return {};
+        };
       }
       return el;
     },
@@ -137,9 +151,12 @@ function createContext() {
   const windowObject = {
     __PCW_ENABLE_TEST_API__: true,
     location: {
-      href: "http://localhost/",
+      href,
+      protocol,
       reload() {},
     },
+    isSecureContext,
+    crossOriginIsolated,
     screen: {
       width: 1920,
       height: 1080,
@@ -180,6 +197,7 @@ function createContext() {
     FileReader: function FileReader() {},
     FileList: function FileList() {},
     Blob: function Blob() {},
+    URL,
     ArrayBuffer,
     DataView,
     Promise,
@@ -217,7 +235,8 @@ function createContext() {
     localStorage: windowObject.localStorage,
     navigator: {
       hardwareConcurrency: 8,
-      userAgent: "bun-test",
+      userAgent,
+      userAgentData,
       language: "ja-JP",
     },
     screen: windowObject.screen,
@@ -276,6 +295,20 @@ function createContext() {
       },
     }),
   };
+
+  if (hasWorker) {
+    windowObject.Worker = function Worker() {};
+  }
+  if (hasWebGpu) {
+    windowObject.navigator = {
+      hardwareConcurrency: 8,
+      userAgent,
+      userAgentData,
+      language: "ja-JP",
+      gpu: {},
+    };
+    context.navigator = windowObject.navigator;
+  }
 
   windowObject.document = document;
   windowObject.window = windowObject;
@@ -450,6 +483,225 @@ test("parseLASPoints propagates timeout instead of swallowing it", async () => {
   await expect(
     vm.runInContext("window.__pcwTestApi.parseLASPoints(__buffer, __header, 1)", context),
   ).rejects.toThrow(/タイムアウト/);
+});
+
+test("browser support policy allows Chrome and Edge only", () => {
+  const chrome = createContext({
+    userAgent:
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+  });
+  expect(vm.runInContext("window.__pcwTestApi.detectBrowserSupport()", chrome)).toEqual({
+    supported: true,
+    browser: "chrome",
+  });
+
+  const edge = createContext({
+    userAgent:
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36 Edg/125.0.0.0",
+  });
+  expect(vm.runInContext("window.__pcwTestApi.detectBrowserSupport()", edge)).toEqual({
+    supported: true,
+    browser: "edge",
+  });
+
+  const firefox = createContext({
+    userAgent:
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 14.0; rv:125.0) Gecko/20100101 Firefox/125.0",
+  });
+  expect(vm.runInContext("window.__pcwTestApi.detectBrowserSupport()", firefox)).toEqual({
+    supported: false,
+    browser: "unsupported",
+  });
+});
+
+test("runtime mode selection distinguishes hosted, portable, and unsupported modes", () => {
+  const hostedHighPerformance = createContext({
+    userAgent:
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    href: "https://example.test/PointCloudWorkbench.html",
+    protocol: "https:",
+    hasWebGpu: true,
+    hasWorker: true,
+    crossOriginIsolated: true,
+  });
+  expect(
+    vm.runInContext("window.__pcwTestApi.buildRuntimeStatus()", hostedHighPerformance),
+  ).toMatchObject({
+    mode: "hosted-high-performance",
+    browser: "chrome",
+    renderer: "WebGPU",
+    worker: "Available",
+    isolation: "COOP/COEP",
+  });
+
+  const portableWebgl = createContext({
+    userAgent:
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    href: "file:///tmp/PointCloudWorkbench.html",
+    protocol: "file:",
+    hasWorker: true,
+  });
+  expect(vm.runInContext("window.__pcwTestApi.selectRuntimeMode()", portableWebgl)).toBe(
+    "portable-online-webgl2",
+  );
+
+  const unsupported = createContext({
+    userAgent:
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 14.0; rv:125.0) Gecko/20100101 Firefox/125.0",
+    href: "https://example.test/PointCloudWorkbench.html",
+    protocol: "https:",
+    webgl2: true,
+  });
+  expect(vm.runInContext("window.__pcwTestApi.selectRuntimeMode()", unsupported)).toBe(
+    "unsupported",
+  );
+});
+
+test("runtime status panel writes the detected capability summary", () => {
+  const context = createContext({
+    userAgent:
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36 Edg/125.0.0.0",
+    href: "https://example.test/PointCloudWorkbench.html",
+    protocol: "https:",
+    hasWorker: true,
+  });
+
+  const status = vm.runInContext("window.__pcwTestApi.updateRuntimeStatusPanel()", context);
+  expect(status.mode).toBe("hosted-normal");
+  expect(context.document.getElementById("runtimeModeLabel").textContent).toBe(
+    "hosted-normal",
+  );
+  expect(context.document.getElementById("runtimeBrowser").textContent).toBe("edge");
+  expect(context.document.getElementById("runtimeRenderer").textContent).toBe("WebGL2");
+  expect(context.document.getElementById("runtimeWorker").textContent).toBe("Available");
+  expect(context.document.getElementById("runtimeIsolation").textContent).toBe("Normal");
+});
+
+test("manual diagnostic report omits point cloud payloads and file names", () => {
+  const context = createContext({
+    userAgent:
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    href: "https://example.test/PointCloudWorkbench.html",
+    protocol: "https:",
+    hasWorker: true,
+  });
+
+  context.__selectedFile = {
+    name: "private-site-survey.las",
+    size: 123456,
+  };
+  vm.runInContext(
+    `
+      window.__pcwTestApi.setWorkflowState({
+        step: "quality-select",
+        selectedQuality: "low",
+        selectedFile: __selectedFile,
+      });
+    `,
+    context,
+  );
+
+  const reportText = vm.runInContext(
+    "window.__pcwTestApi.buildManualDiagnosticReport()",
+    context,
+  );
+  const report = JSON.parse(reportText);
+
+  expect(report.privacy).toMatchObject({
+    manualCopyOnly: true,
+    telemetry: false,
+    sendsPointCloudFile: false,
+    includesPointCloudData: false,
+    includesFileName: false,
+  });
+  expect(report.file).toEqual({
+    extension: "las",
+    sizeBytes: 123456,
+  });
+  expect(report.workflow).toMatchObject({
+    step: "quality-select",
+    selectedQuality: "low",
+  });
+  expect(reportText).not.toContain("private-site-survey");
+  expect(reportText).not.toContain("points\":[");
+});
+
+test("ReaderRegistry exposes LAS and LAZ local readers", () => {
+  const context = createContext();
+
+  const readers = vm.runInContext(
+    "window.__pcwTestApi.getRegisteredPointCloudReaders()",
+    context,
+  );
+
+  expect(readers).toEqual([
+    {
+      extension: "las",
+      label: "LAS local chunked reader",
+      localChunked: true,
+    },
+    {
+      extension: "laz",
+      label: "LAZ local WASM heap reader",
+      localChunked: true,
+    },
+  ]);
+  expect(
+    vm.runInContext('window.__pcwTestApi.resolvePointCloudReader("scan.las").label', context),
+  ).toBe("LAS local chunked reader");
+  expect(
+    vm.runInContext('window.__pcwTestApi.resolvePointCloudReader("scan.laz").label', context),
+  ).toBe("LAZ local WASM heap reader");
+  expect(
+    vm.runInContext('window.__pcwTestApi.resolvePointCloudReader("scan.ply")', context),
+  ).toBeNull();
+});
+
+test("PointCloudData summarizes counts, bounds, and coordinate basis", () => {
+  const context = createContext();
+  context.__header = {
+    numberOfPointRecords: 4,
+    xScaleFactor: 0.01,
+    yScaleFactor: 0.02,
+    zScaleFactor: 0.03,
+    xOffset: 100,
+    yOffset: 200,
+    zOffset: 300,
+  };
+  context.__points = [
+    { x: 10, y: 5, z: 1 },
+    { x: 20, y: 15, z: 9 },
+  ];
+
+  const data = vm.runInContext(
+    `
+      window.__pcwTestApi.createPointCloudData({
+        header: __header,
+        points: __points,
+        fileName: "scan.las",
+        fileSize: 256,
+      })
+    `,
+    context,
+  );
+
+  expect(data.kind).toBe("PointCloudData");
+  expect(data.pointCounts).toMatchObject({
+    sourceCount: 4,
+    decodedCount: 2,
+    displayCount: 2,
+    displayRatio: 50,
+  });
+  expect(data.bounds).toEqual({
+    minX: 10,
+    maxX: 20,
+    minY: 5,
+    maxY: 15,
+    minZ: 1,
+    maxZ: 9,
+  });
+  expect(data.coordinateBasis.scale).toEqual({ x: 0.01, y: 0.02, z: 0.03 });
+  expect(data.coordinateBasis.offset).toEqual({ x: 100, y: 200, z: 300 });
 });
 
 test("startDataLoading restarts memory monitoring before load", async () => {

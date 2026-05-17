@@ -28,3 +28,6 @@ jobs:
 
       - name: Check README
         run: bun scripts/check-readme.js
+
+      - name: Check Server-Zero policy
+        run: bun scripts/check-server-zero.js

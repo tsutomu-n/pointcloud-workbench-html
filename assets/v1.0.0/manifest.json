@@ -1,0 +1,17 @@
+{
+  "name": "PointCloudWorkbench",
+  "version": "1.0.0",
+  "runtime": {
+    "model": "client-max-server-zero",
+    "mode": "static-html",
+    "supportedBrowsers": ["chrome-latest", "edge-latest"],
+    "networkRequired": true,
+    "serverProcessing": false,
+    "pointCloudUpload": false,
+    "telemetry": false
+  },
+  "files": {
+    "app": "/PointCloudWorkbench.html",
+    "sample": "/demo/pointcloud-demo-sample.las"
+  }
+}
