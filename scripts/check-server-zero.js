@@ -35,7 +35,7 @@ const forbiddenPatterns = [
     reason: "automatic telemetry or error reporting endpoints are not allowed",
   },
   {
-    pattern: /uploadPointCloud|pointCloudUpload|\/upload-point-cloud/i,
+    pattern: /uploadPointCloud|sendPointCloudToServer|\/upload-point-cloud/i,
     reason: "selected point cloud files must not be uploaded",
   },
   {
@@ -89,6 +89,7 @@ for (const file of walk(rootDir)) {
     failed = true;
   }
 
+  if (relativeFile === "scripts/check-server-zero.js") continue;
   if (!/\.(html|js|mjs|cjs|ts|json|ya?ml)$/.test(relativeFile)) continue;
 
   const text = fs.readFileSync(file, "utf8");

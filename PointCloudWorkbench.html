@@ -5379,7 +5379,8 @@
         }
 
         detectBrowserSupport() {
-          const nav = window.navigator || navigator || {};
+          const nav =
+            window.navigator || (typeof navigator !== "undefined" ? navigator : {});
           const ua = String(nav.userAgent || "");
           const brands = Array.isArray(nav.userAgentData?.brands)
             ? nav.userAgentData.brands
