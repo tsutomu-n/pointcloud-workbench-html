@@ -1229,6 +1229,22 @@ test("calculateMeasurementMetrics reports source-coordinate distances", () => {
   expect(metrics.heightDifference).toBe(12);
 });
 
+test("calculateMeasurementMetrics rejects invalid source coordinates", () => {
+  const context = createContext();
+
+  expect(() =>
+    vm.runInContext(
+      `
+        window.__pcwTestApi.calculateMeasurementMetrics(
+          { source: { x: NaN, y: 20, z: 30 } },
+          { source: { x: 13, y: 24, z: 42 } }
+        )
+      `,
+      context,
+    ),
+  ).toThrow("計測点の元座標が無効です");
+});
+
 test("formatMeasurementResult labels displayed-point measurement and meter-equivalent units", () => {
   const context = createContext();
 
@@ -1251,6 +1267,66 @@ test("formatMeasurementResult labels displayed-point measurement and meter-equiv
   expect(result.note).toContain("元データの座標単位に依存");
   expect(result.rows).toContainEqual(["高さ差", "12.000 m相当"]);
   expect(result.rows).toContainEqual(["dZ", "12.000 m相当"]);
+});
+
+test("formatMeasurementCopyText includes source point coordinates", () => {
+  const context = createContext();
+
+  const text = vm.runInContext(
+    `
+      window.__pcwTestApi.formatMeasurementCopyText({
+        start: { x: 10, y: 20, z: 30 },
+        end: { x: 13, y: 24, z: 42 },
+        distance3d: 13,
+        horizontalDistance: 5,
+        heightDifference: 12,
+        dx: 3,
+        dy: 4,
+        dz: 12,
+      })
+    `,
+    context,
+  );
+
+  expect(text).toContain("距離: 13.000 m相当");
+  expect(text).toContain("点1 元LAS座標: X=10.000, Y=20.000, Z=30.000");
+  expect(text).toContain("点2 元LAS座標: X=13.000, Y=24.000, Z=42.000");
+  expect(text).toContain("表示点への計測");
+});
+
+test("downsampleSourcePositions preserves source-coordinate index mapping", () => {
+  const context = createContext();
+  context.__sourcePositions = new Float64Array([
+    0, 1, 2,
+    10, 11, 12,
+    20, 21, 22,
+    30, 31, 32,
+  ]);
+
+  const sampled = vm.runInContext(
+    "Array.from(window.__pcwTestApi.downsampleSourcePositions(__sourcePositions, 4, 2))",
+    context,
+  );
+
+  expect(sampled).toEqual([0, 1, 2, 20, 21, 22]);
+});
+
+test("buildLoadProfile includes measurement source-coordinate memory", () => {
+  const context = createContext();
+
+  const profile = vm.runInContext(
+    `
+      window.__pcwTestApi.buildLoadProfile(
+        { name: "dense.las", size: 100 * 1024 * 1024, slice() {} },
+        "maximum",
+        { numberOfPointRecords: 2000000 }
+      )
+    `,
+    context,
+  );
+
+  expect(profile.measurementCoordinateMemoryMB).toBeGreaterThan(0);
+  expect(profile.riskMessage).toContain("計測用座標");
 });
 
 test("hideAllPanels preserves stats toggle markup", () => {

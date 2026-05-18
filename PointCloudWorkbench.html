@@ -4348,7 +4348,7 @@
                   <dl class="measurement-results" id="measurementResults"></dl>
                   <div class="measurement-actions">
                     <button class="control-btn" onclick="clearMeasurement()">
-                      クリア
+                      計測をクリア
                     </button>
                     <button class="control-btn" onclick="copyMeasurementResult()">
                       コピー
@@ -6019,6 +6019,7 @@
       const LOAD_PROFILE_MEMORY_MODEL = {
         runtimeOverheadMB: 192,
         pointObjectBytesPerPoint: 64,
+        sourceCoordinateBytesPerPoint: 24,
         lasChunkMultiplier: 0.15,
         lasChunkFloorMB: 48,
         lasChunkCapMB: 384,
@@ -6515,12 +6516,17 @@
         const pointObjectMB =
           (displayPoints * LOAD_PROFILE_MEMORY_MODEL.pointObjectBytesPerPoint) /
           MB;
+        const measurementCoordinateMemoryMB =
+          (displayPoints *
+            LOAD_PROFILE_MEMORY_MODEL.sourceCoordinateBytesPerPoint) /
+          MB;
         const estimatedPeakMemoryMB = Math.max(
           64,
           Math.round(
             LOAD_PROFILE_MEMORY_MODEL.runtimeOverheadMB +
               settings.memoryMB +
               pointObjectMB +
+              measurementCoordinateMemoryMB +
               stagingMB,
           ),
         );
@@ -6555,6 +6561,7 @@
         const fileType = getFileTypeLabel(safeFile);
         const riskMessage =
           `${fileType} / ${strategy.label} / 推定ピークRAM 約${formatEstimatedMemoryMB(estimatedPeakMemoryMB)}` +
+          ` / 計測用座標 約${formatEstimatedMemoryMB(measurementCoordinateMemoryMB)}保持` +
           (strategy.key === "laz-wasm-chunked"
             ? " / LAZ は内部デコーダ保持ぶんの安全域が狭いです。"
             : "");
@@ -6568,6 +6575,7 @@
           displayPoints,
           displayRatioPercent,
           estimatedPeakMemoryMB,
+          measurementCoordinateMemoryMB,
           safeBudgetMB,
           riskLevel,
           riskLabel: riskLabelMap[riskLevel] || "低",
@@ -8196,11 +8204,19 @@
 
       function getMeasurementPointCoordinates(pointLike) {
         const source = pointLike?.source || pointLike;
-        return {
-          x: Number(source?.x || 0),
-          y: Number(source?.y || 0),
-          z: Number(source?.z || 0),
+        const point = {
+          x: Number(source?.x),
+          y: Number(source?.y),
+          z: Number(source?.z),
         };
+        if (
+          !Number.isFinite(point.x) ||
+          !Number.isFinite(point.y) ||
+          !Number.isFinite(point.z)
+        ) {
+          throw new Error("計測点の元座標が無効です");
+        }
+        return point;
       }
 
       function calculateMeasurementMetrics(startPoint, endPoint) {
@@ -8230,6 +8246,11 @@
         return `${numeric.toFixed(3)} m相当`;
       }
 
+      function formatMeasurementCoordinate(value) {
+        const numeric = Number(value);
+        return Number.isFinite(numeric) ? numeric.toFixed(3) : "-";
+      }
+
       function formatMeasurementResult(metrics) {
         return {
           summary: formatMeasurementValue(metrics.distance3d),
@@ -8242,6 +8263,17 @@
           ],
           note: MEASUREMENT_NOTE,
         };
+      }
+
+      function formatMeasurementCopyText(metrics) {
+        const formatted = formatMeasurementResult(metrics);
+        return [
+          `距離: ${formatted.summary}`,
+          ...formatted.rows.map(([label, value]) => `${label}: ${value}`),
+          `点1 元LAS座標: X=${formatMeasurementCoordinate(metrics.start?.x)}, Y=${formatMeasurementCoordinate(metrics.start?.y)}, Z=${formatMeasurementCoordinate(metrics.start?.z)}`,
+          `点2 元LAS座標: X=${formatMeasurementCoordinate(metrics.end?.x)}, Y=${formatMeasurementCoordinate(metrics.end?.y)}, Z=${formatMeasurementCoordinate(metrics.end?.z)}`,
+          formatted.note,
+        ].join("\n");
       }
 
       function disposeObject3D(object) {
@@ -8302,7 +8334,7 @@
           const label = toggleBtn.querySelector("span");
           if (label) {
             label.textContent = measurementState.enabled
-              ? "距離計測を終了"
+              ? "計測モード終了"
               : "距離計測を開始";
           }
         }
@@ -8348,6 +8380,38 @@
       }
 
       window.clearMeasurement = clearMeasurement;
+
+      function downsampleSourcePositions(
+        sourcePositionArray,
+        currentCount,
+        targetCount,
+      ) {
+        if (!sourcePositionArray) return null;
+        const safeCurrentCount = Math.max(0, Math.floor(Number(currentCount)));
+        const safeTargetCount = Math.max(0, Math.floor(Number(targetCount)));
+        if (
+          safeCurrentCount <= 0 ||
+          safeTargetCount <= 0 ||
+          sourcePositionArray.length < safeCurrentCount * 3
+        ) {
+          return null;
+        }
+
+        const nextPositions = new Float64Array(safeTargetCount * 3);
+        const ratio = safeCurrentCount / safeTargetCount;
+        for (let i = 0; i < safeTargetCount; i++) {
+          const sourceIndex = Math.min(
+            Math.floor(i * ratio),
+            safeCurrentCount - 1,
+          );
+          const srcOffset = sourceIndex * 3;
+          const dstOffset = i * 3;
+          nextPositions[dstOffset] = sourcePositionArray[srcOffset];
+          nextPositions[dstOffset + 1] = sourcePositionArray[srcOffset + 1];
+          nextPositions[dstOffset + 2] = sourcePositionArray[srcOffset + 2];
+        }
+        return nextPositions;
+      }
 
       function calculateMeasurementPickThreshold() {
         if (!pointCloud || !pointCloud.geometry) return pointSize || 1;
@@ -8545,11 +8609,7 @@
           return;
         }
         const formatted = formatMeasurementResult(measurementState.lastResult);
-        const text = [
-          `距離: ${formatted.summary}`,
-          ...formatted.rows.map(([label, value]) => `${label}: ${value}`),
-          formatted.note,
-        ].join("\n");
+        const text = formatMeasurementCopyText(measurementState.lastResult);
         try {
           await navigator.clipboard.writeText(text);
           showToast("計測結果をコピーしました", "success");
@@ -11091,9 +11151,11 @@
             : null;
 
           const newPositions = new Float32Array(targetCount * 3);
-          const newSourcePositions = sourcePositionArray
-            ? new Float64Array(targetCount * 3)
-            : null;
+          const newSourcePositions = downsampleSourcePositions(
+            sourcePositionArray,
+            currentCount,
+            targetCount,
+          );
           const hasColor = !!colorArray;
           const hasClassification = !!classificationArray;
           const newColors = hasColor ? new Float32Array(targetCount * 3) : null;
@@ -11114,14 +11176,6 @@
             newPositions[dstOffset] = positionArray[srcOffset];
             newPositions[dstOffset + 1] = positionArray[srcOffset + 1];
             newPositions[dstOffset + 2] = positionArray[srcOffset + 2];
-            if (newSourcePositions && sourcePositionArray) {
-              newSourcePositions[dstOffset] = sourcePositionArray[srcOffset];
-              newSourcePositions[dstOffset + 1] =
-                sourcePositionArray[srcOffset + 1];
-              newSourcePositions[dstOffset + 2] =
-                sourcePositionArray[srcOffset + 2];
-            }
-
             if (hasColor && colorArray) {
               newColors[dstOffset] = colorArray[srcOffset];
               newColors[dstOffset + 1] = colorArray[srcOffset + 1];
