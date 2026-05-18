@@ -1400,6 +1400,30 @@ test("formatMeasurementTooltip summarizes the hovered history record", () => {
   expect(tooltip.rows).toContainEqual(["高さ差", "12.000 m相当"]);
 });
 
+test("active measurement record prefers hover preview over click selection", () => {
+  const context = createContext();
+
+  const ids = vm.runInContext(
+    `[
+      window.__pcwTestApi.getActiveMeasurementRecordId({
+        previewRecordId: null,
+        selectedRecordId: 7,
+      }),
+      window.__pcwTestApi.getActiveMeasurementRecordId({
+        previewRecordId: 3,
+        selectedRecordId: 7,
+      }),
+      window.__pcwTestApi.getActiveMeasurementRecordId({
+        previewRecordId: null,
+        selectedRecordId: null,
+      }),
+    ]`,
+    context,
+  );
+
+  expect(ids).toEqual([7, 3, null]);
+});
+
 test("downsampleSourcePositions preserves source-coordinate index mapping", () => {
   const context = createContext();
   context.__sourcePositions = new Float64Array([
