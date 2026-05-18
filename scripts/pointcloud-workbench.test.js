@@ -1424,6 +1424,34 @@ test("active measurement record prefers hover preview over click selection", () 
   expect(ids).toEqual([7, 3, null]);
 });
 
+test("removed measurement records clear only matching preview or selection state", () => {
+  const context = createContext();
+
+  const states = vm.runInContext(
+    `[
+      window.__pcwTestApi.clearRemovedMeasurementIdsFromState(
+        { previewRecordId: 3, selectedRecordId: 7 },
+        [{ id: 3 }]
+      ),
+      window.__pcwTestApi.clearRemovedMeasurementIdsFromState(
+        { previewRecordId: 3, selectedRecordId: 7 },
+        [{ id: 7 }]
+      ),
+      window.__pcwTestApi.clearRemovedMeasurementIdsFromState(
+        { previewRecordId: 3, selectedRecordId: 7 },
+        [{ id: 99 }]
+      ),
+    ]`,
+    context,
+  );
+
+  expect(states).toEqual([
+    { previewRecordId: null, selectedRecordId: 7 },
+    { previewRecordId: 3, selectedRecordId: null },
+    { previewRecordId: 3, selectedRecordId: 7 },
+  ]);
+});
+
 test("downsampleSourcePositions preserves source-coordinate index mapping", () => {
   const context = createContext();
   context.__sourcePositions = new Float64Array([

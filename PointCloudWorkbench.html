@@ -8774,8 +8774,33 @@
         });
         document.querySelectorAll(".measurement-history-item").forEach((item) => {
           item.classList.remove("active");
+          item.setAttribute("aria-pressed", "false");
         });
         hideMeasurementTooltip();
+      }
+
+      function clearRemovedMeasurementIdsFromState(state, removedRecords) {
+        const removedIds = new Set(
+          (removedRecords || []).map((record) => record?.id),
+        );
+        return {
+          previewRecordId: removedIds.has(state.previewRecordId)
+            ? null
+            : state.previewRecordId,
+          selectedRecordId: removedIds.has(state.selectedRecordId)
+            ? null
+            : state.selectedRecordId,
+        };
+      }
+
+      function clearRemovedMeasurementRecordState(removedRecords) {
+        const nextState = clearRemovedMeasurementIdsFromState(
+          measurementState,
+          removedRecords,
+        );
+        measurementState.previewRecordId = nextState.previewRecordId;
+        measurementState.selectedRecordId = nextState.selectedRecordId;
+        refreshMeasurementRecordActive();
       }
 
       function renderMeasurementHistoryList() {
@@ -9030,17 +9055,9 @@
           record,
           MEASUREMENT_HISTORY_LIMIT,
         );
-        const removedSelected = next.removed.some(
-          (removed) => removed.id === measurementState.selectedRecordId,
-        );
-        const removedPreview = next.removed.some(
-          (removed) => removed.id === measurementState.previewRecordId,
-        );
-        if (removedSelected || removedPreview) {
-          clearMeasurementRecordSelection();
-        }
         next.removed.forEach(disposeMeasurementRecordHelper);
         measurementState.history = next.history;
+        clearRemovedMeasurementRecordState(next.removed);
         syncLatestMeasurementResult();
         if (next.removed.length > 0) {
           showToast("古い計測履歴を削除しました", "info");
@@ -9055,12 +9072,7 @@
         );
         if (index < 0) return null;
         const [record] = measurementState.history.splice(index, 1);
-        if (
-          measurementState.selectedRecordId === record.id ||
-          measurementState.previewRecordId === record.id
-        ) {
-          clearMeasurementRecordSelection();
-        }
+        clearRemovedMeasurementRecordState([record]);
         disposeMeasurementRecordHelper(record);
         syncLatestMeasurementResult();
         updateMeasurementUi();
@@ -15923,6 +15935,7 @@
           formatMeasurementTooltip,
           getMeasurementPinVisualSpec,
           getActiveMeasurementRecordId,
+          clearRemovedMeasurementIdsFromState,
           downsampleSourcePositions,
           detectBrowserSupport() {
             return compatibilityChecker.detectBrowserSupport();
