@@ -39,6 +39,7 @@ PointCloudWorkbenchへの貢献ありがとうございます。
 bun test scripts/pointcloud-workbench.test.js scripts/documentation-consistency.test.js scripts/gitignore.test.js scripts/repository-metadata.test.js scripts/public-repo-readiness.test.js scripts/landing-page-i18n.test.js
 bun scripts/check-readme.js
 bun scripts/check-server-zero.js
+# 任意: actionlint .github/workflows/*.yml
 ```
 
 ## PRに書くこと

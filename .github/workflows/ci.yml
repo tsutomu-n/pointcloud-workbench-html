@@ -27,6 +27,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
+      - name: Lint GitHub Actions workflows
+        run: |
+          set -euo pipefail
+          ACTIONLINT_VERSION=1.7.12
+          ACTIONLINT_ASSET="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          ACTIONLINT_BASE_URL="https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}"
+          curl -fsSLO "${ACTIONLINT_BASE_URL}/${ACTIONLINT_ASSET}"
+          curl -fsSLO "${ACTIONLINT_BASE_URL}/actionlint_${ACTIONLINT_VERSION}_checksums.txt"
+          grep "  ${ACTIONLINT_ASSET}$" "actionlint_${ACTIONLINT_VERSION}_checksums.txt" | sha256sum -c -
+          tar -xzf "${ACTIONLINT_ASSET}" actionlint
+          ./actionlint .github/workflows/*.yml
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:

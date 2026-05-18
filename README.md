@@ -115,6 +115,7 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 
 - `bun test scripts/pointcloud-workbench.test.js scripts/documentation-consistency.test.js scripts/gitignore.test.js scripts/repository-metadata.test.js scripts/public-repo-readiness.test.js scripts/landing-page-i18n.test.js`
 - `bun scripts/check-readme.js`
+- CI also runs pinned `actionlint` for `.github/workflows/*.yml`; local `actionlint .github/workflows/*.yml` is optional.
 
 ## Repository Scope
 

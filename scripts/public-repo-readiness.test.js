@@ -121,6 +121,11 @@ test("GitHub Actions CI runs Bun tests and README checks on main push and pull_r
   expect(workflow).toContain("- main");
   expect(workflow).toContain("actions/checkout@v5");
   expect(workflow).not.toContain("actions/checkout@v4");
+  expect(workflow).toContain("Lint GitHub Actions workflows");
+  expect(workflow).toContain("ACTIONLINT_VERSION=1.7.12");
+  expect(workflow).toContain("actionlint_${ACTIONLINT_VERSION}_checksums.txt");
+  expect(workflow).toContain("sha256sum -c -");
+  expect(workflow).toContain("./actionlint .github/workflows/*.yml");
   expect(workflow).toContain("oven-sh/setup-bun@v2");
   expect(workflow).toContain("bun-version: 1.3.9");
   expect(workflow).toContain(
@@ -167,6 +172,7 @@ test("Pages demo assets and deployment workflow are present", () => {
 
   expect(fs.existsSync(workflowPath)).toBe(true);
   const workflow = fs.readFileSync(workflowPath, "utf8");
+  expect(workflow).not.toContain("Lint GitHub Actions workflows");
   expect(workflow).toContain("workflow_dispatch:");
   expect(workflow).toContain("FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true");
   expect(workflow).toContain("build:");
