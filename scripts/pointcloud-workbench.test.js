@@ -1354,6 +1354,52 @@ test("formatMeasurementHistoryItem summarizes distance and deltas", () => {
   expect(item.meta).toContain("高さ差 12.000 m相当");
 });
 
+test("measurement pin visual specs use fixed screen-size markers", () => {
+  const context = createContext();
+
+  const specs = vm.runInContext(
+    `[
+      window.__pcwTestApi.getMeasurementPinVisualSpec("start"),
+      window.__pcwTestApi.getMeasurementPinVisualSpec("end"),
+    ]`,
+    context,
+  );
+
+  expect(specs[0]).toMatchObject({
+    role: "start",
+    size: 30,
+    fill: "#38bdf8",
+  });
+  expect(specs[1]).toMatchObject({
+    role: "end",
+    size: 34,
+    fill: "#facc15",
+  });
+  expect(specs[1].size).toBeGreaterThan(specs[0].size);
+});
+
+test("formatMeasurementTooltip summarizes the hovered history record", () => {
+  const context = createContext();
+
+  const tooltip = vm.runInContext(
+    `
+      window.__pcwTestApi.formatMeasurementTooltip({
+        id: 4,
+        metrics: {
+          distance3d: 13,
+          horizontalDistance: 5,
+          heightDifference: 12,
+        },
+      })
+    `,
+    context,
+  );
+
+  expect(tooltip.title).toBe("#4 13.000 m相当");
+  expect(tooltip.rows).toContainEqual(["水平", "5.000 m相当"]);
+  expect(tooltip.rows).toContainEqual(["高さ差", "12.000 m相当"]);
+});
+
 test("downsampleSourcePositions preserves source-coordinate index mapping", () => {
   const context = createContext();
   context.__sourcePositions = new Float64Array([

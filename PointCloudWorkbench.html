@@ -3280,7 +3280,21 @@
         background: rgba(2, 6, 23, 0.36);
         border: 1px solid rgba(148, 163, 184, 0.24);
         border-radius: var(--radius-sm);
+        cursor: pointer;
         padding: var(--space-2);
+        transition:
+          background var(--duration-fast) var(--ease-out),
+          border-color var(--duration-fast) var(--ease-out),
+          box-shadow var(--duration-fast) var(--ease-out);
+      }
+
+      .measurement-history-item:hover,
+      .measurement-history-item:focus-visible,
+      .measurement-history-item.active {
+        background: rgba(14, 116, 144, 0.24);
+        border-color: rgba(56, 189, 248, 0.7);
+        box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.18);
+        outline: none;
       }
 
       .measurement-history-main {
@@ -3318,6 +3332,52 @@
         color: var(--ec-muted);
         font-size: var(--font-size-xs);
         line-height: var(--line-height-normal);
+      }
+
+      .measurement-tooltip {
+        background: rgba(15, 23, 42, 0.96);
+        border: 1px solid rgba(56, 189, 248, 0.74);
+        border-radius: var(--radius-sm);
+        box-shadow: 0 14px 36px rgba(0, 0, 0, 0.32);
+        color: var(--ec-text);
+        display: none;
+        font-size: var(--font-size-xs);
+        left: 0;
+        max-width: 240px;
+        padding: var(--space-2);
+        pointer-events: none;
+        position: fixed;
+        top: 0;
+        transform: translate3d(0, 0, 0);
+        z-index: 1200;
+      }
+
+      .measurement-tooltip.visible {
+        display: block;
+      }
+
+      .measurement-tooltip-title {
+        color: var(--ec-accent);
+        font-family: monospace;
+        font-size: var(--font-size-sm);
+        font-weight: 700;
+        margin-bottom: var(--space-1);
+      }
+
+      .measurement-tooltip-row {
+        align-items: center;
+        display: flex;
+        gap: var(--space-3);
+        justify-content: space-between;
+        line-height: var(--line-height-normal);
+      }
+
+      .measurement-tooltip-row span:first-child {
+        color: var(--ec-muted);
+      }
+
+      .measurement-tooltip-row span:last-child {
+        font-family: monospace;
       }
 
       .slice-range-container {
@@ -5858,6 +5918,7 @@
         nextRecordId: 1,
         pointerDown: null,
         lastResult: null,
+        activeRecordId: null,
       };
       let measurementPointerHandlerBound = false;
 
@@ -8436,57 +8497,87 @@
         measurementState.pointerDown = null;
       }
 
-      function removeMeasurementLabel(record) {
-        if (!record?.helperGroup) return;
-        record.helperGroup.children
-          .filter((child) => child.name === "measurementLabel")
-          .forEach((label) => {
-            record.helperGroup.remove(label);
-            disposeObject3D(label);
-          });
+      function getMeasurementPinVisualSpec(role) {
+        const isEnd = role === "end";
+        return {
+          role: isEnd ? "end" : "start",
+          size: isEnd ? 34 : 30,
+          fill: isEnd ? "#facc15" : "#38bdf8",
+          stroke: "#0f172a",
+          inner: "#ffffff",
+        };
       }
 
-      function createMeasurementLabel(startPoint, endPoint, metrics) {
-        if (!THREE.Sprite || !THREE.CanvasTexture) return null;
+      function createMeasurementPinTexture(spec) {
+        if (!THREE.CanvasTexture) return null;
         const canvas = document.createElement("canvas");
-        canvas.width = 256;
-        canvas.height = 64;
+        canvas.width = 96;
+        canvas.height = 128;
         const ctx = canvas.getContext("2d");
         if (ctx) {
-          ctx.fillStyle = "rgba(15, 23, 42, 0.9)";
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-          ctx.strokeStyle = "#38bdf8";
-          ctx.strokeRect(0.5, 0.5, canvas.width - 1, canvas.height - 1);
-          ctx.fillStyle = "#ffffff";
-          ctx.font = "bold 22px sans-serif";
-          ctx.fillText(formatMeasurementValue(metrics.distance3d), 14, 38);
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.beginPath();
+          ctx.moveTo(48, 118);
+          ctx.lineTo(31, 72);
+          ctx.lineTo(65, 72);
+          ctx.closePath();
+          ctx.fillStyle = spec.fill;
+          ctx.fill();
+          ctx.lineWidth = 8;
+          ctx.strokeStyle = spec.stroke;
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.arc(48, 47, 32, 0, Math.PI * 2);
+          ctx.fillStyle = spec.fill;
+          ctx.fill();
+          ctx.lineWidth = 8;
+          ctx.strokeStyle = spec.stroke;
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.arc(48, 47, 12, 0, Math.PI * 2);
+          ctx.fillStyle = spec.inner;
+          ctx.fill();
         }
-        const sprite = new THREE.Sprite(
-          new THREE.SpriteMaterial({
-            map: new THREE.CanvasTexture(canvas),
-            depthTest: false,
-          }),
-        );
-        sprite.name = "measurementLabel";
-        sprite.position
-          .copy(startPoint.display)
-          .add(endPoint.display)
-          .multiplyScalar(0.5);
-        sprite.scale.set(24, 6, 1);
-        return sprite;
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.needsUpdate = true;
+        return texture;
       }
 
-      function refreshLatestMeasurementLabel() {
-        measurementState.history.forEach(removeMeasurementLabel);
-        const latest =
-          measurementState.history[measurementState.history.length - 1] || null;
-        if (!latest?.helperGroup) return;
-        const label = createMeasurementLabel(
-          latest.startPoint,
-          latest.endPoint,
-          latest.metrics,
+      function createMeasurementPinMarker(point, role) {
+        if (!THREE.Points || !THREE.PointsMaterial || !THREE.BufferGeometry) {
+          return null;
+        }
+        const spec = getMeasurementPinVisualSpec(role);
+        const texture = createMeasurementPinTexture(spec);
+        const geometry = new THREE.BufferGeometry().setFromPoints([
+          point.display,
+        ]);
+        const materialOptions = {
+          color: 0xffffff,
+          depthTest: false,
+          depthWrite: false,
+          size: spec.size,
+          sizeAttenuation: false,
+          transparent: true,
+        };
+        if (texture) {
+          materialOptions.map = texture;
+          materialOptions.alphaTest = 0.08;
+        }
+        const marker = new THREE.Points(
+          geometry,
+          new THREE.PointsMaterial(materialOptions),
         );
-        if (label) latest.helperGroup.add(label);
+        marker.name = "measurementPinMarker";
+        marker.renderOrder = 20;
+        marker.userData = {
+          role: spec.role,
+          baseSize: spec.size,
+          baseOpacity: 1,
+        };
+        return marker;
       }
 
       function formatMeasurementHistoryItem(record) {
@@ -8499,6 +8590,133 @@
             `高さ差 ${formatMeasurementValue(record.metrics.heightDifference)}`,
           ].join(" / "),
         };
+      }
+
+      function formatMeasurementTooltip(record) {
+        if (!record?.metrics) return null;
+        return {
+          title: `#${record.id} ${formatMeasurementValue(record.metrics.distance3d)}`,
+          rows: [
+            ["水平", formatMeasurementValue(record.metrics.horizontalDistance)],
+            ["高さ差", formatMeasurementValue(record.metrics.heightDifference)],
+          ],
+        };
+      }
+
+      function ensureMeasurementTooltip() {
+        let tooltip = document.getElementById("measurementTooltip");
+        if (tooltip) return tooltip;
+        tooltip = document.createElement("div");
+        tooltip.id = "measurementTooltip";
+        tooltip.className = "measurement-tooltip";
+        tooltip.setAttribute("role", "status");
+        tooltip.setAttribute("aria-live", "polite");
+        document.body.appendChild(tooltip);
+        return tooltip;
+      }
+
+      function positionMeasurementTooltip(tooltip, event, sourceElement = null) {
+        const margin = 12;
+        const fallbackRect =
+          sourceElement && typeof sourceElement.getBoundingClientRect === "function"
+            ? sourceElement.getBoundingClientRect()
+            : null;
+        const anchorX =
+          Number.isFinite(event?.clientX) ? event.clientX : fallbackRect?.right || margin;
+        const anchorY =
+          Number.isFinite(event?.clientY) ? event.clientY : fallbackRect?.top || margin;
+        const width = tooltip.offsetWidth || 220;
+        const height = tooltip.offsetHeight || 96;
+        const maxX = Math.max(margin, window.innerWidth - width - margin);
+        const maxY = Math.max(margin, window.innerHeight - height - margin);
+        const left = Math.min(Math.max(anchorX + margin, margin), maxX);
+        const top = Math.min(Math.max(anchorY + margin, margin), maxY);
+        tooltip.style.left = `${left}px`;
+        tooltip.style.top = `${top}px`;
+      }
+
+      function showMeasurementTooltip(record, event = null, sourceElement = null) {
+        const formatted = formatMeasurementTooltip(record);
+        if (!formatted) return;
+        const tooltip = ensureMeasurementTooltip();
+        tooltip.innerHTML = [
+          `<div class="measurement-tooltip-title">${escapeHtml(formatted.title)}</div>`,
+          ...formatted.rows.map(
+            ([label, value]) =>
+              `<div class="measurement-tooltip-row"><span>${escapeHtml(label)}</span><span>${escapeHtml(value)}</span></div>`,
+          ),
+        ].join("");
+        tooltip.classList.add("visible");
+        positionMeasurementTooltip(tooltip, event, sourceElement);
+      }
+
+      function hideMeasurementTooltip() {
+        const tooltip = document.getElementById("measurementTooltip");
+        if (!tooltip) return;
+        tooltip.classList.remove("visible");
+      }
+
+      function setMeasurementObjectActive(object, active) {
+        if (!object?.material) return;
+        const material = object.material;
+        if (object.name === "measurementPinMarker") {
+          const baseSize = object.userData?.baseSize || material.size || 30;
+          material.size = active ? baseSize + 10 : baseSize;
+          material.opacity = active ? 1 : object.userData?.baseOpacity || 1;
+        }
+        if (object.name === "measurementLine" && material.color) {
+          material.color.set(active ? 0x38bdf8 : 0xfacc15);
+          material.linewidth = active ? 3 : 1;
+          material.opacity = active ? 1 : 0.88;
+          material.transparent = true;
+        }
+        object.renderOrder = active ? 30 : 20;
+      }
+
+      function setMeasurementRecordActive(id, event = null, sourceElement = null) {
+        const numericId = Number(id);
+        measurementState.activeRecordId = Number.isFinite(numericId)
+          ? numericId
+          : null;
+        const activeRecord = measurementState.history.find(
+          (record) => record.id === measurementState.activeRecordId,
+        );
+        measurementState.history.forEach((record) => {
+          const active = Boolean(
+            activeRecord && record.id === measurementState.activeRecordId,
+          );
+          if (record.helperGroup) {
+            record.helperGroup.children.forEach((child) => {
+              setMeasurementObjectActive(child, active);
+            });
+          }
+        });
+        document.querySelectorAll(".measurement-history-item").forEach((item) => {
+          item.classList.toggle(
+            "active",
+            Number(item.dataset.measurementId) === measurementState.activeRecordId,
+          );
+        });
+        if (activeRecord) {
+          showMeasurementTooltip(activeRecord, event, sourceElement);
+        } else {
+          hideMeasurementTooltip();
+        }
+      }
+
+      function clearMeasurementRecordActive() {
+        measurementState.activeRecordId = null;
+        measurementState.history.forEach((record) => {
+          if (record.helperGroup) {
+            record.helperGroup.children.forEach((child) => {
+              setMeasurementObjectActive(child, false);
+            });
+          }
+        });
+        document.querySelectorAll(".measurement-history-item").forEach((item) => {
+          item.classList.remove("active");
+        });
+        hideMeasurementTooltip();
       }
 
       function renderMeasurementHistoryList() {
@@ -8515,6 +8733,7 @@
         if (!list) return;
         if (measurementState.history.length === 0) {
           list.innerHTML = "";
+          clearMeasurementRecordActive();
           return;
         }
         list.innerHTML = measurementState.history
@@ -8523,12 +8742,12 @@
           .map((record) => {
             const item = formatMeasurementHistoryItem(record);
             return [
-              `<div class="measurement-history-item" data-measurement-id="${item.id}">`,
+              `<div class="measurement-history-item" data-measurement-id="${item.id}" tabindex="0" onmouseenter="previewMeasurementRecord(${item.id}, event, this)" onmousemove="previewMeasurementRecord(${item.id}, event, this)" onmouseleave="clearMeasurementPreview()" onfocus="previewMeasurementRecord(${item.id}, event, this)" onblur="clearMeasurementPreview()" onclick="selectMeasurementRecord(${item.id}, event, this)">`,
               '<div class="measurement-history-main">',
               `<div class="measurement-history-distance">#${item.id} ${escapeHtml(item.distance)}</div>`,
               '<div class="measurement-history-actions">',
-              `<button class="control-btn" onclick="copyMeasurementRecord(${item.id})">コピー</button>`,
-              `<button class="control-btn" onclick="deleteMeasurementRecord(${item.id})">削除</button>`,
+              `<button class="control-btn" onclick="event.stopPropagation(); copyMeasurementRecord(${item.id})">コピー</button>`,
+              `<button class="control-btn" onclick="event.stopPropagation(); deleteMeasurementRecord(${item.id})">削除</button>`,
               "</div>",
               "</div>",
               `<div class="measurement-history-meta">${escapeHtml(item.meta)}</div>`,
@@ -8536,6 +8755,14 @@
             ].join("");
           })
           .join("");
+        if (
+          measurementState.activeRecordId &&
+          measurementState.history.some(
+            (record) => record.id === measurementState.activeRecordId,
+          )
+        ) {
+          setMeasurementRecordActive(measurementState.activeRecordId);
+        }
       }
 
       function updateMeasurementUi() {
@@ -8595,6 +8822,7 @@
       }
 
       function clearMeasurementHistory(options = {}) {
+        clearMeasurementRecordActive();
         clearMeasurementHelpers();
         resetMeasurementDraft();
         measurementState.history = [];
@@ -8693,27 +8921,21 @@
         };
       }
 
-      function createMeasurementHelpers(startPoint, endPoint, metrics, options = {}) {
+      function createMeasurementHelpers(startPoint, endPoint, metrics, id = null) {
         if (!scene || !THREE.Group) return null;
 
         const group = new THREE.Group();
         group.name = "measurementHelper";
+        group.userData = {
+          measurementId: id,
+        };
 
-        const markerRadius = Math.max(
-          calculateMeasurementPickThreshold() * 0.6,
-          0.4,
-        );
-        [startPoint, endPoint].forEach((point) => {
-          const marker = new THREE.Mesh(
-            new THREE.SphereGeometry(markerRadius, 12, 8),
-            new THREE.MeshBasicMaterial({
-              color: 0x38bdf8,
-              depthTest: false,
-            }),
-          );
-          marker.position.copy(point.display);
-          marker.name = "measurementHelper";
-          group.add(marker);
+        [
+          ["start", startPoint],
+          ["end", endPoint],
+        ].forEach(([role, point]) => {
+          const marker = createMeasurementPinMarker(point, role);
+          if (marker) group.add(marker);
         });
 
         const lineGeometry = new THREE.BufferGeometry().setFromPoints([
@@ -8725,27 +8947,26 @@
           new THREE.LineBasicMaterial({
             color: 0xfacc15,
             depthTest: false,
+            linewidth: 1,
+            opacity: 0.88,
+            transparent: true,
           }),
         );
-        line.name = "measurementHelper";
+        line.name = "measurementLine";
+        line.renderOrder = 20;
+        line.userData = {
+          measurementId: id,
+        };
         group.add(line);
-
-        if (options.includeLabel) {
-          const label = createMeasurementLabel(startPoint, endPoint, metrics);
-          if (label) group.add(label);
-        }
 
         scene.add(group);
         return group;
       }
 
       function addMeasurementRecord(startPoint, endPoint) {
-        measurementState.history.forEach(removeMeasurementLabel);
         const id = measurementState.nextRecordId++;
         const metrics = calculateMeasurementMetrics(startPoint, endPoint);
-        const helperGroup = createMeasurementHelpers(startPoint, endPoint, metrics, {
-          includeLabel: true,
-        });
+        const helperGroup = createMeasurementHelpers(startPoint, endPoint, metrics, id);
         const record = {
           id,
           startPoint,
@@ -8774,9 +8995,11 @@
         );
         if (index < 0) return null;
         const [record] = measurementState.history.splice(index, 1);
+        if (measurementState.activeRecordId === record.id) {
+          clearMeasurementRecordActive();
+        }
         disposeMeasurementRecordHelper(record);
         syncLatestMeasurementResult();
-        refreshLatestMeasurementLabel();
         updateMeasurementUi();
         return record;
       }
@@ -8877,6 +9100,27 @@
           console.warn("計測履歴のコピーに失敗:", error);
           showToast("コピーに失敗しました", "warning");
         }
+      };
+
+      window.previewMeasurementRecord = function (
+        id,
+        event = null,
+        sourceElement = null,
+      ) {
+        setMeasurementRecordActive(id, event, sourceElement);
+      };
+
+      window.selectMeasurementRecord = function (
+        id,
+        event = null,
+        sourceElement = null,
+      ) {
+        if (event?.target?.closest?.("button")) return;
+        setMeasurementRecordActive(id, event, sourceElement);
+      };
+
+      window.clearMeasurementPreview = function () {
+        clearMeasurementRecordActive();
       };
 
       window.deleteMeasurementRecord = function (id) {
@@ -15603,6 +15847,8 @@
           createMeasurementRecord,
           appendMeasurementRecord,
           formatMeasurementHistoryItem,
+          formatMeasurementTooltip,
+          getMeasurementPinVisualSpec,
           downsampleSourcePositions,
           detectBrowserSupport() {
             return compatibilityChecker.detectBrowserSupport();
