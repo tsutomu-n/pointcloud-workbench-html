@@ -112,6 +112,7 @@ test("GitHub Actions CI runs Bun tests and README checks on main push and pull_r
   expect(workflow).toContain("push:");
   expect(workflow).toContain("pull_request:");
   expect(workflow).toContain("workflow_dispatch:");
+  expect(workflow).toContain("FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true");
   expect(workflow).toContain("permissions:");
   expect(workflow).toContain("contents: read");
   expect(workflow).toContain("concurrency:");
@@ -167,8 +168,16 @@ test("Pages demo assets and deployment workflow are present", () => {
   expect(fs.existsSync(workflowPath)).toBe(true);
   const workflow = fs.readFileSync(workflowPath, "utf8");
   expect(workflow).toContain("workflow_dispatch:");
+  expect(workflow).toContain("FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true");
+  expect(workflow).toContain("build:");
+  expect(workflow).toContain("deploy:");
+  expect(workflow).toContain("needs: build");
   expect(workflow).toContain("timeout-minutes: 15");
-  expect(workflow).toContain("actions/configure-pages@v5");
+  expect(workflow).toContain("actions: read");
+  expect(workflow).toContain("pages: write");
+  expect(workflow).toContain("id-token: write");
+  expect(workflow).toContain("actions/configure-pages@v6");
+  expect(workflow).not.toContain("actions/configure-pages@v5");
   expect(workflow).toContain("actions/checkout@v5");
   expect(workflow).not.toContain("actions/checkout@v4");
   expect(workflow).toContain("oven-sh/setup-bun@v2");
@@ -179,8 +188,10 @@ test("Pages demo assets and deployment workflow are present", () => {
   );
   expect(workflow).toContain("bun scripts/check-readme.js");
   expect(workflow).toContain("bun scripts/check-server-zero.js");
-  expect(workflow).toContain("actions/upload-pages-artifact@v4");
-  expect(workflow).toContain("actions/deploy-pages@v4");
+  expect(workflow).toContain("actions/upload-pages-artifact@v5");
+  expect(workflow).not.toContain("actions/upload-pages-artifact@v4");
+  expect(workflow).toContain("actions/deploy-pages@v5");
+  expect(workflow).not.toContain("actions/deploy-pages@v4");
   expect(workflow).toContain("name: ${{ 'github-pages' }}");
   expect(workflow).toContain("cp _headers site/_headers");
   expect(workflow).toContain("cp assets/latest/manifest.json site/assets/latest/manifest.json");
