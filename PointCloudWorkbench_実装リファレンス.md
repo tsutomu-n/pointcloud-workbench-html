@@ -129,7 +129,7 @@
 - `y = point.z - minZ`
 - `z = -(point.y - centerY)`
 - `position`, `color`, `classification` バッファ属性を構築
-- 計測用の元LAS座標は描画属性ではなく `pointCloud.userData.sourcePositions` に保持
+- 計測用の元LAS座標は描画属性ではなく `pointCloud.userData.sourcePositions` に保持し、読み込みプロファイルの推定ピークRAMに含める
 - `statsData` と分類統計を更新
 
 ### 8.2 `downsamplePointCloud()`
@@ -184,6 +184,7 @@
 - `window.copyMeasurementResult()`
 - 2点クリックで表示点に吸着し、元LAS基準の `3D距離 / 水平距離 / 高さ差 / dX / dY / dZ` を表示
 - 距離は `m相当` 表示であり、元データの座標単位に依存する
+- `Esc` または「計測モード終了」は選択モードだけを止め、直近結果は「計測をクリア」まで残す
 - スライス:
 - `window.toggleSlicing()`
 - `updateSlicing()`

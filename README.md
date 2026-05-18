@@ -84,7 +84,7 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 - Local LAS uses header-first preview plus chunked point-data reads. Local LAZ uses chunked transfers into WASM. URL loading and some compatibility paths may still use full `ArrayBuffer` reads.
 - Raising file-size acceptance does not change the actual render cap. Confirm `source points / rendered points / render ratio` in the quality screen and statistics panel.
 - Automatic classification is a height-based assist feature, not a survey-grade classification guarantee.
-- Distance measurement snaps to displayed sampled points, not the full source LAS/LAZ point set. Distances are shown as `m-equivalent` and depend on the source coordinate unit.
+- Distance measurement snaps to displayed sampled points, not the full source LAS/LAZ point set. Distances are shown as `m-equivalent` and depend on the source coordinate unit. The load profile includes the extra source-coordinate memory kept for measurement.
 
 ## Repository Layout
 

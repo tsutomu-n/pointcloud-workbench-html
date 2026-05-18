@@ -8608,7 +8608,6 @@
           showToast("コピーできる計測結果がありません", "warning");
           return;
         }
-        const formatted = formatMeasurementResult(measurementState.lastResult);
         const text = formatMeasurementCopyText(measurementState.lastResult);
         try {
           await navigator.clipboard.writeText(text);
@@ -14565,6 +14564,13 @@
               window.cancelLoading();
               break;
             }
+            if (measurementState.enabled) {
+              measurementState.enabled = false;
+              measurementState.pointerDown = null;
+              updateMeasurementUi();
+              event.preventDefault();
+              break;
+            }
             // ヘルプモーダルが表示されている場合は閉じる（fix1b: フォーカス復元付き）
             const helpModal = document.getElementById('keyboardHelpModal');
             if (helpModal) { helpModal._close ? helpModal._close() : helpModal.remove(); break; }
@@ -15323,6 +15329,8 @@
           updateEstimations,
           calculateMeasurementMetrics,
           formatMeasurementResult,
+          formatMeasurementCopyText,
+          downsampleSourcePositions,
           detectBrowserSupport() {
             return compatibilityChecker.detectBrowserSupport();
           },
