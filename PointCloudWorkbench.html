@@ -8341,8 +8341,6 @@
         if (panel) panel.classList.toggle("visible", measurementState.enabled);
         if (note) note.textContent = MEASUREMENT_NOTE;
 
-        if (!measurementState.enabled) return;
-
         if (status) {
           if (measurementState.lastResult) {
             status.textContent = "計測完了";
