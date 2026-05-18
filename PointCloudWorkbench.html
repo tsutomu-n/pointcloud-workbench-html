@@ -3255,6 +3255,65 @@
         margin-bottom: var(--space-2);
       }
 
+      .measurement-history {
+        border-top: 1px solid var(--ec-border);
+        margin-top: var(--space-3);
+        padding-top: var(--space-3);
+      }
+
+      .measurement-history-header {
+        align-items: center;
+        color: var(--ec-muted);
+        display: flex;
+        font-size: var(--font-size-xs);
+        font-weight: 700;
+        justify-content: space-between;
+        margin-bottom: var(--space-2);
+      }
+
+      .measurement-history-list {
+        display: grid;
+        gap: var(--space-2);
+      }
+
+      .measurement-history-item {
+        background: rgba(2, 6, 23, 0.36);
+        border: 1px solid rgba(148, 163, 184, 0.24);
+        border-radius: var(--radius-sm);
+        padding: var(--space-2);
+      }
+
+      .measurement-history-main {
+        align-items: center;
+        display: flex;
+        gap: var(--space-2);
+        justify-content: space-between;
+      }
+
+      .measurement-history-distance {
+        color: var(--ec-text);
+        font-family: monospace;
+        font-size: var(--font-size-sm);
+        font-weight: 700;
+      }
+
+      .measurement-history-meta {
+        color: var(--ec-muted);
+        font-size: var(--font-size-xs);
+        margin-top: var(--space-1);
+      }
+
+      .measurement-history-actions {
+        display: flex;
+        gap: var(--space-1);
+        flex-shrink: 0;
+      }
+
+      .measurement-history-actions .control-btn {
+        min-height: 28px;
+        padding: var(--space-1) var(--space-2);
+      }
+
       .measurement-note {
         color: var(--ec-muted);
         font-size: var(--font-size-xs);
@@ -4348,11 +4407,21 @@
                   <dl class="measurement-results" id="measurementResults"></dl>
                   <div class="measurement-actions">
                     <button class="control-btn" onclick="clearMeasurement()">
-                      計測をクリア
+                      計測を全消去
                     </button>
                     <button class="control-btn" onclick="copyMeasurementResult()">
                       コピー
                     </button>
+                  </div>
+                  <div class="measurement-history" id="measurementHistory">
+                    <div class="measurement-history-header">
+                      <span>計測履歴</span>
+                      <span id="measurementHistoryCount">0/20</span>
+                    </div>
+                    <div
+                      class="measurement-history-list"
+                      id="measurementHistoryList"
+                    ></div>
                   </div>
                   <div class="measurement-note" id="measurementNote">
                     表示点への計測です。距離はLAS座標単位をm相当として表示し、元データの座標単位に依存します。
@@ -5780,10 +5849,13 @@
       let pointSize = 1.0;
       const MEASUREMENT_NOTE =
         "表示点への計測です。距離はLAS座標単位をm相当として表示し、元データの座標単位に依存します。";
+      const MEASUREMENT_HISTORY_LIMIT = 20;
       let measurementState = {
         enabled: false,
         selectedPoints: [],
         helperGroup: null,
+        history: [],
+        nextRecordId: 1,
         pointerDown: null,
         lastResult: null,
       };
@@ -8276,6 +8348,27 @@
         ].join("\n");
       }
 
+      function createMeasurementRecord(id, startPoint, endPoint, helperGroup = null) {
+        const metrics = calculateMeasurementMetrics(startPoint, endPoint);
+        return {
+          id,
+          startPoint,
+          endPoint,
+          metrics,
+          helperGroup,
+        };
+      }
+
+      function appendMeasurementRecord(history, record, limit = MEASUREMENT_HISTORY_LIMIT) {
+        const safeLimit = Math.max(1, Math.floor(Number(limit)) || 1);
+        const nextHistory = [...history, record];
+        const removed = [];
+        while (nextHistory.length > safeLimit) {
+          removed.push(nextHistory.shift());
+        }
+        return { history: nextHistory, removed };
+      }
+
       function disposeObject3D(object) {
         if (!object) return;
         if (object.children && object.children.length) {
@@ -8300,7 +8393,17 @@
         }
       }
 
+      function disposeMeasurementRecordHelper(record) {
+        if (!record?.helperGroup) return;
+        if (record.helperGroup.parent) {
+          record.helperGroup.parent.remove(record.helperGroup);
+        }
+        disposeObject3D(record.helperGroup);
+        record.helperGroup = null;
+      }
+
       function clearMeasurementHelpers() {
+        measurementState.history.forEach(disposeMeasurementRecordHelper);
         if (scene) {
           scene.children
             .filter((child) => child.name === "measurementHelper")
@@ -8319,6 +8422,120 @@
         }
         disposeObject3D(measurementState.helperGroup);
         measurementState.helperGroup = null;
+      }
+
+      function syncLatestMeasurementResult() {
+        const latest =
+          measurementState.history[measurementState.history.length - 1] || null;
+        measurementState.lastResult = latest ? latest.metrics : null;
+        measurementState.helperGroup = latest ? latest.helperGroup : null;
+      }
+
+      function resetMeasurementDraft() {
+        measurementState.selectedPoints = [];
+        measurementState.pointerDown = null;
+      }
+
+      function removeMeasurementLabel(record) {
+        if (!record?.helperGroup) return;
+        record.helperGroup.children
+          .filter((child) => child.name === "measurementLabel")
+          .forEach((label) => {
+            record.helperGroup.remove(label);
+            disposeObject3D(label);
+          });
+      }
+
+      function createMeasurementLabel(startPoint, endPoint, metrics) {
+        if (!THREE.Sprite || !THREE.CanvasTexture) return null;
+        const canvas = document.createElement("canvas");
+        canvas.width = 256;
+        canvas.height = 64;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.fillStyle = "rgba(15, 23, 42, 0.9)";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.strokeStyle = "#38bdf8";
+          ctx.strokeRect(0.5, 0.5, canvas.width - 1, canvas.height - 1);
+          ctx.fillStyle = "#ffffff";
+          ctx.font = "bold 22px sans-serif";
+          ctx.fillText(formatMeasurementValue(metrics.distance3d), 14, 38);
+        }
+        const sprite = new THREE.Sprite(
+          new THREE.SpriteMaterial({
+            map: new THREE.CanvasTexture(canvas),
+            depthTest: false,
+          }),
+        );
+        sprite.name = "measurementLabel";
+        sprite.position
+          .copy(startPoint.display)
+          .add(endPoint.display)
+          .multiplyScalar(0.5);
+        sprite.scale.set(24, 6, 1);
+        return sprite;
+      }
+
+      function refreshLatestMeasurementLabel() {
+        measurementState.history.forEach(removeMeasurementLabel);
+        const latest =
+          measurementState.history[measurementState.history.length - 1] || null;
+        if (!latest?.helperGroup) return;
+        const label = createMeasurementLabel(
+          latest.startPoint,
+          latest.endPoint,
+          latest.metrics,
+        );
+        if (label) latest.helperGroup.add(label);
+      }
+
+      function formatMeasurementHistoryItem(record) {
+        const formatted = formatMeasurementResult(record.metrics);
+        return {
+          id: record.id,
+          distance: formatted.summary,
+          meta: [
+            `水平 ${formatMeasurementValue(record.metrics.horizontalDistance)}`,
+            `高さ差 ${formatMeasurementValue(record.metrics.heightDifference)}`,
+          ].join(" / "),
+        };
+      }
+
+      function renderMeasurementHistoryList() {
+        const historyPanel = document.getElementById("measurementHistory");
+        const count = document.getElementById("measurementHistoryCount");
+        const list = document.getElementById("measurementHistoryList");
+        if (historyPanel) {
+          historyPanel.style.display =
+            measurementState.history.length > 0 ? "block" : "none";
+        }
+        if (count) {
+          count.textContent = `${measurementState.history.length}/${MEASUREMENT_HISTORY_LIMIT}`;
+        }
+        if (!list) return;
+        if (measurementState.history.length === 0) {
+          list.innerHTML = "";
+          return;
+        }
+        list.innerHTML = measurementState.history
+          .slice()
+          .reverse()
+          .map((record) => {
+            const item = formatMeasurementHistoryItem(record);
+            return [
+              `<div class="measurement-history-item" data-measurement-id="${item.id}">`,
+              '<div class="measurement-history-main">',
+              `<div class="measurement-history-distance">#${item.id} ${escapeHtml(item.distance)}</div>`,
+              '<div class="measurement-history-actions">',
+              `<button class="control-btn" onclick="copyMeasurementRecord(${item.id})">コピー</button>`,
+              `<button class="control-btn" onclick="deleteMeasurementRecord(${item.id})">削除</button>`,
+              "</div>",
+              "</div>",
+              `<div class="measurement-history-meta">${escapeHtml(item.meta)}</div>`,
+              "</div>",
+            ].join("");
+          })
+          .join("");
       }
 
       function updateMeasurementUi() {
@@ -8341,16 +8558,20 @@
         if (panel) {
           panel.classList.toggle(
             "visible",
-            measurementState.enabled || !!measurementState.lastResult
+            measurementState.enabled ||
+              measurementState.history.length > 0 ||
+              measurementState.selectedPoints.length > 0
           );
         }
         if (note) note.textContent = MEASUREMENT_NOTE;
 
         if (status) {
-          if (measurementState.lastResult) {
-            status.textContent = "計測完了";
-          } else if (measurementState.selectedPoints.length === 1) {
+          if (measurementState.selectedPoints.length === 1) {
             status.textContent = "2点目をクリック";
+          } else if (measurementState.lastResult) {
+            status.textContent = measurementState.enabled
+              ? "計測完了。次の1点目をクリック"
+              : "計測完了";
           } else {
             status.textContent = "1点目をクリック";
           }
@@ -8370,16 +8591,22 @@
                 .join("")
             : "";
         }
+        renderMeasurementHistoryList();
       }
 
-      function clearMeasurement(options = {}) {
+      function clearMeasurementHistory(options = {}) {
         clearMeasurementHelpers();
-        measurementState.selectedPoints = [];
+        resetMeasurementDraft();
+        measurementState.history = [];
         measurementState.lastResult = null;
         if (options.disable) {
           measurementState.enabled = false;
         }
         updateMeasurementUi();
+      }
+
+      function clearMeasurement(options = {}) {
+        clearMeasurementHistory(options);
       }
 
       window.clearMeasurement = clearMeasurement;
@@ -8466,9 +8693,8 @@
         };
       }
 
-      function createMeasurementHelpers(startPoint, endPoint, metrics) {
-        clearMeasurementHelpers();
-        if (!scene || !THREE.Group) return;
+      function createMeasurementHelpers(startPoint, endPoint, metrics, options = {}) {
+        if (!scene || !THREE.Group) return null;
 
         const group = new THREE.Group();
         group.name = "measurementHelper";
@@ -8504,51 +8730,64 @@
         line.name = "measurementHelper";
         group.add(line);
 
-        if (THREE.Sprite && THREE.CanvasTexture) {
-          const canvas = document.createElement("canvas");
-          canvas.width = 256;
-          canvas.height = 64;
-          const ctx = canvas.getContext("2d");
-          if (ctx) {
-            ctx.fillStyle = "rgba(15, 23, 42, 0.9)";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.strokeStyle = "#38bdf8";
-            ctx.strokeRect(0.5, 0.5, canvas.width - 1, canvas.height - 1);
-            ctx.fillStyle = "#ffffff";
-            ctx.font = "bold 22px sans-serif";
-            ctx.fillText(formatMeasurementValue(metrics.distance3d), 14, 38);
-          }
-          const sprite = new THREE.Sprite(
-            new THREE.SpriteMaterial({
-              map: new THREE.CanvasTexture(canvas),
-              depthTest: false,
-            }),
-          );
-          sprite.name = "measurementHelper";
-          sprite.position
-            .copy(startPoint.display)
-            .add(endPoint.display)
-            .multiplyScalar(0.5);
-          sprite.scale.set(24, 6, 1);
-          group.add(sprite);
+        if (options.includeLabel) {
+          const label = createMeasurementLabel(startPoint, endPoint, metrics);
+          if (label) group.add(label);
         }
 
         scene.add(group);
-        measurementState.helperGroup = group;
+        return group;
+      }
+
+      function addMeasurementRecord(startPoint, endPoint) {
+        measurementState.history.forEach(removeMeasurementLabel);
+        const id = measurementState.nextRecordId++;
+        const metrics = calculateMeasurementMetrics(startPoint, endPoint);
+        const helperGroup = createMeasurementHelpers(startPoint, endPoint, metrics, {
+          includeLabel: true,
+        });
+        const record = {
+          id,
+          startPoint,
+          endPoint,
+          metrics,
+          helperGroup,
+        };
+        const next = appendMeasurementRecord(
+          measurementState.history,
+          record,
+          MEASUREMENT_HISTORY_LIMIT,
+        );
+        next.removed.forEach(disposeMeasurementRecordHelper);
+        measurementState.history = next.history;
+        syncLatestMeasurementResult();
+        if (next.removed.length > 0) {
+          showToast("古い計測履歴を削除しました", "info");
+        }
+        return record;
+      }
+
+      function deleteMeasurementRecordById(id) {
+        const numericId = Number(id);
+        const index = measurementState.history.findIndex(
+          (record) => record.id === numericId,
+        );
+        if (index < 0) return null;
+        const [record] = measurementState.history.splice(index, 1);
+        disposeMeasurementRecordHelper(record);
+        syncLatestMeasurementResult();
+        refreshLatestMeasurementLabel();
+        updateMeasurementUi();
+        return record;
       }
 
       function handleMeasurementPoint(point) {
-        if (measurementState.selectedPoints.length >= 2) {
-          clearMeasurement();
-        }
         measurementState.selectedPoints.push(point);
-        measurementState.lastResult = null;
 
         if (measurementState.selectedPoints.length === 2) {
           const [startPoint, endPoint] = measurementState.selectedPoints;
-          const metrics = calculateMeasurementMetrics(startPoint, endPoint);
-          measurementState.lastResult = metrics;
-          createMeasurementHelpers(startPoint, endPoint, metrics);
+          addMeasurementRecord(startPoint, endPoint);
+          resetMeasurementDraft();
         }
 
         updateMeasurementUi();
@@ -8619,6 +8858,34 @@
           console.warn("計測結果のコピーに失敗:", error);
           showToast("コピーに失敗しました", "warning");
         }
+      };
+
+      window.copyMeasurementRecord = async function (id) {
+        const numericId = Number(id);
+        const record = measurementState.history.find(
+          (item) => item.id === numericId,
+        );
+        if (!record) {
+          showToast("コピーできる計測履歴がありません", "warning");
+          return;
+        }
+        const text = formatMeasurementCopyText(record.metrics);
+        try {
+          await navigator.clipboard.writeText(text);
+          showToast("計測履歴をコピーしました", "success");
+        } catch (error) {
+          console.warn("計測履歴のコピーに失敗:", error);
+          showToast("コピーに失敗しました", "warning");
+        }
+      };
+
+      window.deleteMeasurementRecord = function (id) {
+        const removed = deleteMeasurementRecordById(id);
+        if (!removed) {
+          showToast("削除できる計測履歴がありません", "warning");
+          return;
+        }
+        showToast("計測履歴を削除しました", "success");
       };
 
       function clearPointCloud() {
@@ -15333,6 +15600,9 @@
           calculateMeasurementMetrics,
           formatMeasurementResult,
           formatMeasurementCopyText,
+          createMeasurementRecord,
+          appendMeasurementRecord,
+          formatMeasurementHistoryItem,
           downsampleSourcePositions,
           detectBrowserSupport() {
             return compatibilityChecker.detectBrowserSupport();

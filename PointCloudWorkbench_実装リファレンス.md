@@ -182,9 +182,14 @@
 - `window.toggleMeasurementMode()`
 - `window.clearMeasurement()`
 - `window.copyMeasurementResult()`
+- `window.copyMeasurementRecord(id)`
+- `window.deleteMeasurementRecord(id)`
 - 2点クリックで表示点に吸着し、元LAS基準の `3D距離 / 水平距離 / 高さ差 / dX / dY / dZ` を表示
 - 距離は `m相当` 表示であり、元データの座標単位に依存する
-- `Esc` または「計測モード終了」は選択モードだけを止め、直近結果は「計測をクリア」まで残す
+- `measurementState.history` がページ内の一時履歴を最大20件まで保持する
+- 各履歴 record が自分の helper group を保持し、個別削除、全消去、点群破棄時に dispose する
+- 最新履歴のみ距離ラベル sprite を表示し、過去履歴はマーカーと線だけを残す
+- `Esc` または「計測モード終了」は選択モードだけを止め、履歴は「計測を全消去」まで残す
 - スライス:
 - `window.toggleSlicing()`
 - `updateSlicing()`

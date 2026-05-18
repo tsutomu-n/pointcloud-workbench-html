@@ -1294,6 +1294,66 @@ test("formatMeasurementCopyText includes source point coordinates", () => {
   expect(text).toContain("表示点への計測");
 });
 
+test("createMeasurementRecord stores metrics for measurement history", () => {
+  const context = createContext();
+
+  const record = vm.runInContext(
+    `
+      window.__pcwTestApi.createMeasurementRecord(
+        7,
+        { source: { x: 10, y: 20, z: 30 } },
+        { source: { x: 13, y: 24, z: 42 } }
+      )
+    `,
+    context,
+  );
+
+  expect(record.id).toBe(7);
+  expect(record.metrics.distance3d).toBe(13);
+  expect(record.metrics.horizontalDistance).toBe(5);
+  expect(record.metrics.heightDifference).toBe(12);
+});
+
+test("appendMeasurementRecord enforces the measurement history limit", () => {
+  const context = createContext();
+  context.__history = [{ id: 1 }, { id: 2 }];
+  context.__record = { id: 3 };
+
+  const result = vm.runInContext(
+    "window.__pcwTestApi.appendMeasurementRecord(__history, __record, 2)",
+    context,
+  );
+
+  expect(result.history.map((record) => record.id)).toEqual([2, 3]);
+  expect(result.removed.map((record) => record.id)).toEqual([1]);
+});
+
+test("formatMeasurementHistoryItem summarizes distance and deltas", () => {
+  const context = createContext();
+
+  const item = vm.runInContext(
+    `
+      window.__pcwTestApi.formatMeasurementHistoryItem({
+        id: 4,
+        metrics: {
+          distance3d: 13,
+          horizontalDistance: 5,
+          heightDifference: 12,
+          dx: 3,
+          dy: 4,
+          dz: 12,
+        },
+      })
+    `,
+    context,
+  );
+
+  expect(item.id).toBe(4);
+  expect(item.distance).toBe("13.000 m相当");
+  expect(item.meta).toContain("水平 5.000 m相当");
+  expect(item.meta).toContain("高さ差 12.000 m相当");
+});
+
 test("downsampleSourcePositions preserves source-coordinate index mapping", () => {
   const context = createContext();
   context.__sourcePositions = new Float64Array([

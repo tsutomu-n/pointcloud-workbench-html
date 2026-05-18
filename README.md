@@ -60,7 +60,7 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 - Manual diagnostic report copy with no telemetry, no LAS/LAZ upload, and no file name included
 - Load quality selection (`LOW` / `MEDIUM` / `HIGH` / `MAX`)
 - 3D and 2D view switching
-- Displayed-point distance measurement with 3D distance, horizontal distance, height difference, and source-coordinate dX / dY / dZ
+- Displayed-point distance measurement history with 3D distance, horizontal distance, height difference, and source-coordinate dX / dY / dZ
 - Elevation and classification color modes
 - Slice view and 2D cross-section inspection
 - Automatic classification assistance and classification quality review
@@ -84,7 +84,7 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 - Local LAS uses header-first preview plus chunked point-data reads. Local LAZ uses chunked transfers into WASM. URL loading and some compatibility paths may still use full `ArrayBuffer` reads.
 - Raising file-size acceptance does not change the actual render cap. Confirm `source points / rendered points / render ratio` in the quality screen and statistics panel.
 - Automatic classification is a height-based assist feature, not a survey-grade classification guarantee.
-- Distance measurement snaps to displayed sampled points, not the full source LAS/LAZ point set. Distances are shown as `m-equivalent` and depend on the source coordinate unit. The load profile includes the extra source-coordinate memory kept for measurement.
+- Distance measurement snaps to displayed sampled points, not the full source LAS/LAZ point set. Up to 20 measurement results are kept as temporary in-page history. Distances are shown as `m-equivalent` and depend on the source coordinate unit. The load profile includes the extra source-coordinate memory kept for measurement.
 
 ## Repository Layout
 
