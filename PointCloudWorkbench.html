@@ -8338,7 +8338,12 @@
               : "距離計測を開始";
           }
         }
-        if (panel) panel.classList.toggle("visible", measurementState.enabled);
+        if (panel) {
+          panel.classList.toggle(
+            "visible",
+            measurementState.enabled || !!measurementState.lastResult
+          );
+        }
         if (note) note.textContent = MEASUREMENT_NOTE;
 
         if (status) {
