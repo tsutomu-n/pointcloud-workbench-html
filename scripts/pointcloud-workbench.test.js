@@ -1208,6 +1208,51 @@ test("normalizeHeightValue returns a safe midpoint for flat ranges", () => {
   expect(Number.isFinite(normalized)).toBe(true);
 });
 
+test("calculateMeasurementMetrics reports source-coordinate distances", () => {
+  const context = createContext();
+
+  const metrics = vm.runInContext(
+    `
+      window.__pcwTestApi.calculateMeasurementMetrics(
+        { source: { x: 10, y: 20, z: 30 } },
+        { source: { x: 13, y: 24, z: 42 } }
+      )
+    `,
+    context,
+  );
+
+  expect(metrics.dx).toBe(3);
+  expect(metrics.dy).toBe(4);
+  expect(metrics.dz).toBe(12);
+  expect(metrics.distance3d).toBe(13);
+  expect(metrics.horizontalDistance).toBe(5);
+  expect(metrics.heightDifference).toBe(12);
+});
+
+test("formatMeasurementResult labels displayed-point measurement and meter-equivalent units", () => {
+  const context = createContext();
+
+  const result = vm.runInContext(
+    `
+      window.__pcwTestApi.formatMeasurementResult({
+        distance3d: 13,
+        horizontalDistance: 5,
+        heightDifference: 12,
+        dx: 3,
+        dy: 4,
+        dz: 12,
+      })
+    `,
+    context,
+  );
+
+  expect(result.summary).toContain("13.000 m相当");
+  expect(result.note).toContain("表示点への計測");
+  expect(result.note).toContain("元データの座標単位に依存");
+  expect(result.rows).toContainEqual(["高さ差", "12.000 m相当"]);
+  expect(result.rows).toContainEqual(["dZ", "12.000 m相当"]);
+});
+
 test("hideAllPanels preserves stats toggle markup", () => {
   const context = createContext();
   const label = createMockElement("statsToggleLabel");
@@ -1467,7 +1512,12 @@ test("initThreeJS replaces the previous renderer canvas and binds context listen
   expect(context.__container.children).toHaveLength(1);
   expect(
     Object.keys(context.__renderers[1].domElement.__events).sort(),
-  ).toEqual(["webglcontextlost", "webglcontextrestored"]);
+  ).toEqual([
+    "pointerdown",
+    "pointerup",
+    "webglcontextlost",
+    "webglcontextrestored",
+  ]);
   expect(context.__controlsDisposed).toBe(1);
   expect(context.__removedWindowEvents).toContain("resize");
 });

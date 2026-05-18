@@ -28,7 +28,7 @@
 - ワークフロー制御
 - ファイル選択、品質選択、読み込み、完了
 - 3D描画・可視化制御
-- カメラ、表示モード、2D/3D、スライス、分類
+- カメラ、表示モード、2D/3D、距離計測、スライス、分類
 - UIユーティリティ
 - ダイアログ、トースト、キーボード、統計表示
 
@@ -129,6 +129,7 @@
 - `y = point.z - minZ`
 - `z = -(point.y - centerY)`
 - `position`, `color`, `classification` バッファ属性を構築
+- 計測用の元LAS座標は描画属性ではなく `pointCloud.userData.sourcePositions` に保持
 - `statsData` と分類統計を更新
 
 ### 8.2 `downsamplePointCloud()`
@@ -173,10 +174,16 @@
 - `updateLegendPanel()` が凡例 DOM を動的生成
 - `window.toggleLegendPanel()` は公開されているが、現状UIに専用ボタン導線はない
 
-## 12. 2D・スライス・補助表示
+## 12. 2D・距離計測・スライス・補助表示
 - 2D:
 - `window.set2DView(view)`
 - `window.exit2DView()`
+- 距離計測:
+- `window.toggleMeasurementMode()`
+- `window.clearMeasurement()`
+- `window.copyMeasurementResult()`
+- 2点クリックで表示点に吸着し、元LAS基準の `3D距離 / 水平距離 / 高さ差 / dX / dY / dZ` を表示
+- 距離は `m相当` 表示であり、元データの座標単位に依存する
 - スライス:
 - `window.toggleSlicing()`
 - `updateSlicing()`

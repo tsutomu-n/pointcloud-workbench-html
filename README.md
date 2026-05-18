@@ -45,7 +45,7 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 1. Open the GitHub Pages landing page or launch the app directly.
 2. In the app, choose `サンプルデータを使用` and select the bundled Pages sample, or load your own `.las` / `.laz`.
 3. Review the pre-flight panel for load path, risk level, and estimated display ratio.
-4. Inspect the cloud in 3D / 2D, try slice mode, and review statistics and classification output.
+4. Inspect the cloud in 3D / 2D, measure displayed-point distances, try slice mode, and review statistics and classification output.
 
 ## Key Capabilities
 
@@ -60,6 +60,7 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 - Manual diagnostic report copy with no telemetry, no LAS/LAZ upload, and no file name included
 - Load quality selection (`LOW` / `MEDIUM` / `HIGH` / `MAX`)
 - 3D and 2D view switching
+- Displayed-point distance measurement with 3D distance, horizontal distance, height difference, and source-coordinate dX / dY / dZ
 - Elevation and classification color modes
 - Slice view and 2D cross-section inspection
 - Automatic classification assistance and classification quality review
@@ -83,6 +84,7 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 - Local LAS uses header-first preview plus chunked point-data reads. Local LAZ uses chunked transfers into WASM. URL loading and some compatibility paths may still use full `ArrayBuffer` reads.
 - Raising file-size acceptance does not change the actual render cap. Confirm `source points / rendered points / render ratio` in the quality screen and statistics panel.
 - Automatic classification is a height-based assist feature, not a survey-grade classification guarantee.
+- Distance measurement snaps to displayed sampled points, not the full source LAS/LAZ point set. Distances are shown as `m-equivalent` and depend on the source coordinate unit.
 
 ## Repository Layout
 

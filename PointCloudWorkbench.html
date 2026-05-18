@@ -3192,6 +3192,75 @@
         border-radius: var(--radius-sm);
       }
 
+      .measurement-section {
+        margin-top: var(--space-4);
+      }
+
+      .measurement-btn.active {
+        background: rgba(56, 189, 248, 0.18);
+        border-color: var(--ec-accent);
+        color: var(--ec-accent);
+      }
+
+      .measurement-panel {
+        display: none;
+        margin-top: var(--space-3);
+        padding: var(--space-3);
+        background: rgba(15, 23, 42, 0.72);
+        border: 1px solid var(--ec-border);
+        border-radius: var(--radius-sm);
+      }
+
+      .measurement-panel.visible {
+        display: block;
+      }
+
+      .measurement-status {
+        color: var(--ec-text);
+        font-size: var(--font-size-sm);
+        font-weight: 600;
+        margin-bottom: var(--space-2);
+      }
+
+      .measurement-summary {
+        color: var(--ec-accent);
+        font-size: var(--font-size-lg);
+        font-weight: 700;
+        margin-bottom: var(--space-2);
+      }
+
+      .measurement-results {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: var(--space-1) var(--space-3);
+        font-size: var(--font-size-sm);
+        margin-bottom: var(--space-3);
+      }
+
+      .measurement-results dt {
+        color: var(--ec-muted);
+      }
+
+      .measurement-results dd {
+        color: var(--ec-text);
+        font-family: monospace;
+        margin: 0;
+        text-align: right;
+      }
+
+      .measurement-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: var(--space-2);
+        margin-bottom: var(--space-2);
+      }
+
+      .measurement-note {
+        color: var(--ec-muted);
+        font-size: var(--font-size-xs);
+        line-height: var(--line-height-normal);
+      }
+
       .slice-range-container {
         display: flex;
         align-items: center;
@@ -4222,6 +4291,71 @@
                     id="legendContent"
                   >
                     <div class="legend-loading">分類データを解析中...</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="panel-section measurement-section">
+                <div class="panel-section-title">
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M3 18h18"></path>
+                    <path d="M5 18V6"></path>
+                    <path d="M19 18V6"></path>
+                    <path d="M5 8h14"></path>
+                    <path d="m7 6-2 2 2 2"></path>
+                    <path d="m17 6 2 2-2 2"></path>
+                  </svg>
+                  距離計測
+                </div>
+                <button
+                  class="control-btn slice-btn measurement-btn"
+                  id="measurementToggleBtn"
+                  onclick="toggleMeasurementMode()"
+                >
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    aria-hidden="true"
+                  >
+                    <path d="M3 18h18"></path>
+                    <path d="M5 18V6"></path>
+                    <path d="M19 18V6"></path>
+                    <path d="M5 8h14"></path>
+                  </svg>
+                  <span>距離計測を開始</span>
+                </button>
+                <div class="measurement-panel" id="measurementPanel">
+                  <div class="measurement-status" id="measurementStatus">
+                    1点目をクリック
+                  </div>
+                  <div class="measurement-summary" id="measurementSummary">
+                    -
+                  </div>
+                  <dl class="measurement-results" id="measurementResults"></dl>
+                  <div class="measurement-actions">
+                    <button class="control-btn" onclick="clearMeasurement()">
+                      クリア
+                    </button>
+                    <button class="control-btn" onclick="copyMeasurementResult()">
+                      コピー
+                    </button>
+                  </div>
+                  <div class="measurement-note" id="measurementNote">
+                    表示点への計測です。距離はLAS座標単位をm相当として表示し、元データの座標単位に依存します。
                   </div>
                 </div>
               </div>
@@ -5644,6 +5778,16 @@
         previousMode: null,
       };
       let pointSize = 1.0;
+      const MEASUREMENT_NOTE =
+        "表示点への計測です。距離はLAS座標単位をm相当として表示し、元データの座標単位に依存します。";
+      let measurementState = {
+        enabled: false,
+        selectedPoints: [],
+        helperGroup: null,
+        pointerDown: null,
+        lastResult: null,
+      };
+      let measurementPointerHandlerBound = false;
 
       // キーボード状態管理
       const keys = {
@@ -8050,8 +8194,374 @@
         }
       };
 
+      function getMeasurementPointCoordinates(pointLike) {
+        const source = pointLike?.source || pointLike;
+        return {
+          x: Number(source?.x || 0),
+          y: Number(source?.y || 0),
+          z: Number(source?.z || 0),
+        };
+      }
+
+      function calculateMeasurementMetrics(startPoint, endPoint) {
+        const start = getMeasurementPointCoordinates(startPoint);
+        const end = getMeasurementPointCoordinates(endPoint);
+        const dx = end.x - start.x;
+        const dy = end.y - start.y;
+        const dz = end.z - start.z;
+        const horizontalDistance = Math.sqrt(dx * dx + dy * dy);
+        const distance3d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+        return {
+          start,
+          end,
+          dx,
+          dy,
+          dz,
+          distance3d,
+          horizontalDistance,
+          heightDifference: Math.abs(dz),
+        };
+      }
+
+      function formatMeasurementValue(value) {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return "-";
+        return `${numeric.toFixed(3)} m相当`;
+      }
+
+      function formatMeasurementResult(metrics) {
+        return {
+          summary: formatMeasurementValue(metrics.distance3d),
+          rows: [
+            ["水平距離", formatMeasurementValue(metrics.horizontalDistance)],
+            ["高さ差", formatMeasurementValue(metrics.heightDifference)],
+            ["dX", formatMeasurementValue(metrics.dx)],
+            ["dY", formatMeasurementValue(metrics.dy)],
+            ["dZ", formatMeasurementValue(metrics.dz)],
+          ],
+          note: MEASUREMENT_NOTE,
+        };
+      }
+
+      function disposeObject3D(object) {
+        if (!object) return;
+        if (object.children && object.children.length) {
+          [...object.children].forEach(disposeObject3D);
+        }
+        if (object.geometry && typeof object.geometry.dispose === "function") {
+          object.geometry.dispose();
+        }
+        const material = object.material;
+        if (Array.isArray(material)) {
+          material.forEach((item) => {
+            if (item?.map && typeof item.map.dispose === "function") {
+              item.map.dispose();
+            }
+            if (item && typeof item.dispose === "function") item.dispose();
+          });
+        } else if (material && typeof material.dispose === "function") {
+          if (material.map && typeof material.map.dispose === "function") {
+            material.map.dispose();
+          }
+          material.dispose();
+        }
+      }
+
+      function clearMeasurementHelpers() {
+        if (scene) {
+          scene.children
+            .filter((child) => child.name === "measurementHelper")
+            .forEach((helper) => {
+              scene.remove(helper);
+              disposeObject3D(helper);
+            });
+        }
+        if (
+          measurementState.helperGroup &&
+          measurementState.helperGroup.parent
+        ) {
+          measurementState.helperGroup.parent.remove(
+            measurementState.helperGroup,
+          );
+        }
+        disposeObject3D(measurementState.helperGroup);
+        measurementState.helperGroup = null;
+      }
+
+      function updateMeasurementUi() {
+        const toggleBtn = document.getElementById("measurementToggleBtn");
+        const panel = document.getElementById("measurementPanel");
+        const status = document.getElementById("measurementStatus");
+        const summary = document.getElementById("measurementSummary");
+        const results = document.getElementById("measurementResults");
+        const note = document.getElementById("measurementNote");
+
+        if (toggleBtn) {
+          toggleBtn.classList.toggle("active", measurementState.enabled);
+          const label = toggleBtn.querySelector("span");
+          if (label) {
+            label.textContent = measurementState.enabled
+              ? "距離計測を終了"
+              : "距離計測を開始";
+          }
+        }
+        if (panel) panel.classList.toggle("visible", measurementState.enabled);
+        if (note) note.textContent = MEASUREMENT_NOTE;
+
+        if (!measurementState.enabled) return;
+
+        if (status) {
+          if (measurementState.lastResult) {
+            status.textContent = "計測完了";
+          } else if (measurementState.selectedPoints.length === 1) {
+            status.textContent = "2点目をクリック";
+          } else {
+            status.textContent = "1点目をクリック";
+          }
+        }
+
+        const formatted = measurementState.lastResult
+          ? formatMeasurementResult(measurementState.lastResult)
+          : null;
+        if (summary) summary.textContent = formatted?.summary || "-";
+        if (results) {
+          results.innerHTML = formatted
+            ? formatted.rows
+                .map(
+                  ([label, value]) =>
+                    `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd>`,
+                )
+                .join("")
+            : "";
+        }
+      }
+
+      function clearMeasurement(options = {}) {
+        clearMeasurementHelpers();
+        measurementState.selectedPoints = [];
+        measurementState.lastResult = null;
+        if (options.disable) {
+          measurementState.enabled = false;
+        }
+        updateMeasurementUi();
+      }
+
+      window.clearMeasurement = clearMeasurement;
+
+      function calculateMeasurementPickThreshold() {
+        if (!pointCloud || !pointCloud.geometry) return pointSize || 1;
+        pointCloud.geometry.computeBoundingBox();
+        const box = pointCloud.geometry.boundingBox;
+        if (!box) return pointSize || 1;
+        const size = box.getSize(new THREE.Vector3());
+        const diagonal = Math.sqrt(
+          size.x * size.x + size.y * size.y + size.z * size.z,
+        );
+        const base = Math.max(pointSize * 2, diagonal * 0.004);
+        return Math.min(Math.max(base, 0.05), Math.max(diagonal * 0.04, 2));
+      }
+
+      function getSourcePointAtIndex(index) {
+        const sourcePositions = pointCloud?.userData?.sourcePositions;
+        if (!sourcePositions || index == null || index < 0) return null;
+        const offset = index * 3;
+        if (offset + 2 >= sourcePositions.length) return null;
+        return {
+          x: sourcePositions[offset],
+          y: sourcePositions[offset + 1],
+          z: sourcePositions[offset + 2],
+        };
+      }
+
+      function pickMeasurementPoint(event) {
+        if (!renderer || !camera || !pointCloud || !THREE.Raycaster) {
+          return null;
+        }
+        const rect = renderer.domElement.getBoundingClientRect();
+        const mouse = new THREE.Vector2(
+          ((event.clientX - rect.left) / rect.width) * 2 - 1,
+          -((event.clientY - rect.top) / rect.height) * 2 + 1,
+        );
+        const raycaster = new THREE.Raycaster();
+        raycaster.params.Points.threshold = calculateMeasurementPickThreshold();
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObject(pointCloud, false);
+        if (!intersects || intersects.length === 0) return null;
+
+        const hit = intersects[0];
+        const source = getSourcePointAtIndex(hit.index);
+        if (!source) return null;
+        return {
+          index: hit.index,
+          display: hit.point.clone(),
+          source,
+        };
+      }
+
+      function createMeasurementHelpers(startPoint, endPoint, metrics) {
+        clearMeasurementHelpers();
+        if (!scene || !THREE.Group) return;
+
+        const group = new THREE.Group();
+        group.name = "measurementHelper";
+
+        const markerRadius = Math.max(
+          calculateMeasurementPickThreshold() * 0.6,
+          0.4,
+        );
+        [startPoint, endPoint].forEach((point) => {
+          const marker = new THREE.Mesh(
+            new THREE.SphereGeometry(markerRadius, 12, 8),
+            new THREE.MeshBasicMaterial({
+              color: 0x38bdf8,
+              depthTest: false,
+            }),
+          );
+          marker.position.copy(point.display);
+          marker.name = "measurementHelper";
+          group.add(marker);
+        });
+
+        const lineGeometry = new THREE.BufferGeometry().setFromPoints([
+          startPoint.display,
+          endPoint.display,
+        ]);
+        const line = new THREE.Line(
+          lineGeometry,
+          new THREE.LineBasicMaterial({
+            color: 0xfacc15,
+            depthTest: false,
+          }),
+        );
+        line.name = "measurementHelper";
+        group.add(line);
+
+        if (THREE.Sprite && THREE.CanvasTexture) {
+          const canvas = document.createElement("canvas");
+          canvas.width = 256;
+          canvas.height = 64;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.fillStyle = "rgba(15, 23, 42, 0.9)";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = "#38bdf8";
+            ctx.strokeRect(0.5, 0.5, canvas.width - 1, canvas.height - 1);
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "bold 22px sans-serif";
+            ctx.fillText(formatMeasurementValue(metrics.distance3d), 14, 38);
+          }
+          const sprite = new THREE.Sprite(
+            new THREE.SpriteMaterial({
+              map: new THREE.CanvasTexture(canvas),
+              depthTest: false,
+            }),
+          );
+          sprite.name = "measurementHelper";
+          sprite.position
+            .copy(startPoint.display)
+            .add(endPoint.display)
+            .multiplyScalar(0.5);
+          sprite.scale.set(24, 6, 1);
+          group.add(sprite);
+        }
+
+        scene.add(group);
+        measurementState.helperGroup = group;
+      }
+
+      function handleMeasurementPoint(point) {
+        if (measurementState.selectedPoints.length >= 2) {
+          clearMeasurement();
+        }
+        measurementState.selectedPoints.push(point);
+        measurementState.lastResult = null;
+
+        if (measurementState.selectedPoints.length === 2) {
+          const [startPoint, endPoint] = measurementState.selectedPoints;
+          const metrics = calculateMeasurementMetrics(startPoint, endPoint);
+          measurementState.lastResult = metrics;
+          createMeasurementHelpers(startPoint, endPoint, metrics);
+        }
+
+        updateMeasurementUi();
+      }
+
+      function bindMeasurementPointerHandlers() {
+        if (!renderer || !renderer.domElement || measurementPointerHandlerBound) {
+          return;
+        }
+
+        renderer.domElement.addEventListener("pointerdown", (event) => {
+          if (!measurementState.enabled) return;
+          measurementState.pointerDown = {
+            x: event.clientX,
+            y: event.clientY,
+            time: performance.now(),
+          };
+        });
+
+        renderer.domElement.addEventListener("pointerup", (event) => {
+          if (!measurementState.enabled || !measurementState.pointerDown) return;
+          const start = measurementState.pointerDown;
+          measurementState.pointerDown = null;
+          const moved = Math.hypot(
+            event.clientX - start.x,
+            event.clientY - start.y,
+          );
+          if (moved > 4) return;
+          const point = pickMeasurementPoint(event);
+          if (!point) {
+            showToast(
+              "点を選択できませんでした。点群の近くをクリックしてください",
+              "warning",
+            );
+            return;
+          }
+          handleMeasurementPoint(point);
+        });
+
+        measurementPointerHandlerBound = true;
+      }
+
+      window.toggleMeasurementMode = function () {
+        if (!pointCloud) {
+          showToast(
+            "点群データを読み込んでから距離計測を開始してください",
+            "warning",
+          );
+          return;
+        }
+        measurementState.enabled = !measurementState.enabled;
+        if (!measurementState.enabled) {
+          measurementState.pointerDown = null;
+        }
+        updateMeasurementUi();
+      };
+
+      window.copyMeasurementResult = async function () {
+        if (!measurementState.lastResult) {
+          showToast("コピーできる計測結果がありません", "warning");
+          return;
+        }
+        const formatted = formatMeasurementResult(measurementState.lastResult);
+        const text = [
+          `距離: ${formatted.summary}`,
+          ...formatted.rows.map(([label, value]) => `${label}: ${value}`),
+          formatted.note,
+        ].join("\n");
+        try {
+          await navigator.clipboard.writeText(text);
+          showToast("計測結果をコピーしました", "success");
+        } catch (error) {
+          console.warn("計測結果のコピーに失敗:", error);
+          showToast("コピーに失敗しました", "warning");
+        }
+      };
+
       function clearPointCloud() {
         try {
+          clearMeasurement();
           if (!pointCloud) return;
 
           if (scene) {
@@ -8100,6 +8610,7 @@
 
           // Clear scene data
           clearPointCloud();
+          clearMeasurement({ disable: true });
 
           // Hide panels and overlays
           showFileSelectScreen();
@@ -8411,6 +8922,7 @@
           }
         }
         renderer = null;
+        measurementPointerHandlerBound = false;
 
         if (!preserveScene) {
           scene = null;
@@ -8630,6 +9142,7 @@
         );
 
         bindRendererRuntimeHandlers();
+        bindMeasurementPointerHandlers();
 
         updateProgress(15, "Three.js初期化完了");
 
@@ -10164,7 +10677,7 @@
         }
 
         let geometry;
-        let positions, colors;
+        let positions, colors, sourcePositions;
         let classificationArray;
 
         let validPointCount = 0;
@@ -10176,6 +10689,7 @@
           // メモリ割り当て（失敗する可能性がある）
           try {
             positions = new Float32Array(points.length * 3);
+            sourcePositions = new Float64Array(points.length * 3);
             colors = new Float32Array(points.length * 3);
             classificationArray = new Uint8Array(points.length);
           } catch (memoryError) {
@@ -10252,6 +10766,9 @@
             positions[validPointCount * 3] = x;
             positions[validPointCount * 3 + 1] = y;
             positions[validPointCount * 3 + 2] = z;
+            sourcePositions[validPointCount * 3] = point.x;
+            sourcePositions[validPointCount * 3 + 1] = point.y;
+            sourcePositions[validPointCount * 3 + 2] = point.z;
 
             // 高度による色分け（ゼロレンジでも安全）
             const normalizedZ = normalizeHeightValue(
@@ -10310,16 +10827,21 @@
           // 実際に使用する分だけのバッファを作成
           if (validPointCount < points.length) {
             const trimmedPositions = new Float32Array(validPointCount * 3);
+            const trimmedSourcePositions = new Float64Array(validPointCount * 3);
             const trimmedColors = new Float32Array(validPointCount * 3);
             const trimmedClassification = new Uint8Array(validPointCount);
 
             trimmedPositions.set(positions.subarray(0, validPointCount * 3));
+            trimmedSourcePositions.set(
+              sourcePositions.subarray(0, validPointCount * 3),
+            );
             trimmedColors.set(colors.subarray(0, validPointCount * 3));
             trimmedClassification.set(
               classificationArray.subarray(0, validPointCount),
             );
 
             positions = trimmedPositions;
+            sourcePositions = trimmedSourcePositions;
             colors = trimmedColors;
             classificationArray = trimmedClassification;
           }
@@ -10473,6 +10995,7 @@
         );
 
         pointCloud = new THREE.Points(geometry, material);
+        pointCloud.userData.sourcePositions = sourcePositions;
 
         // 点群の詳細情報をログ出力
         console.log(" 点群オブジェクト詳細:");
@@ -10561,12 +11084,16 @@
           }
 
           const positionArray = positionAttribute.array;
+          const sourcePositionArray = pointCloud.userData?.sourcePositions || null;
           const colorArray = colorAttribute ? colorAttribute.array : null;
           const classificationArray = classificationAttribute
             ? classificationAttribute.array
             : null;
 
           const newPositions = new Float32Array(targetCount * 3);
+          const newSourcePositions = sourcePositionArray
+            ? new Float64Array(targetCount * 3)
+            : null;
           const hasColor = !!colorArray;
           const hasClassification = !!classificationArray;
           const newColors = hasColor ? new Float32Array(targetCount * 3) : null;
@@ -10587,6 +11114,13 @@
             newPositions[dstOffset] = positionArray[srcOffset];
             newPositions[dstOffset + 1] = positionArray[srcOffset + 1];
             newPositions[dstOffset + 2] = positionArray[srcOffset + 2];
+            if (newSourcePositions && sourcePositionArray) {
+              newSourcePositions[dstOffset] = sourcePositionArray[srcOffset];
+              newSourcePositions[dstOffset + 1] =
+                sourcePositionArray[srcOffset + 1];
+              newSourcePositions[dstOffset + 2] =
+                sourcePositionArray[srcOffset + 2];
+            }
 
             if (hasColor && colorArray) {
               newColors[dstOffset] = colorArray[srcOffset];
@@ -10603,6 +11137,9 @@
             "position",
             new THREE.BufferAttribute(newPositions, 3),
           );
+          if (newSourcePositions) {
+            pointCloud.userData.sourcePositions = newSourcePositions;
+          }
           if (hasColor) {
             pointCloud.geometry.setAttribute(
               "color",
@@ -14730,6 +15267,8 @@
           readFileIntoWasmHeap,
           decompressLAZFile,
           updateEstimations,
+          calculateMeasurementMetrics,
+          formatMeasurementResult,
           detectBrowserSupport() {
             return compatibilityChecker.detectBrowserSupport();
           },
