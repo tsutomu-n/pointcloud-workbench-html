@@ -111,6 +111,12 @@ test("GitHub Actions CI runs Bun tests and README checks on main push and pull_r
   expect(workflow).toContain("name: CI");
   expect(workflow).toContain("push:");
   expect(workflow).toContain("pull_request:");
+  expect(workflow).toContain("workflow_dispatch:");
+  expect(workflow).toContain("permissions:");
+  expect(workflow).toContain("contents: read");
+  expect(workflow).toContain("concurrency:");
+  expect(workflow).toContain("cancel-in-progress: true");
+  expect(workflow).toContain("timeout-minutes: 10");
   expect(workflow).toContain("- main");
   expect(workflow).toContain("actions/checkout@v5");
   expect(workflow).not.toContain("actions/checkout@v4");
@@ -160,11 +166,14 @@ test("Pages demo assets and deployment workflow are present", () => {
 
   expect(fs.existsSync(workflowPath)).toBe(true);
   const workflow = fs.readFileSync(workflowPath, "utf8");
+  expect(workflow).toContain("workflow_dispatch:");
+  expect(workflow).toContain("timeout-minutes: 15");
   expect(workflow).toContain("actions/configure-pages@v5");
   expect(workflow).toContain("actions/checkout@v5");
   expect(workflow).not.toContain("actions/checkout@v4");
   expect(workflow).toContain("oven-sh/setup-bun@v2");
   expect(workflow).toContain("bun-version: 1.3.9");
+  expect(workflow).toContain("bun --version");
   expect(workflow).toContain(
     "bun test scripts/pointcloud-workbench.test.js scripts/documentation-consistency.test.js scripts/gitignore.test.js scripts/repository-metadata.test.js scripts/public-repo-readiness.test.js scripts/landing-page-i18n.test.js"
   );
@@ -177,6 +186,10 @@ test("Pages demo assets and deployment workflow are present", () => {
   expect(workflow).toContain("cp assets/latest/manifest.json site/assets/latest/manifest.json");
   expect(workflow).toContain("pointcloud-demo-sample.las");
   expect(workflow).toContain(".nojekyll");
+  expect(workflow).toContain("Verify Pages artifact");
+  expect(workflow).toContain('test "$(head -c 4 site/demo/pointcloud-demo-sample.las)" = "LASF"');
+  expect(workflow).toContain("MEASUREMENT_HISTORY_LIMIT");
+  expect(workflow).toContain("find site -type f -size +25M");
 });
 
 test("Server-Zero static assets and PR template document the operating policy", () => {
