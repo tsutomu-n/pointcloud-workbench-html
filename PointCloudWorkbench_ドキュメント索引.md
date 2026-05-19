@@ -22,6 +22,12 @@
 - `PointCloudWorkbench_実装リファレンス.md`
 - 実装構造、主要関数、状態モデル、拡張ポイント、改修時の注意点
 
+## 計画・仕様
+- `docs/crs-diagnostics-implementation-plan.ja.md`
+- `docs/crs-diagnostics-final-spec.ja.md`
+- `docs/crs-diagnostics-oss-research.ja.md`
+- CRS 診断の推奨実装計画、最終形仕様、OSS 採用調査
+
 ## 運用ルール
 - 実装変更時は、該当するガイドを同時更新してください。
 - 操作仕様を変更した場合は運用ガイド、内部処理を変更した場合は実装リファレンスを更新対象にしてください。
