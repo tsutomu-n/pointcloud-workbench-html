@@ -153,6 +153,7 @@ OSS を使うなら、WKT 解析だけを軽量候補として限定採用する
 - LAS 1.4 では WKT と GeoTIFF の両方が存在する場合、より表現力のある WKT を優先する方針が妥当である。
 - LAS 1.3 / 1.4 の EVLR は VLR より大きい CRS 情報を持てるため、VLR だけを読むと CRS を見逃す可能性がある。
 - GeoTIFF key は LAS VLR 内では小さな key directory と params として入るため、GeoTIFF raster decoder 全体を入れる必要はない。
+- EVLR は VLR より大きい payload を持てるため、ブラウザでは header 先読みと payload byte cap が必要である。CRS 診断のために EVLR offset から file end まで一括読みしない。
 
 参照:
 
@@ -182,6 +183,7 @@ OSS を使うなら、WKT 解析だけを軽量候補として限定採用する
 
 - PR1 から PR4 までは自前の純粋関数で進める。
 - EVLR 対応は後回しにせず、VLR 抽出と同じ診断基盤で扱う。
+- EVLR は header-first sequential read にし、projection record 以外の巨大 payload を読まない。
 - PR3 では WKT parser OSS の導入を stop condition にする。
   - 正規表現と簡易 section 判定で EPSG、単位、垂直 CRS 有無が取れない fixture が出た場合だけ `wkt-crs` を検討する。
 - `@loaders.gl/las` は LAS 1.4 非対応のため、既存 loader の置換には使わない。

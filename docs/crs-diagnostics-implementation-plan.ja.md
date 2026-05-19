@@ -30,7 +30,7 @@
   - LAS version
   - point format
 - `headerSize` から `pointDataOffset` 直前までを slice 読みし、VLR を解析する。
-- LAS 1.3 / 1.4 で EVLR がある場合は、`startOfFirstExtendedVariableLengthRecord` 以降を bounded slice で読み、CRS 候補だけを解析する。
+- LAS 1.3 / 1.4 で EVLR がある場合は、`startOfFirstExtendedVariableLengthRecord` から EVLR header を逐次 bounded slice で読み、CRS 候補 record の payload だけを上限内で解析する。
 - `LASF_Projection` の主要 record を対象にする。
   - `2111`: OGC Math Transform WKT
   - `2112`: OGC WKT
@@ -102,9 +102,9 @@
 - `readLASVlrSectionFromFile()` 相当の関数を追加する。
 - `readLASEvlrSectionFromFile()` 相当の関数を追加する。
 - VLR header を順に読み、`userId`、`recordId`、`recordLengthAfterHeader`、`description`、payload を抽出する。
-- EVLR header を順に読み、8 byte record length を安全な上限内で扱う。
+- EVLR header を順に読み、8 byte record length を安全な上限内で扱う。EVLR offset から file end まで一括 slice しない。
 - VLR 数と `pointDataOffset` を超えない範囲で読みを止める。
-- EVLR は `startOfFirstExtendedVariableLengthRecord` と file size を超えない範囲で読みを止める。
+- EVLR は `startOfFirstExtendedVariableLengthRecord`、file size、record count、診断用 byte cap を超えない範囲で読みを止める。
 - 破損 VLR では例外で読み込み全体を落とさず、診断結果に警告を残す。
 
 テスト:
@@ -112,6 +112,8 @@
 - `LASF_Projection` 以外の VLR を無視または raw summary に留めること。
 - record length が範囲外の VLR で安全に停止すること。
 - record length が大きすぎる EVLR で全量読み込みに進まないこと。
+- 非 CRS EVLR の巨大 payload を読まないこと。
+- record 数や byte 数の上限到達時に `diagnostic-limit-reached` 相当の警告を残すこと。
 
 ### PR3: WKT / GeoTIFF / EPSG 候補解析を追加する
 
@@ -175,6 +177,7 @@
 - `X/Y/Z だけでは地球上の位置は確定しません` という注意を必要時に出す。
 - point format 6-10 なのに WKT がない場合は、LAS 1.4 CRS 表現として不整合の可能性がある旨を出す。
 - WKT と GeoTIFF が矛盾する可能性がある場合は、WKT 優先で表示しつつ「複数 CRS 候補あり」と出す。
+- 問い合わせ文コピーを実装する場合は、既存の clipboard pattern に合わせ、ローカルファイル名、点群 payload、座標配列を含めない。
 
 テスト:
 - CRS 診断カードが header / VLR 診断結果を反映すること。
@@ -221,11 +224,13 @@ bun scripts/check-server-zero.js
 ## 追加レビューで修正したリスク
 
 - EVLR を初期計画から落としていたため、LAS 1.4 の CRS を見逃す可能性があった。VLR と EVLR の両方を bounded slice で扱う方針へ修正した。
+- EVLR を offset から file end まで読む設計に見える余地があった。EVLR header を先に読み、projection record payload だけを上限付きで読む方針へ修正した。
 - point format 6-10 と Global Encoding WKT bit の扱いが弱かった。WKT 必須系の不整合を診断警告として扱う。
 - `survey-safe` は安全断定に見えるため、内部 status 名を `complete-crs-metadata` に変更する。成果簿照合が必要な点は維持する。
 - WKT 内の EPSG 抽出で unit code や datum code を CRS code と誤判定するリスクがあった。EPSG 候補を horizontal / vertical / unit / other に分ける。
 - Math Transform WKT `2111` を見落としていた。変換は適用しないが、存在と注意を診断へ残す。
 - `parse-warning` が主判定を上書きすると利用者に情報が伝わりにくい。警告は主判定に併記する設計へ寄せる。
+- docs / README 同期対象として `docs/README.ja.md` と `scripts/documentation-consistency.test.js` も実装計画に含める。
 
 ## OSS 活用方針
 

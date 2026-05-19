@@ -382,24 +382,38 @@ function createChunkedFile(buffer, name = "scan.las") {
 }
 
 function createLasHeaderBuffer({
+  globalEncoding = 0,
+  headerSize = 227,
+  numberOfVariableLengthRecords = 0,
   pointCount = 1000,
   pointDataOffset = 227,
   pointDataRecordFormat = 1,
   pointDataRecordLength = 28,
   versionMajor = 1,
   versionMinor = 2,
+  startOfFirstExtendedVariableLengthRecord = 0n,
+  numberOfExtendedVariableLengthRecords = 0,
   pointCount64 = 0n,
 } = {}) {
   const buffer = new ArrayBuffer(512);
   const view = new DataView(buffer);
   const bytes = new Uint8Array(buffer);
   bytes.set(new TextEncoder().encode("LASF"), 0);
+  view.setUint16(6, globalEncoding, true);
   view.setUint8(24, versionMajor);
   view.setUint8(25, versionMinor);
+  view.setUint16(94, headerSize, true);
   view.setUint32(96, pointDataOffset, true);
+  view.setUint32(100, numberOfVariableLengthRecords, true);
   view.setUint8(104, pointDataRecordFormat);
   view.setUint16(105, pointDataRecordLength, true);
   view.setUint32(107, pointCount, true);
+  view.setBigUint64(
+    235,
+    BigInt(startOfFirstExtendedVariableLengthRecord),
+    true,
+  );
+  view.setUint32(243, numberOfExtendedVariableLengthRecords, true);
   view.setBigUint64(247, BigInt(pointCount64), true);
   view.setFloat64(131, 0.01, true);
   view.setFloat64(139, 0.01, true);
