@@ -4736,6 +4736,41 @@
                 </div>
               </div>
               <div class="stats-tile">
+                <div class="stats-tile-title">座標情報</div>
+                <div class="stats-item">
+                  判定: <span class="stats-value" id="crsStatus">不明</span>
+                </div>
+                <div class="stats-item">
+                  水平CRS: <span class="stats-value" id="crsHorizontal">不明</span>
+                </div>
+                <div class="stats-item">
+                  垂直CRS / 高さ基準:
+                  <span class="stats-value" id="crsVertical">不明</span>
+                </div>
+                <div class="stats-item">
+                  EPSG候補:
+                  <span class="stats-value" id="crsEpsgCandidates">不明</span>
+                </div>
+                <div class="stats-item">
+                  WKT / GeoTIFF:
+                  <span class="stats-value" id="crsSources">不明</span>
+                </div>
+                <div class="stats-item">
+                  単位: <span class="stats-value" id="crsUnits">不明</span>
+                </div>
+                <div class="stats-item">
+                  注意: <span class="stats-value" id="crsWarnings">不明</span>
+                </div>
+                <button
+                  class="control-btn"
+                  id="crsInquiryCopyBtn"
+                  onclick="copyCrsInquiryText()"
+                  style="margin-top: 8px"
+                >
+                  確認文をコピー
+                </button>
+              </div>
+              <div class="stats-tile">
                 <div class="stats-tile-title">点群 / 分類</div>
                 <div class="stats-item">
                   元データ点数:
@@ -6149,6 +6184,12 @@
         headerBytes: 512,
         lasPointChunkBytes: 8 * MB,
         lazHeapChunkBytes: 8 * MB,
+      };
+      const CRS_DIAGNOSTIC_POLICY = {
+        maxRecords: 64,
+        maxVlrBytes: 512 * 1024,
+        maxEvlrPayloadBytes: 512 * 1024,
+        maxTextChars: 12000,
       };
       const LOAD_PROFILE_MEMORY_MODEL = {
         runtimeOverheadMB: 192,
@@ -9177,6 +9218,19 @@
         }
       };
 
+      window.copyCrsInquiryText = async function () {
+        try {
+          if (!navigator.clipboard?.writeText) {
+            throw new Error("Clipboard API is unavailable");
+          }
+          await navigator.clipboard.writeText(formatCrsInquiryText());
+          showToast("座標系の確認文をコピーしました", "success");
+        } catch (error) {
+          console.warn("座標系確認文のコピーに失敗:", error);
+          showToast("コピーに失敗しました", "warning");
+        }
+      };
+
       window.previewMeasurementRecord = function (
         id,
         event = null,
@@ -10272,6 +10326,51 @@
         return parseLASHeader(headerBuffer);
       }
 
+      async function attachCrsDiagnosticsFromFile(
+        file,
+        header,
+        loadSessionId = activeLoadSessionId,
+      ) {
+        if (!file || !header || typeof file.slice !== "function") {
+          const projectionSummary = summarizeProjectionRecords([]);
+          header.crsDiagnostics = buildCoordinateReferenceDiagnostics({
+            header,
+            projectionSummary,
+          });
+          return header.crsDiagnostics;
+        }
+        try {
+          const projectionRecords = await readLASProjectionRecordsFromFile(
+            file,
+            header,
+            loadSessionId,
+          );
+          const projectionSummary = summarizeProjectionRecords(
+            projectionRecords.records,
+          );
+          projectionSummary.warnings = [
+            ...(projectionSummary.warnings || []),
+            ...(projectionRecords.warnings || []),
+            ...(header.crsDiagnosticsWarnings || []),
+          ];
+          header.crsDiagnostics = buildCoordinateReferenceDiagnostics({
+            header,
+            projectionSummary,
+          });
+        } catch (error) {
+          const projectionSummary = summarizeProjectionRecords([]);
+          projectionSummary.warnings = [
+            createCrsWarning("parse-warning", error?.message || "CRS metadata parsing failed."),
+            ...(header.crsDiagnosticsWarnings || []),
+          ];
+          header.crsDiagnostics = buildCoordinateReferenceDiagnostics({
+            header,
+            projectionSummary,
+          });
+        }
+        return header.crsDiagnostics;
+      }
+
       async function analyzeSelectedFilePreview(file, options = {}) {
         const previewFile = file || workflowState.selectedFile;
         const quality = options.quality || workflowState.selectedQuality;
@@ -10295,6 +10394,7 @@
         ) {
           try {
             header = await parseLASHeaderFromFile(previewFile, 0);
+            await attachCrsDiagnosticsFromFile(previewFile, header, 0);
           } catch (error) {
             console.warn("ファイルプレビュー解析に失敗:", error);
           }
@@ -10532,6 +10632,11 @@
 
         try {
           statsData.header = header;
+          statsData.crsDiagnostics = header.crsDiagnostics ||
+            buildCoordinateReferenceDiagnostics({
+              header,
+              projectionSummary: summarizeProjectionRecords([]),
+            });
           applyPointCountSummary(headerPointCount, points.length);
           statsData.lasVersion = `${header.versionMajor ?? 1}.${header.versionMinor ?? 2}`;
           statsData.classificationSource = "file";
@@ -10583,6 +10688,7 @@
 
         updateProgress(30, "ヘッダー解析中...");
         const header = await parseLASHeaderFromFile(file);
+        await attachCrsDiagnosticsFromFile(file, header);
 
         console.log(
           `ヘッダー解析成功: ${header.numberOfPointRecords.toLocaleString()}点`,
@@ -10624,6 +10730,9 @@
 
         if (lazResult?.cancelled || lazResult?.points === null) {
           throw new Error("__CANCELLED__");
+        }
+        if (lazResult.header) {
+          await attachCrsDiagnosticsFromFile(file, lazResult.header);
         }
 
         finalizePointCloudData(
@@ -10733,6 +10842,552 @@
         return parts.pop().toLowerCase();
       }
 
+      function readUint64AsNumber(view, offset) {
+        if (offset + 8 > view.byteLength) return null;
+        const value = view.getBigUint64(offset, true);
+        return value > BigInt(Number.MAX_SAFE_INTEGER)
+          ? Number.MAX_SAFE_INTEGER
+          : Number(value);
+      }
+
+      function createCrsWarning(code, message) {
+        return { code, message };
+      }
+
+      function uniqueStrings(values) {
+        return [...new Set((values || []).filter(Boolean).map(String))];
+      }
+
+      function decodeLasString(bytes) {
+        const array = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || []);
+        let end = array.indexOf(0);
+        if (end < 0) end = array.length;
+        return new TextDecoder().decode(array.slice(0, end)).trim();
+      }
+
+      function getLasProjectionRecordType(record) {
+        if (!record || record.userId !== "LASF_Projection") return null;
+        const types = {
+          2111: "mathTransformWkt",
+          2112: "coordinateSystemWkt",
+          34735: "geoKeyDirectory",
+          34736: "geoDoubleParams",
+          34737: "geoAsciiParams",
+        };
+        return types[record.recordId] || null;
+      }
+
+      function isProjectionRecord(record) {
+        return Boolean(getLasProjectionRecordType(record));
+      }
+
+      function parseLASVlrRecords(arrayBuffer, options = {}) {
+        const view = new DataView(arrayBuffer || new ArrayBuffer(0));
+        const records = [];
+        const warnings = [];
+        let offset = Number(options.startOffset || 0);
+        const maxOffset = Math.min(
+          Number(options.endOffset ?? view.byteLength),
+          view.byteLength,
+        );
+        const recordLimit = Math.min(
+          Number(options.count ?? CRS_DIAGNOSTIC_POLICY.maxRecords),
+          CRS_DIAGNOSTIC_POLICY.maxRecords,
+        );
+        let consumedPayloadBytes = 0;
+
+        for (let index = 0; index < recordLimit; index += 1) {
+          if (offset + 54 > maxOffset) break;
+          const userId = decodeLasString(new Uint8Array(arrayBuffer, offset + 2, 16));
+          const recordId = view.getUint16(offset + 18, true);
+          const length = view.getUint16(offset + 20, true);
+          const description = decodeLasString(new Uint8Array(arrayBuffer, offset + 22, 32));
+          const payloadOffset = offset + 54;
+          const payloadEnd = payloadOffset + length;
+
+          if (payloadEnd > maxOffset) {
+            warnings.push(createCrsWarning("parse-warning", "VLR record length exceeds VLR bounds."));
+            break;
+          }
+
+          let payload = new Uint8Array(0);
+          if (userId === "LASF_Projection") {
+            consumedPayloadBytes += length;
+            if (consumedPayloadBytes > CRS_DIAGNOSTIC_POLICY.maxVlrBytes) {
+              warnings.push(createCrsWarning("diagnostic-limit-reached", "VLR diagnostic byte limit reached."));
+              break;
+            }
+            payload = new Uint8Array(arrayBuffer, payloadOffset, length).slice();
+          }
+
+          records.push({
+            kind: "VLR",
+            userId,
+            recordId,
+            recordLengthAfterHeader: length,
+            description,
+            payload,
+            projectionType: getLasProjectionRecordType({ userId, recordId }),
+          });
+          offset = payloadEnd;
+        }
+
+        if ((options.count || 0) > recordLimit) {
+          warnings.push(createCrsWarning("diagnostic-limit-reached", "VLR record count limit reached."));
+        }
+
+        return { records, warnings };
+      }
+
+      async function readLASEvlrRecordsFromFile(file, header, loadSessionId = 0) {
+        const records = [];
+        const warnings = [];
+        const count = Number(header?.numberOfExtendedVariableLengthRecords || 0);
+        const start = Number(header?.startOfFirstExtendedVariableLengthRecord || 0);
+        if (!count) return { records, warnings };
+        if (!Number.isSafeInteger(start) || start <= 0 || start >= file.size || start < Number(header?.pointDataOffset || 0)) {
+          warnings.push(createCrsWarning("evlr-skipped", "EVLR offset is invalid for bounded CRS diagnostics."));
+          return { records, warnings };
+        }
+
+        let offset = start;
+        const limit = Math.min(count, CRS_DIAGNOSTIC_POLICY.maxRecords);
+        for (let index = 0; index < limit; index += 1) {
+          if (offset + 60 > file.size) {
+            warnings.push(createCrsWarning("parse-warning", "EVLR header exceeds file bounds."));
+            break;
+          }
+          const headerBuffer = await readBlobAsArrayBuffer(
+            file.slice(offset, offset + 60),
+            loadSessionId,
+          );
+          const view = new DataView(headerBuffer);
+          const userId = decodeLasString(new Uint8Array(headerBuffer, 2, 16));
+          const recordId = view.getUint16(18, true);
+          const length = readUint64AsNumber(view, 20) || 0;
+          const description = decodeLasString(new Uint8Array(headerBuffer, 28, 32));
+          const payloadOffset = offset + 60;
+          const payloadEnd = payloadOffset + length;
+
+          if (payloadEnd > file.size) {
+            warnings.push(createCrsWarning("parse-warning", "EVLR record length exceeds file bounds."));
+            break;
+          }
+
+          let payload = new Uint8Array(0);
+          const projectionType = getLasProjectionRecordType({ userId, recordId });
+          if (projectionType) {
+            if (length > CRS_DIAGNOSTIC_POLICY.maxEvlrPayloadBytes) {
+              warnings.push(createCrsWarning("diagnostic-limit-reached", "EVLR payload exceeds diagnostic byte limit."));
+              offset = payloadEnd;
+              continue;
+            }
+            const payloadBuffer = await readBlobAsArrayBuffer(
+              file.slice(payloadOffset, payloadEnd),
+              loadSessionId,
+            );
+            payload = new Uint8Array(payloadBuffer);
+          }
+
+          records.push({
+            kind: "EVLR",
+            userId,
+            recordId,
+            recordLengthAfterHeader: length,
+            description,
+            payload,
+            projectionType,
+          });
+          offset = payloadEnd;
+        }
+
+        if (count > limit) {
+          warnings.push(createCrsWarning("diagnostic-limit-reached", "EVLR record count limit reached."));
+        }
+
+        return { records, warnings };
+      }
+
+      function parseLASEvlrRecords(arrayBuffer, options = {}) {
+        const records = [];
+        const warnings = [];
+        if (!arrayBuffer || arrayBuffer.byteLength < 60) return { records, warnings };
+        const view = new DataView(arrayBuffer);
+        let offset = Math.max(0, Number(options.startOffset || 0));
+        const endOffset = Math.min(arrayBuffer.byteLength, Number(options.endOffset || arrayBuffer.byteLength));
+        const count = Math.max(0, Number(options.count || 0));
+        const limit = Math.min(count || CRS_DIAGNOSTIC_POLICY.maxRecords, CRS_DIAGNOSTIC_POLICY.maxRecords);
+
+        for (let index = 0; index < limit && offset + 60 <= endOffset; index += 1) {
+          const userId = decodeLasString(new Uint8Array(arrayBuffer, offset + 2, 16));
+          const recordId = view.getUint16(offset + 18, true);
+          const payloadLength = readUint64AsNumber(view, offset + 20);
+          const description = decodeLasString(new Uint8Array(arrayBuffer, offset + 28, 32));
+          const payloadStart = offset + 60;
+          const payloadEnd = payloadStart + payloadLength;
+          if (
+            !Number.isFinite(payloadLength) ||
+            payloadLength < 0 ||
+            payloadLength > CRS_DIAGNOSTIC_POLICY.maxEvlrPayloadBytes ||
+            payloadEnd > endOffset
+          ) {
+            warnings.push(createCrsWarning("evlr-skipped", `EVLR ${recordId} was skipped because its payload bounds are unsafe.`));
+            break;
+          }
+          const payload = new Uint8Array(arrayBuffer, payloadStart, payloadLength);
+          records.push({
+            kind: "EVLR",
+            userId,
+            recordId,
+            description,
+            payload,
+            projectionType: getLasProjectionRecordType({ userId, recordId }),
+          });
+          offset = payloadEnd;
+        }
+
+        if (count > limit) {
+          warnings.push(createCrsWarning("diagnostic-limit-reached", "EVLR record count limit reached."));
+        }
+
+        return { records, warnings };
+      }
+
+      async function readLASProjectionRecordsFromFile(file, header, loadSessionId = 0) {
+        const warnings = [];
+        const records = [];
+        const headerSize = Number(header?.headerSize || 0);
+        const pointDataOffset = Number(header?.pointDataOffset || 0);
+        if (
+          header?.numberOfVariableLengthRecords > 0 &&
+          headerSize >= 0 &&
+          pointDataOffset > headerSize &&
+          pointDataOffset <= file.size
+        ) {
+          const vlrBuffer = await readBlobAsArrayBuffer(
+            file.slice(headerSize, pointDataOffset),
+            loadSessionId,
+          );
+          const parsed = parseLASVlrRecords(vlrBuffer, {
+            startOffset: 0,
+            endOffset: vlrBuffer.byteLength,
+            count: header?.numberOfVariableLengthRecords || 0,
+          });
+          records.push(...parsed.records);
+          warnings.push(...parsed.warnings);
+        } else if (header?.numberOfVariableLengthRecords) {
+          warnings.push(createCrsWarning("parse-warning", "VLR bounds are invalid."));
+        }
+
+        const evlr = await readLASEvlrRecordsFromFile(file, header, loadSessionId);
+        records.push(...evlr.records);
+        warnings.push(...evlr.warnings);
+        return { records: records.filter(isProjectionRecord), warnings };
+      }
+
+      function extractNullTerminatedText(payload) {
+        return decodeLasString(payload).slice(0, CRS_DIAGNOSTIC_POLICY.maxTextChars);
+      }
+
+      function classifyWktEpsgCandidates(wktText) {
+        const result = { horizontal: [], vertical: [], unit: [], other: [] };
+        const text = String(wktText || "");
+        const matches = [...text.matchAll(/(?:AUTHORITY|ID)\s*\[\s*"EPSG"\s*,\s*"?(\d+)"?/gi)];
+        const getContextStack = (index) => {
+          const stack = [];
+          let inQuote = false;
+          for (let i = 0; i < index; i += 1) {
+            const char = text[i];
+            if (char === '"' && text[i - 1] !== "\\") {
+              inQuote = !inQuote;
+              continue;
+            }
+            if (inQuote) continue;
+            if (char === "]") {
+              stack.pop();
+              continue;
+            }
+            const keywordMatch = text.slice(i).match(/^([A-Z_]+)\s*\[/i);
+            if (keywordMatch) {
+              stack.push(keywordMatch[1].toUpperCase());
+              i += keywordMatch[0].length - 1;
+            }
+          }
+          return stack;
+        };
+        for (const match of matches) {
+          const code = match[1];
+          const contextStack = getContextStack(match.index);
+          const owner = contextStack[contextStack.length - 1] || "";
+          if (/^(UNIT|LENGTHUNIT|ANGLEUNIT)$/.test(owner)) result.unit.push(code);
+          else if (/^(VERTCRS|VERT_CS|VERT_DATUM)$/.test(owner)) result.vertical.push(code);
+          else if (/^(PROJCRS|PROJCS|GEOGCRS|GEOGCS|COMPOUNDCRS)$/.test(owner)) result.horizontal.push(code);
+          else result.other.push(code);
+        }
+        return {
+          horizontal: uniqueStrings(result.horizontal),
+          vertical: uniqueStrings(result.vertical),
+          unit: uniqueStrings(result.unit),
+          other: uniqueStrings(result.other),
+        };
+      }
+
+      function summarizeWktCrs(wktText) {
+        const text = String(wktText || "").trim();
+        const nameMatch = text.match(/^(?:PROJCRS|PROJCS|GEOGCRS|GEOGCS|COMPOUNDCRS|VERTCRS|VERT_CS)\s*\[\s*"([^"]+)"/i);
+        return {
+          present: Boolean(text),
+          text: text.slice(0, CRS_DIAGNOSTIC_POLICY.maxTextChars),
+          name: nameMatch?.[1] || null,
+          hasVertical: /\b(?:VERTCRS|VERT_CS|VERT_DATUM)\b/i.test(text),
+          units: /\b(?:UNIT|LENGTHUNIT)\s*\[\s*"metre"/i.test(text)
+            ? { horizontal: "metre", vertical: /\b(?:VERTCRS|VERT_CS)\b/i.test(text) ? "metre" : null }
+            : { horizontal: null, vertical: null },
+          epsgCandidates: classifyWktEpsgCandidates(text),
+        };
+      }
+
+      function parseGeoKeyDirectory(payload) {
+        const view = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
+        const warnings = [];
+        if (payload.byteLength < 8 || payload.byteLength % 2 !== 0) {
+          return { keys: {}, warnings: [createCrsWarning("parse-warning", "GeoKeyDirectoryTag is malformed.")] };
+        }
+        const keyCount = view.getUint16(6, true);
+        const expectedLength = 8 + keyCount * 8;
+        if (expectedLength > payload.byteLength) {
+          warnings.push(createCrsWarning("parse-warning", "GeoKeyDirectoryTag key count exceeds payload length."));
+        }
+        const keys = {};
+        for (let i = 0; i < keyCount && 8 + i * 8 + 8 <= payload.byteLength; i += 1) {
+          const offset = 8 + i * 8;
+          const keyId = view.getUint16(offset, true);
+          keys[keyId] = {
+            keyId,
+            tiffTagLocation: view.getUint16(offset + 2, true),
+            count: view.getUint16(offset + 4, true),
+            valueOffset: view.getUint16(offset + 6, true),
+          };
+        }
+        return { keys, warnings };
+      }
+
+      function parseGeoDoubleParams(payload) {
+        const values = [];
+        const view = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
+        for (let offset = 0; offset + 8 <= payload.byteLength; offset += 8) {
+          values.push(view.getFloat64(offset, true));
+        }
+        return values;
+      }
+
+      function parseGeoAsciiParams(payload) {
+        return decodeLasString(payload);
+      }
+
+      function summarizeGeoTiffKeys(geoKeyDirectory, geoDoubleParams = [], geoAsciiParams = "") {
+        const warnings = [...(geoKeyDirectory?.warnings || [])];
+        const keys = geoKeyDirectory?.keys || {};
+        const getValue = (id) => keys[id]?.valueOffset ? String(keys[id].valueOffset) : null;
+        const projected = getValue(3072);
+        const geographic = getValue(2048);
+        const vertical = getValue(4096);
+        const horizontal = projected || geographic;
+        const unit = getValue(3076) || getValue(4099);
+        return {
+          present: Object.keys(keys).length > 0,
+          name: geoAsciiParams || null,
+          epsgCandidates: {
+            horizontal: uniqueStrings([horizontal]),
+            vertical: uniqueStrings([vertical]),
+            unit: uniqueStrings([unit]),
+            other: [],
+          },
+          units: {
+            horizontal: unit === "9001" ? "metre" : null,
+            vertical: getValue(4099) === "9001" ? "metre" : null,
+          },
+          warnings,
+        };
+      }
+
+      function summarizeProjectionRecords(records = []) {
+        const warnings = [];
+        const wktRecords = records.filter((record) => record.projectionType === "coordinateSystemWkt");
+        const mathTransformRecords = records.filter((record) => record.projectionType === "mathTransformWkt");
+        const geoKeyRecord = records.find((record) => record.projectionType === "geoKeyDirectory");
+        const geoDoubleRecord = records.find((record) => record.projectionType === "geoDoubleParams");
+        const geoAsciiRecord = records.find((record) => record.projectionType === "geoAsciiParams");
+        const preferredWktRecord = wktRecords.find((record) => record.kind === "EVLR") || wktRecords[0] || null;
+        const wkt = preferredWktRecord ? summarizeWktCrs(extractNullTerminatedText(preferredWktRecord.payload)) : null;
+        let geoTiff = null;
+        if (geoKeyRecord) {
+          const directory = parseGeoKeyDirectory(geoKeyRecord.payload);
+          geoTiff = summarizeGeoTiffKeys(
+            directory,
+            geoDoubleRecord ? parseGeoDoubleParams(geoDoubleRecord.payload) : [],
+            geoAsciiRecord ? parseGeoAsciiParams(geoAsciiRecord.payload) : "",
+          );
+          warnings.push(...geoTiff.warnings);
+        }
+        if (mathTransformRecords.length) {
+          warnings.push(createCrsWarning("math-transform-wkt-present", "Math Transform WKT is present but not applied."));
+        }
+        const wktHorizontal = wkt?.epsgCandidates?.horizontal?.[0] || null;
+        const geoHorizontal = geoTiff?.epsgCandidates?.horizontal?.[0] || null;
+        if (wktHorizontal && geoHorizontal && wktHorizontal !== geoHorizontal) {
+          warnings.push(createCrsWarning("crs-mismatch-warning", "WKT and GeoTIFF CRS candidates differ."));
+        }
+        if (wktRecords.length > 1) {
+          warnings.push(createCrsWarning("multiple-crs-candidates", "Multiple WKT CRS records are present."));
+        }
+        return {
+          wkt,
+          geoTiff,
+          warnings,
+          rawSources: {
+            hasWkt: Boolean(wkt),
+            hasGeoTiff: Boolean(geoTiff),
+            hasMathTransformWkt: mathTransformRecords.length > 0,
+            vlrCount: records.filter((record) => record.kind === "VLR").length,
+            evlrCount: records.filter((record) => record.kind === "EVLR").length,
+          },
+        };
+      }
+
+      function buildCoordinateReferenceDiagnostics({ header, projectionSummary } = {}) {
+        const warnings = [...(projectionSummary?.warnings || [])];
+        const wkt = projectionSummary?.wkt || null;
+        const geoTiff = projectionSummary?.geoTiff || null;
+        const horizontalCandidates = uniqueStrings([
+          ...(wkt?.epsgCandidates?.horizontal || []),
+          ...(geoTiff?.epsgCandidates?.horizontal || []),
+        ]);
+        const verticalCandidates = uniqueStrings([
+          ...(wkt?.epsgCandidates?.vertical || []),
+          ...(geoTiff?.epsgCandidates?.vertical || []),
+        ]);
+        const unitCandidates = uniqueStrings([
+          ...(wkt?.epsgCandidates?.unit || []),
+          ...(geoTiff?.epsgCandidates?.unit || []),
+        ]);
+        const horizontalName = wkt?.name || geoTiff?.name || null;
+        const verticalDetected = Boolean(wkt?.hasVertical || verticalCandidates.length);
+        const hasHorizontal = Boolean(horizontalName || horizontalCandidates.length);
+        const hasUnits = Boolean(wkt?.units?.horizontal || geoTiff?.units?.horizontal || unitCandidates.length);
+        const pointFormat = Number(header?.pointDataRecordFormat);
+        const requiresWkt = pointFormat >= 6 && pointFormat <= 10;
+        if (requiresWkt && !projectionSummary?.rawSources?.hasWkt) {
+          warnings.push(createCrsWarning("missing-wkt-for-point-format", "Point formats 6-10 should provide WKT CRS metadata."));
+        }
+        if (header?.wktGlobalEncodingBit && !projectionSummary?.rawSources?.hasWkt) {
+          warnings.push(createCrsWarning("wkt-bit-mismatch", "Global Encoding WKT bit is set but no WKT record was found."));
+        }
+        if (hasHorizontal && !verticalDetected) {
+          warnings.push(createCrsWarning("vertical-crs-missing", "高さ基準は LAS/LAZ 内から確認できませんでした。"));
+        }
+        if (hasHorizontal && !hasUnits) {
+          warnings.push(createCrsWarning("unit-unknown", "座標単位は LAS/LAZ 内から確認できませんでした。"));
+        }
+        const status = !hasHorizontal
+          ? "missing-horizontal-crs"
+          : verticalDetected && hasUnits
+            ? "complete-crs-metadata"
+            : !verticalDetected
+              ? "vertical-unknown"
+              : "usable-horizontal-crs";
+        return {
+          status,
+          confidence: status === "complete-crs-metadata" ? "high" : hasHorizontal ? "medium" : "low",
+          horizontal: {
+            detected: hasHorizontal,
+            name: horizontalName,
+            epsg: horizontalCandidates,
+            source: wkt ? "wkt" : geoTiff ? "geotiff" : null,
+          },
+          vertical: {
+            detected: verticalDetected,
+            name: verticalDetected ? wkt?.name || null : null,
+            epsg: verticalCandidates,
+            heightBasis: verticalDetected ? wkt?.name || null : null,
+            source: wkt?.hasVertical ? "wkt" : verticalCandidates.length ? "geotiff" : null,
+          },
+          units: {
+            horizontal: wkt?.units?.horizontal || geoTiff?.units?.horizontal || (unitCandidates.length ? `EPSG:${unitCandidates[0]}` : null),
+            vertical: wkt?.units?.vertical || geoTiff?.units?.vertical || null,
+          },
+          rawSources: {
+            ...(projectionSummary?.rawSources || {}),
+            globalEncodingWktBit: Boolean(header?.wktGlobalEncodingBit),
+            pointDataRecordFormat: header?.pointDataRecordFormat ?? null,
+          },
+          epsgCandidates: {
+            horizontal: horizontalCandidates,
+            vertical: verticalCandidates,
+            unit: unitCandidates,
+            other: uniqueStrings([...(wkt?.epsgCandidates?.other || []), ...(geoTiff?.epsgCandidates?.other || [])]),
+          },
+          warnings: warnings.map((warning) => warning.message),
+          warningCodes: uniqueStrings(warnings.map((warning) => warning.code)),
+        };
+      }
+
+      function formatCrsDiagnosticsStatus(diagnostics) {
+        const labels = {
+          "missing-horizontal-crs": "CRS 不明のため、地球上の位置は特定できません",
+          "usable-horizontal-crs": "位置特定に使える可能性があります",
+          "vertical-unknown": "平面位置は確認できますが、高さ基準は不明です",
+          "complete-crs-metadata": "水平位置と高さ基準を確認できます",
+        };
+        return labels[diagnostics?.status] || "不明";
+      }
+
+      function formatCrsDiagnosticsRows(diagnostics) {
+        const unknown = "不明";
+        const horizontal = diagnostics?.horizontal?.detected
+          ? diagnostics.horizontal.name || diagnostics.horizontal.epsg.map((code) => `EPSG:${code}`).join(", ")
+          : unknown;
+        const vertical = diagnostics?.vertical?.detected
+          ? diagnostics.vertical.name || diagnostics.vertical.epsg.map((code) => `EPSG:${code}`).join(", ")
+          : unknown;
+        const epsg = [
+          ...(diagnostics?.epsgCandidates?.horizontal || []).map((code) => `EPSG:${code}`),
+          ...(diagnostics?.epsgCandidates?.vertical || []).map((code) => `EPSG:${code}`),
+        ].join(", ") || unknown;
+        const sources = [
+          diagnostics?.rawSources?.hasWkt ? "WKTあり" : "WKTなし",
+          diagnostics?.rawSources?.hasGeoTiff ? "GeoTIFFあり" : "GeoTIFFなし",
+          diagnostics?.rawSources?.hasMathTransformWkt ? "Math Transform WKTあり" : null,
+        ].filter(Boolean).join(" / ");
+        return {
+          status: formatCrsDiagnosticsStatus(diagnostics),
+          horizontal,
+          vertical,
+          epsg,
+          sources: sources || unknown,
+          units: diagnostics?.units?.horizontal || diagnostics?.units?.vertical || unknown,
+          warnings: diagnostics?.warnings?.length ? diagnostics.warnings.join(" / ") : "なし",
+        };
+      }
+
+      function formatCrsInquiryText() {
+        return [
+          "LAS/LAZ ファイルの座標系をご教示ください。",
+          "",
+          "確認したい内容は以下です。",
+          "",
+          "・測地系: JGD2011 / JGD2000 / WGS84 など",
+          "・投影座標系: 平面直角座標系の場合は第何系か",
+          "・EPSGコード",
+          "・高さ基準: T.P.標高 / 楕円体高 など",
+          "・単位: mでよいか",
+          "・LAS/LAZ 内に CRS が埋め込まれているか",
+          "・別途 .prj、測量成果簿、メタデータがあるか",
+          "",
+          "特に、Z値を標高として扱えるか確認したいです。",
+        ].join("\n");
+      }
+
       // LASヘッダー解析（簡易版）
       function parseLASHeader(arrayBuffer) {
         const view = new DataView(arrayBuffer);
@@ -10747,16 +11402,35 @@
         const rawPointDataRecordFormat = view.getUint8(104);
         const normalizedPointDataRecordFormat =
           rawPointDataRecordFormat & 0x3f;
+        const versionMajor = view.getUint8(24);
+        const versionMinor = view.getUint8(25);
+        const supportsLas14Header =
+          versionMajor > 1 || (versionMajor === 1 && versionMinor >= 4);
+        const startOfFirstExtendedVariableLengthRecord = supportsLas14Header
+          ? readUint64AsNumber(view, 235) || 0
+          : 0;
         const header = {
           signature: signature,
-          versionMajor: view.getUint8(24),
-          versionMinor: view.getUint8(25),
+          globalEncoding: view.getUint16(6, true),
+          wktGlobalEncodingBit: Boolean(view.getUint16(6, true) & 0x10),
+          versionMajor,
+          versionMinor,
+          headerSize: view.getUint16(94, true),
           pointDataOffset: view.getUint32(96, true),
+          numberOfVariableLengthRecords: view.getUint32(100, true),
           pointDataRecordLength: view.getUint16(105, true),
           pointDataRecordFormat: normalizedPointDataRecordFormat,
           pointDataRecordFormatRaw: rawPointDataRecordFormat,
           isCompressedPointFormat:
             normalizedPointDataRecordFormat !== rawPointDataRecordFormat,
+          startOfWaveformDataPacketRecord: supportsLas14Header
+            ? readUint64AsNumber(view, 227) || 0
+            : 0,
+          startOfFirstExtendedVariableLengthRecord,
+          numberOfExtendedVariableLengthRecords: supportsLas14Header
+            ? view.getUint32(243, true)
+            : 0,
+          crsDiagnosticsWarnings: [],
           xScaleFactor: view.getFloat64(131, true),
           yScaleFactor: view.getFloat64(139, true),
           zScaleFactor: view.getFloat64(147, true),
@@ -10770,6 +11444,21 @@
           maxZ: view.getFloat64(211, true),
           minZ: view.getFloat64(219, true),
         };
+
+        if (!header.headerSize || header.headerSize > header.pointDataOffset) {
+          header.crsDiagnosticsWarnings.push(
+            createCrsWarning("parse-warning", "LAS header size and point data offset are inconsistent."),
+          );
+        }
+        if (
+          header.numberOfExtendedVariableLengthRecords > 0 &&
+          (!Number.isSafeInteger(header.startOfFirstExtendedVariableLengthRecord) ||
+            header.startOfFirstExtendedVariableLengthRecord <= 0)
+        ) {
+          header.crsDiagnosticsWarnings.push(
+            createCrsWarning("evlr-skipped", "EVLR offset is invalid for CRS diagnostics."),
+          );
+        }
 
         // LAS 1.4 64-bit 点数フィールド対応
         // まずlegacy 32-bit点数を読み込む
@@ -15541,6 +16230,23 @@
         updateStatsPanelLayout();
       };
 
+      function updateCrsDiagnosticsDisplay(diagnostics) {
+        const rows = formatCrsDiagnosticsRows(diagnostics);
+        const mappings = {
+          crsStatus: rows.status,
+          crsHorizontal: rows.horizontal,
+          crsVertical: rows.vertical,
+          crsEpsgCandidates: rows.epsg,
+          crsSources: rows.sources,
+          crsUnits: rows.units,
+          crsWarnings: rows.warnings,
+        };
+        Object.entries(mappings).forEach(([id, value]) => {
+          const el = document.getElementById(id);
+          if (el) el.textContent = value || "不明";
+        });
+      }
+
       // 統計情報更新
       function updateStatsDisplay() {
         if (!statsData.header) return;
@@ -15575,6 +16281,7 @@
             ? `約${formatEstimatedMemoryMB(statsData.estimatedPeakMemoryMB)}`
             : "-";
         }
+        updateCrsDiagnosticsDisplay(statsData.crsDiagnostics || header.crsDiagnostics);
 
         // 点群統計
         document.getElementById("originalPoints").textContent =
@@ -15913,7 +16620,21 @@
             return workflowState;
           },
           parseLASPoints,
+          parseLASHeader,
           parseLASPointsFromFile,
+          parseLASVlrRecords,
+          parseLASEvlrRecords,
+          readLASProjectionRecordsFromFile,
+          summarizeWktCrs,
+          parseGeoKeyDirectory,
+          parseGeoDoubleParams,
+          parseGeoAsciiParams,
+          summarizeGeoTiffKeys,
+          summarizeProjectionRecords,
+          buildCoordinateReferenceDiagnostics,
+          formatCrsDiagnosticsStatus,
+          formatCrsDiagnosticsRows,
+          formatCrsInquiryText,
           analyzeSelectedFilePreview,
           checkFileSizeLimits,
           buildLoadProfile,

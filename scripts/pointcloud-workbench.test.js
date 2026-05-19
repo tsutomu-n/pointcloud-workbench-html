@@ -430,6 +430,423 @@ function createLasHeaderBuffer({
   return buffer;
 }
 
+function encodeFixedAscii(view, offset, length, value) {
+  const bytes = new TextEncoder().encode(value);
+  new Uint8Array(view.buffer, offset, length).set(bytes.slice(0, length));
+}
+
+function createVlrRecord({ userId = "LASF_Projection", recordId, payload = new Uint8Array(), description = "" }) {
+  const payloadBytes = payload instanceof Uint8Array ? payload : new TextEncoder().encode(String(payload));
+  const buffer = new ArrayBuffer(54 + payloadBytes.byteLength);
+  const view = new DataView(buffer);
+  view.setUint16(0, 0, true);
+  encodeFixedAscii(view, 2, 16, userId);
+  view.setUint16(18, recordId, true);
+  view.setUint16(20, payloadBytes.byteLength, true);
+  encodeFixedAscii(view, 22, 32, description);
+  new Uint8Array(buffer, 54).set(payloadBytes);
+  return new Uint8Array(buffer);
+}
+
+function createEvlrRecord({ userId = "LASF_Projection", recordId, payload = new Uint8Array(), description = "" }) {
+  const payloadBytes = payload instanceof Uint8Array ? payload : new TextEncoder().encode(String(payload));
+  const buffer = new ArrayBuffer(60 + payloadBytes.byteLength);
+  const view = new DataView(buffer);
+  view.setUint16(0, 0, true);
+  encodeFixedAscii(view, 2, 16, userId);
+  view.setUint16(18, recordId, true);
+  view.setBigUint64(20, BigInt(payloadBytes.byteLength), true);
+  encodeFixedAscii(view, 28, 32, description);
+  new Uint8Array(buffer, 60).set(payloadBytes);
+  return new Uint8Array(buffer);
+}
+
+function concatUint8Arrays(parts) {
+  const total = parts.reduce((sum, part) => sum + part.byteLength, 0);
+  const output = new Uint8Array(total);
+  let offset = 0;
+  for (const part of parts) {
+    output.set(part instanceof Uint8Array ? part : new Uint8Array(part), offset);
+    offset += part.byteLength;
+  }
+  return output;
+}
+
+function createGeoKeyDirectoryPayload(entries) {
+  const buffer = new ArrayBuffer(8 + entries.length * 8);
+  const view = new DataView(buffer);
+  view.setUint16(0, 1, true);
+  view.setUint16(2, 1, true);
+  view.setUint16(4, 0, true);
+  view.setUint16(6, entries.length, true);
+  entries.forEach((entry, index) => {
+    const offset = 8 + index * 8;
+    view.setUint16(offset, entry.keyId, true);
+    view.setUint16(offset + 2, entry.tiffTagLocation || 0, true);
+    view.setUint16(offset + 4, entry.count || 1, true);
+    view.setUint16(offset + 6, entry.valueOffset, true);
+  });
+  return new Uint8Array(buffer);
+}
+
+test("parseLASHeader exposes VLR and EVLR boundary fields for CRS diagnostics", () => {
+  const context = createContext();
+  context.__buffer = createLasHeaderBuffer({
+    globalEncoding: 0x10,
+    headerSize: 375,
+    numberOfVariableLengthRecords: 2,
+    pointDataOffset: 640,
+    pointDataRecordFormat: 6,
+    pointDataRecordLength: 30,
+    versionMajor: 1,
+    versionMinor: 4,
+    startOfFirstExtendedVariableLengthRecord: 2048n,
+    numberOfExtendedVariableLengthRecords: 1,
+    pointCount: 0,
+    pointCount64: 99n,
+  });
+
+  const header = vm.runInContext(
+    "window.__pcwTestApi.parseLASHeader(__buffer)",
+    context,
+  );
+
+  expect(header.globalEncoding).toBe(0x10);
+  expect(header.wktGlobalEncodingBit).toBe(true);
+  expect(header.headerSize).toBe(375);
+  expect(header.numberOfVariableLengthRecords).toBe(2);
+  expect(header.pointDataOffset).toBe(640);
+  expect(header.pointDataRecordFormat).toBe(6);
+  expect(header.startOfFirstExtendedVariableLengthRecord).toBe(2048);
+  expect(header.numberOfExtendedVariableLengthRecords).toBe(1);
+});
+
+test("parseLASHeader keeps EVLR fields empty for legacy headers", () => {
+  const context = createContext();
+  context.__buffer = createLasHeaderBuffer({
+    versionMajor: 1,
+    versionMinor: 2,
+    startOfFirstExtendedVariableLengthRecord: 2048n,
+    numberOfExtendedVariableLengthRecords: 3,
+  });
+
+  const header = vm.runInContext(
+    "window.__pcwTestApi.parseLASHeader(__buffer)",
+    context,
+  );
+
+  expect(header.startOfFirstExtendedVariableLengthRecord).toBe(0);
+  expect(header.numberOfExtendedVariableLengthRecords).toBe(0);
+});
+
+test("readLASProjectionRecords reads bounded VLR projection records without point data", async () => {
+  const context = createContext();
+  installImmediateBlobReader(context);
+  const wktPayload = new TextEncoder().encode('PROJCRS["JGD2011 / Japan Plane Rectangular CS IX",LENGTHUNIT["metre",1,ID["EPSG",9001]],ID["EPSG",6677]]\0');
+  const vlrs = concatUint8Arrays([
+    createVlrRecord({ recordId: 2112, payload: wktPayload }),
+    createVlrRecord({
+      recordId: 34735,
+      payload: createGeoKeyDirectoryPayload([
+        { keyId: 3072, valueOffset: 6677 },
+        { keyId: 3076, valueOffset: 9001 },
+      ]),
+    }),
+    createVlrRecord({
+      recordId: 34736,
+      payload: new Uint8Array(new Float64Array([1.25, 2.5]).buffer),
+    }),
+    createVlrRecord({
+      recordId: 34737,
+      payload: new TextEncoder().encode("JGD2011 / Japan Plane Rectangular CS IX|\0"),
+    }),
+  ]);
+  const headerSize = 227;
+  const pointDataOffset = headerSize + vlrs.byteLength;
+  const header = createLasHeaderBuffer({
+    headerSize,
+    pointDataOffset,
+    numberOfVariableLengthRecords: 4,
+  });
+  const fileBuffer = concatUint8Arrays([
+    new Uint8Array(header).slice(0, headerSize),
+    vlrs,
+    new Uint8Array(64),
+  ]).buffer;
+  context.__file = createChunkedFile(fileBuffer, "projected.las");
+  context.__header = vm.runInContext("window.__pcwTestApi.parseLASHeader(__buffer)", Object.assign(context, { __buffer: header }));
+
+  const result = await vm.runInContext(
+    "window.__pcwTestApi.readLASProjectionRecordsFromFile(__file, __header, 0)",
+    context,
+  );
+
+  expect(result.records.map((record) => record.recordId)).toEqual([2112, 34735, 34736, 34737]);
+  expect(context.__blobReadCalls).toBe(1);
+  expect(context.__blobReadSizes).toEqual([vlrs.byteLength]);
+});
+
+test("readLASProjectionRecords reads EVLR WKT with header-first bounded payload reads", async () => {
+  const context = createContext();
+  installImmediateBlobReader(context);
+  const headerSize = 227;
+  const pointDataOffset = 512;
+  const evlrOffset = 640;
+  const evlr = createEvlrRecord({
+    recordId: 2112,
+    payload: new TextEncoder().encode('PROJCRS["JGD2011 / Japan Plane Rectangular CS IX",ID["EPSG",6677]]\0'),
+  });
+  const header = createLasHeaderBuffer({
+    versionMajor: 1,
+    versionMinor: 4,
+    headerSize,
+    pointDataOffset,
+    startOfFirstExtendedVariableLengthRecord: BigInt(evlrOffset),
+    numberOfExtendedVariableLengthRecords: 1,
+  });
+  const fileBytes = new Uint8Array(evlrOffset + evlr.byteLength);
+  fileBytes.set(new Uint8Array(header).slice(0, headerSize), 0);
+  fileBytes.set(evlr, evlrOffset);
+  context.__file = createChunkedFile(fileBytes.buffer, "evlr.las");
+  context.__header = vm.runInContext("window.__pcwTestApi.parseLASHeader(__buffer)", Object.assign(context, { __buffer: header }));
+
+  const result = await vm.runInContext(
+    "window.__pcwTestApi.readLASProjectionRecordsFromFile(__file, __header, 0)",
+    context,
+  );
+
+  expect(result.records).toHaveLength(1);
+  expect(result.records[0].kind).toBe("EVLR");
+  expect(result.records[0].recordId).toBe(2112);
+  expect(context.__blobReadSizes).toEqual([60, evlr.byteLength - 60]);
+});
+
+test("readLASProjectionRecords skips unsafe EVLR offsets and oversized non-projection payloads", async () => {
+  const context = createContext();
+  installImmediateBlobReader(context);
+  const header = createLasHeaderBuffer({
+    versionMajor: 1,
+    versionMinor: 4,
+    pointDataOffset: 512,
+    startOfFirstExtendedVariableLengthRecord: 0n,
+    numberOfExtendedVariableLengthRecords: 1,
+  });
+  context.__file = createChunkedFile(header, "bad-evlr.las");
+  context.__header = vm.runInContext("window.__pcwTestApi.parseLASHeader(__buffer)", Object.assign(context, { __buffer: header }));
+
+  const result = await vm.runInContext(
+    "window.__pcwTestApi.readLASProjectionRecordsFromFile(__file, __header, 0)",
+    context,
+  );
+
+  expect(result.records).toHaveLength(0);
+  expect(result.warnings.some((warning) => warning.code === "evlr-skipped")).toBe(true);
+});
+
+test("readLASProjectionRecords warns for EVLR offsets beyond file size and overlapping point data", async () => {
+  const context = createContext();
+  installImmediateBlobReader(context);
+  for (const headerOptions of [
+    {
+      pointDataOffset: 512,
+      startOfFirstExtendedVariableLengthRecord: 4096n,
+      numberOfExtendedVariableLengthRecords: 1,
+    },
+    {
+      pointDataOffset: 1024,
+      startOfFirstExtendedVariableLengthRecord: 640n,
+      numberOfExtendedVariableLengthRecords: 1,
+    },
+    {
+      pointDataOffset: 512,
+      startOfFirstExtendedVariableLengthRecord: BigInt(Number.MAX_SAFE_INTEGER) + 2n,
+      numberOfExtendedVariableLengthRecords: 1,
+    },
+  ]) {
+    const headerBuffer = createLasHeaderBuffer({
+      versionMajor: 1,
+      versionMinor: 4,
+      ...headerOptions,
+    });
+    context.__file = createChunkedFile(headerBuffer, "unsafe-evlr.las");
+    context.__header = vm.runInContext(
+      "window.__pcwTestApi.parseLASHeader(__buffer)",
+      Object.assign(context, { __buffer: headerBuffer }),
+    );
+
+    const result = await vm.runInContext(
+      "window.__pcwTestApi.readLASProjectionRecordsFromFile(__file, __header, 0)",
+      context,
+    );
+
+    expect(result.records).toHaveLength(0);
+    expect(result.warnings.some((warning) => warning.code === "evlr-skipped")).toBe(true);
+  }
+});
+
+test("parseLASVlrRecords reports malformed lengths and record cap", () => {
+  const context = createContext();
+  const malformed = createVlrRecord({ recordId: 2112, payload: new TextEncoder().encode("short") });
+  new DataView(malformed.buffer, malformed.byteOffset, malformed.byteLength).setUint16(20, 200, true);
+  context.__malformed = malformed;
+  context.__single = createVlrRecord({ recordId: 2112, payload: new TextEncoder().encode("ok") });
+
+  const malformedResult = vm.runInContext(
+    "window.__pcwTestApi.parseLASVlrRecords(__malformed.buffer, { count: 1 })",
+    context,
+  );
+  const cappedResult = vm.runInContext(
+    "window.__pcwTestApi.parseLASVlrRecords(__single.buffer, { count: 65 })",
+    context,
+  );
+
+  expect(malformedResult.records).toHaveLength(0);
+  expect(malformedResult.warnings.some((warning) => warning.code === "parse-warning")).toBe(true);
+  expect(cappedResult.warnings.some((warning) => warning.code === "diagnostic-limit-reached")).toBe(true);
+});
+
+test("summarizeWktCrs separates CRS, vertical, unit, and other EPSG candidates", () => {
+  const context = createContext();
+  context.__wkt = 'COMPOUNDCRS["JGD2011 / Japan Plane Rectangular CS IX + height",PROJCRS["JGD2011 / Japan Plane Rectangular CS IX",BASEGEOGCRS["JGD2011",ID["EPSG",6668]],LENGTHUNIT["metre",1,ID["EPSG",9001]],ID["EPSG",6677]],VERTCRS["Tokyo Peil height",LENGTHUNIT["metre",1,ID["EPSG",9001]],ID["EPSG",6695]]]';
+
+  const summary = vm.runInContext(
+    "window.__pcwTestApi.summarizeWktCrs(__wkt)",
+    context,
+  );
+
+  expect(summary.present).toBe(true);
+  expect(summary.hasVertical).toBe(true);
+  expect(summary.epsgCandidates.horizontal).toContain("6677");
+  expect(summary.epsgCandidates.vertical).toContain("6695");
+  expect(summary.epsgCandidates.unit).toContain("9001");
+  expect(summary.epsgCandidates.horizontal).not.toContain("9001");
+});
+
+test("summarizeWktCrs handles WKT1 authorities, datum codes, and missing top-level CRS EPSG", () => {
+  const context = createContext();
+  context.__wkt1 = 'PROJCS["JGD2011 / Japan Plane Rectangular CS IX",GEOGCS["JGD2011",DATUM["Japanese Geodetic Datum 2011",AUTHORITY["EPSG","1128"]],AUTHORITY["EPSG","6668"]],UNIT["metre",1,AUTHORITY["EPSG","9001"]],AUTHORITY["EPSG","6677"]]';
+  context.__noTopLevel = 'PROJCRS["Local projected grid",BASEGEOGCRS["JGD2011",ID["EPSG",6668]],CONVERSION["Local method",METHOD["Transverse Mercator",ID["EPSG",9807]]],LENGTHUNIT["metre",1,ID["EPSG",9001]]]';
+
+  const wkt1 = vm.runInContext(
+    "window.__pcwTestApi.summarizeWktCrs(__wkt1)",
+    context,
+  );
+  const noTopLevel = vm.runInContext(
+    "window.__pcwTestApi.summarizeWktCrs(__noTopLevel)",
+    context,
+  );
+
+  expect(wkt1.epsgCandidates.horizontal).toContain("6677");
+  expect(wkt1.epsgCandidates.unit).toContain("9001");
+  expect(wkt1.epsgCandidates.other).toContain("1128");
+  expect(noTopLevel.present).toBe(true);
+  expect(noTopLevel.epsgCandidates.horizontal).toEqual([]);
+  expect(noTopLevel.epsgCandidates.unit).toEqual(["9001"]);
+  expect(noTopLevel.epsgCandidates.other).toContain("9807");
+});
+
+test("summarizeGeoTiffKeys extracts CRS and unit EPSG candidates", () => {
+  const context = createContext();
+  context.__payload = createGeoKeyDirectoryPayload([
+    { keyId: 3072, valueOffset: 6677 },
+    { keyId: 4096, valueOffset: 6695 },
+    { keyId: 3076, valueOffset: 9001 },
+  ]);
+
+  const summary = vm.runInContext(
+    `
+      const dir = window.__pcwTestApi.parseGeoKeyDirectory(__payload);
+      window.__pcwTestApi.summarizeGeoTiffKeys(dir, [], "");
+    `,
+    context,
+  );
+
+  expect(summary.epsgCandidates.horizontal).toEqual(["6677"]);
+  expect(summary.epsgCandidates.vertical).toEqual(["6695"]);
+  expect(summary.epsgCandidates.unit).toEqual(["9001"]);
+  expect(summary.units.horizontal).toBe("metre");
+});
+
+test("summarizeProjectionRecords prefers WKT and warns on CRS mismatch", () => {
+  const context = createContext();
+  const wktPayload = new TextEncoder().encode('PROJCRS["JGD2011 / Japan Plane Rectangular CS IX",LENGTHUNIT["metre",1,ID["EPSG",9001]],ID["EPSG",6677]]\0');
+  const geoPayload = createGeoKeyDirectoryPayload([
+    { keyId: 3072, valueOffset: 6678 },
+    { keyId: 3076, valueOffset: 9001 },
+  ]);
+  context.__records = [
+    { kind: "EVLR", userId: "LASF_Projection", recordId: 2112, projectionType: "coordinateSystemWkt", payload: wktPayload },
+    { kind: "VLR", userId: "LASF_Projection", recordId: 34735, projectionType: "geoKeyDirectory", payload: geoPayload },
+  ];
+
+  const summary = vm.runInContext(
+    "window.__pcwTestApi.summarizeProjectionRecords(__records)",
+    context,
+  );
+
+  expect(summary.wkt.epsgCandidates.horizontal).toEqual(["6677"]);
+  expect(summary.geoTiff.epsgCandidates.horizontal).toEqual(["6678"]);
+  expect(summary.warnings.some((warning) => warning.code === "crs-mismatch-warning")).toBe(true);
+});
+
+test("buildCoordinateReferenceDiagnostics keeps parse warnings separate from main CRS status", () => {
+  const context = createContext();
+  context.__header = {
+    pointDataRecordFormat: 6,
+    wktGlobalEncodingBit: true,
+  };
+  context.__summary = {
+    wkt: {
+      name: "JGD2011 / Japan Plane Rectangular CS IX",
+      hasVertical: false,
+      units: { horizontal: "metre", vertical: null },
+      epsgCandidates: { horizontal: ["6677"], vertical: [], unit: ["9001"], other: [] },
+    },
+    geoTiff: null,
+    warnings: [{ code: "parse-warning", message: "一部のVLRを解析できませんでした。" }],
+    rawSources: { hasWkt: true, hasGeoTiff: false, hasMathTransformWkt: false, vlrCount: 1, evlrCount: 0 },
+  };
+
+  const diagnostics = vm.runInContext(
+    "window.__pcwTestApi.buildCoordinateReferenceDiagnostics({ header: __header, projectionSummary: __summary })",
+    context,
+  );
+
+  expect(diagnostics.status).toBe("vertical-unknown");
+  expect(diagnostics.warningCodes).toContain("parse-warning");
+  expect(diagnostics.warningCodes).toContain("vertical-crs-missing");
+});
+
+test("CRS display helpers render unknowns cautiously and inquiry text omits sensitive data", () => {
+  const context = createContext();
+  context.__diagnostics = {
+    status: "missing-horizontal-crs",
+    horizontal: { detected: false, name: null, epsg: [] },
+    vertical: { detected: false, name: null, epsg: [] },
+    units: { horizontal: null, vertical: null },
+    epsgCandidates: { horizontal: [], vertical: [], unit: [], other: [] },
+    rawSources: { hasWkt: false, hasGeoTiff: false, hasMathTransformWkt: false },
+    warnings: ["X/Y/Z 座標だけでは、公共座標かローカル座標か判定できません。"],
+  };
+
+  const rows = vm.runInContext(
+    "window.__pcwTestApi.formatCrsDiagnosticsRows(__diagnostics)",
+    context,
+  );
+  const inquiry = vm.runInContext(
+    "window.__pcwTestApi.formatCrsInquiryText()",
+    context,
+  );
+
+  expect(rows.status).toContain("特定できません");
+  expect(rows.horizontal).toBe("不明");
+  expect(rows.vertical).toBe("不明");
+  expect(JSON.stringify(rows)).not.toContain("安全");
+  expect(inquiry).toContain("EPSGコード");
+  expect(inquiry).not.toContain("scan.las");
+  expect(inquiry).not.toContain("PointData");
+});
+
 test("load session helpers isolate stale loads", () => {
   const context = createContext();
 

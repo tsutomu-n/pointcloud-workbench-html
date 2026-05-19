@@ -1,6 +1,6 @@
 # PointCloudWorkbench 実装リファレンス
 
-更新日時: 2026-03-15 21:55:39 JST
+更新日時: 2026-05-19 00:00:00 JST
 
 ## 1. スコープ
 - 対象: `PointCloudWorkbench.html`（単一ファイル構成）
@@ -64,6 +64,7 @@
 - `FILE_READ_TIMEOUT_POLICY` はサイズ依存で `60秒〜300秒` に拡張
 - `POINT_PARSE_TIMEOUT_POLICY` はサイズ依存で `30秒〜300秒` に拡張
 - `FILE_IO_POLICY` は header 先読込と chunked 読込サイズを定義
+- `CRS_DIAGNOSTIC_POLICY` は CRS 診断用の record 数、VLR byte 数、EVLR payload byte 数、WKT text 長の上限を定義
 - `SUPPORTED_LANGUAGES = ["ja", "en", "zh"]`
 
 ## 5. 初期化フロー
@@ -84,15 +85,16 @@
 3. `loadLASFileActual(file)` または `loadSampleDataActual()`
 4. `buildPointCloudFromLASFile(file)`（ローカル LAS）
 5. `parseLASHeaderFromFile()` / `parseLASPointsFromFile()`（ローカル LAS）
-6. `buildPointCloudFromLAZFile(file)`（ローカル LAZ）
-7. `readFileIntoWasmHeap()` / `decompressLAZFile()`（ローカル LAZ）
-8. `readFileAsArrayBuffer()` / `buildPointCloudFromArrayBuffer()`（URL 読込や互換経路）
-9. `parsePointsFromArrayBuffer()`
-10. `parseLASHeader()` / `parseLASPoints()`（ArrayBuffer 経路の LAS）
-11. `decodeLAZPoint()`（LAZ）
-12. `createPointCloudFromData(points, header, filename)`
-13. `setupPointCloudVisualization()`
-14. `completeLoading()`
+6. `attachCrsDiagnosticsFromFile()` / `readLASProjectionRecordsFromFile()`（ローカル LAS/LAZ の CRS metadata 診断）
+7. `buildPointCloudFromLAZFile(file)`（ローカル LAZ）
+8. `readFileIntoWasmHeap()` / `decompressLAZFile()`（ローカル LAZ）
+9. `readFileAsArrayBuffer()` / `buildPointCloudFromArrayBuffer()`（URL 読込や互換経路）
+10. `parsePointsFromArrayBuffer()`
+11. `parseLASHeader()` / `parseLASPoints()`（ArrayBuffer 経路の LAS）
+12. `decodeLAZPoint()`（LAZ）
+13. `createPointCloudFromData(points, header, filename)`
+14. `setupPointCloudVisualization()`
+15. `completeLoading()`
 
 ## 7. LAS/LAZ 実装要点
 
@@ -101,6 +103,8 @@
 - LAS 1.4 の 64-bit 点数を処理
 - 圧縮フラグ付き LAZ (`pointDataRecordFormat` の上位ビット) は base format へ正規化してから点数判定する
 - `pointDataRecordFormat` と `legacyPointCount` に応じて点数解釈を分岐
+- CRS 診断向けに `globalEncoding`、WKT bit、`headerSize`、VLR count、`pointDataOffset`、EVLR offset / count を保持する
+- 不正な header size、point data offset、EVLR offset は点群読み込み全体を止めず、`crsDiagnosticsWarnings` に警告として渡す
 
 ### 7.2 `parseLASPoints()`
 - 品質設定の上限点数まで等間隔サンプリング
@@ -119,6 +123,17 @@
 - 診断情報を `window.__lazDebug` に保存
 - 圧縮ファイルを WASM 側へ複製するため、LAS より上限を保守的にしている
 - ローカル `LAZ` は `readFileIntoWasmHeap()` で chunk ごとに WASM ヒープへ転送し、JS 全量 `ArrayBuffer` を避ける
+
+### 7.5 CRS 診断
+- `readLASProjectionRecordsFromFile()` は、VLR を `headerSize` から `pointDataOffset` 直前までの上限付き `slice()` で読む
+- EVLR は `readLASEvlrRecordsFromFile()` が 60 byte header を先に読み、`LASF_Projection` の対象 record だけ payload を上限付きで読む。EVLR offset から file end までは一括で読まない
+- 対象 record は Coordinate System WKT (`2112`)、Math Transform WKT (`2111`)、GeoTIFF GeoKeyDirectory (`34735`)、GeoDoubleParams (`34736`)、GeoAsciiParams (`34737`)
+- `summarizeWktCrs()` は WKT1/WKT2 の名称、垂直 CRS 有無、単位、EPSG 候補を `horizontal / vertical / unit / other` に分ける
+- `summarizeGeoTiffKeys()` は GeoTIFF key の `3072` / `2048` / `4096` / `3076` / `4099` を候補として扱う
+- `summarizeProjectionRecords()` は表示用には WKT を優先し、EVLR WKT を VLR WKT より優先する。WKT と GeoTIFF の水平 CRS 候補が異なる場合は warning を残す
+- `buildCoordinateReferenceDiagnostics()` は主 status と warnings を分け、水平 CRS が検出できている場合に parse warning だけで主判定を失わない
+- CRS 診断は座標変換、EPSG DB 参照、ジオイド補正、地図照合、外部 API 呼び出し、サーバー処理を行わない
+- `formatCrsInquiryText()` / `copyCrsInquiryText()` は問い合わせ用の確認項目だけを出し、ローカルファイル名、点群 payload、座標配列を含めない
 
 ## 8. 点群生成と描画
 
@@ -227,6 +242,7 @@
 - `resetSlicing`
 - `toggleCADMode`
 - `autoClassify`
+- `copyCrsInquiryText`
 
 ### 14.4 開発補助
 - `debugClassification`

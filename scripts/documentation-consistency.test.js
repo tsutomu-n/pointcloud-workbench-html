@@ -62,3 +62,27 @@ test("OSS docs keep Client-Max and Server-Zero policy aligned", () => {
   expect(cloudflare).toContain("Workers fetch handler");
   expect(architecture).toContain("ユーザーPC側の責務");
 });
+
+test("CRS diagnostics docs keep local-only and no-conversion boundaries aligned", () => {
+  const readme = read("README.md");
+  const readmeJa = read("docs/README.ja.md");
+  const ops = read("PointCloudWorkbench_運用手順書.md");
+  const ref = read("PointCloudWorkbench_実装リファレンス.md");
+  const index = read("PointCloudWorkbench_ドキュメント索引.md");
+  const spec = read("docs/crs-diagnostics-final-spec.ja.md");
+  const plan = read("docs/crs-diagnostics-implementation-plan.ja.md");
+
+  expect(readme).toContain("CRS diagnostics");
+  expect(readme).toContain("do not perform coordinate conversion");
+  expect(readme).toContain("no LAS/LAZ upload");
+  expect(readmeJa).toContain("CRS 診断");
+  expect(readmeJa).toContain("座標変換");
+  expect(readmeJa).toContain("サーバー側 CRS 処理は行いません");
+  expect(ops).toContain("CRS 診断の確認");
+  expect(ops).toContain("ローカルファイル名、点群 payload、座標配列は含まれない");
+  expect(ref).toContain("readLASProjectionRecordsFromFile()");
+  expect(ref).toContain("座標変換、EPSG DB 参照");
+  expect(index).toContain("LAS/LAZ アップロードは行いません");
+  expect(spec).toContain("座標変換」ではなく");
+  expect(plan).toContain("EVLR header を先に読み");
+});

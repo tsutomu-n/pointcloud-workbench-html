@@ -58,6 +58,7 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 - Load-path visibility and estimated peak RAM risk display before import
 - Runtime mode summary for Hosted / Portable / renderer / isolation capabilities
 - Manual diagnostic report copy with no telemetry, no LAS/LAZ upload, and no file name included
+- CRS diagnostics from local LAS/LAZ header, VLR, and EVLR metadata, including WKT / GeoTIFF / EPSG candidates and cautious height-basis warnings
 - Load quality selection (`LOW` / `MEDIUM` / `HIGH` / `MAX`)
 - 3D and 2D view switching
 - Displayed-point distance measurement history with 3D distance, horizontal distance, height difference, and source-coordinate dX / dY / dZ
@@ -79,6 +80,8 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 - `three.js` and `laz-perf` are loaded from CDNs, so normal operation requires network access.
 - The server path is static-only. It must not add Workers, Pages Functions, APIs, telemetry, DB writes, or server-side point cloud processing.
 - Selected point cloud files stay on the user's device. Network access is for application assets and optional map tiles, not LAS/LAZ upload.
+- CRS diagnostics are local metadata inspection only. They do not perform coordinate conversion, geocoding, EPSG database lookup, map matching, or server-side CRS processing.
+- CRS diagnostics read bounded LAS header / VLR / EVLR slices and do not upload LAS/LAZ files or copy local file names into CRS inquiry text.
 - LAS files in the `2GB to 3GB` range are experimental. Start from `LOW` quality and verify memory use and responsiveness.
 - LAZ has a narrower safety margin because the decoder consumes extra memory. Files above `2GB` are rejected.
 - Local LAS uses header-first preview plus chunked point-data reads. Local LAZ uses chunked transfers into WASM. URL loading and some compatibility paths may still use full `ArrayBuffer` reads.
