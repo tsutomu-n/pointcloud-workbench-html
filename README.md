@@ -118,6 +118,10 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 
 - `bun test scripts/pointcloud-workbench.test.js scripts/documentation-consistency.test.js scripts/gitignore.test.js scripts/repository-metadata.test.js scripts/public-repo-readiness.test.js scripts/landing-page-i18n.test.js`
 - `bun scripts/check-readme.js`
+- Browser smoke for local LAS/LAZ diagnostics (headless Playwright, no repo dependency install):
+  - `bunx --package playwright playwright install chromium`
+  - `bunx --package playwright node scripts/e2e/run-diagnostics-smoke.mjs --las samples/test.las --laz samples/test.laz`
+  - Output screenshots: `.tmp/e2e/las-diagnostics.png`, `.tmp/e2e/laz-diagnostics.png`
 - CI also runs pinned `actionlint` for `.github/workflows/*.yml`; local `actionlint .github/workflows/*.yml` is optional.
 
 ## Repository Scope
