@@ -1056,6 +1056,12 @@ test("manual diagnostic report omits point cloud payloads and file names", () =>
   expect(report.diagnosticsCandidates).toMatchObject({
     total: 0,
     activeKind: "all",
+    byKind: {
+      "Z外れ値": 0,
+      "孤立候補": 0,
+      "欠測セル": 0,
+      "密度スパイク": 0,
+    },
   });
   expect(reportText).not.toContain("private-site-survey");
   expect(reportText).not.toContain("points\":[");
