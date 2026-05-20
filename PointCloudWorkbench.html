@@ -1557,6 +1557,34 @@
         margin-top: 8px;
       }
 
+      .diagnostic-candidate-controls {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto auto;
+        gap: 6px;
+        margin-top: 8px;
+      }
+
+      .diagnostic-candidate-filter {
+        min-height: 32px;
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        border-radius: 6px;
+        background: rgba(15, 23, 42, 0.84);
+        color: var(--ec-muted);
+        padding: 0 8px;
+        font-size: 12px;
+      }
+
+      .diagnostic-candidate-copy-btn {
+        min-height: 32px;
+        border: 1px solid rgba(2, 132, 199, 0.45);
+        border-radius: 6px;
+        background: rgba(2, 132, 199, 0.14);
+        color: #e2e8f0;
+        font-size: 11px;
+        padding: 0 10px;
+        cursor: pointer;
+      }
+
       .diagnostic-candidate-btn {
         width: 100%;
         min-height: 34px;
@@ -4949,11 +4977,43 @@
                   height="96"
                   aria-label="表示点ベース密度ヒートマップ"
                 ></canvas>
+                <div class="diagnostic-candidate-controls">
+                  <select
+                    class="diagnostic-candidate-filter"
+                    id="diagnosticCandidateFilter"
+                    onchange="setDiagnosticCandidateFilter(this.value)"
+                    aria-label="異常候補フィルター"
+                  >
+                    <option value="all">全候補</option>
+                    <option value="Z外れ値">Z外れ値</option>
+                    <option value="孤立候補">孤立候補</option>
+                    <option value="欠測セル">欠測セル</option>
+                    <option value="密度スパイク">密度スパイク</option>
+                  </select>
+                  <button
+                    class="diagnostic-candidate-copy-btn"
+                    type="button"
+                    onclick="copySelectedDiagnosticCandidate()"
+                  >
+                    選択コピー
+                  </button>
+                  <button
+                    class="diagnostic-candidate-copy-btn"
+                    type="button"
+                    onclick="copyDiagnosticCandidateSummary()"
+                  >
+                    要約コピー
+                  </button>
+                </div>
                 <div
                   class="diagnostic-candidate-list"
                   id="diagnosticCandidateList"
                   aria-label="異常候補一覧"
                 ></div>
+                <div class="stats-item">
+                  候補サマリ:
+                  <span class="stats-value" id="diagnosticCandidateSummary">-</span>
+                </div>
                 <canvas
                   class="diagnostics-canvas"
                   id="sectionProfileCanvas"
@@ -6129,6 +6189,7 @@
         diagnosticsReport: null,
         diagnosticCandidateMap: {},
         selectedDiagnosticCandidateKey: null,
+        diagnosticCandidateFilterKind: "all",
         sectionProfile: null,
       };
       let diagnosticCandidateMarker = null;
@@ -6177,6 +6238,9 @@
         const recentErrors = (errorTracker.errors || [])
           .slice(-5)
           .map(summarizeDiagnosticError);
+        const diagnosticCandidates = buildDiagnosticCandidateSummary(
+          statsData.diagnosticsReport,
+        );
 
         const report = {
           generatedAt: new Date().toISOString(),
@@ -6206,6 +6270,7 @@
             displayRatio: Number(statsData.displayRatio || 0),
             pointCloudSummary,
           },
+          diagnosticsCandidates: diagnosticCandidates,
           recentErrors,
         };
 
@@ -6215,10 +6280,7 @@
       async function copyManualDiagnosticReport() {
         const report = buildManualDiagnosticReport();
         try {
-          if (!navigator.clipboard?.writeText) {
-            throw new Error("Clipboard API unavailable");
-          }
-          await navigator.clipboard.writeText(report);
+          await copyTextToClipboard(report);
           showToast("診断情報をコピーしました。Issueに貼り付けできます。", "success");
           return { ok: true, report };
         } catch (error) {
@@ -6230,6 +6292,25 @@
             reason: error?.message || "Clipboard copy failed",
           };
         }
+      }
+
+      async function copyTextToClipboard(text) {
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(text);
+          return true;
+        }
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.setAttribute("readonly", "");
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        textarea.style.pointerEvents = "none";
+        document.body.appendChild(textarea);
+        textarea.select();
+        const copied = document.execCommand?.("copy");
+        document.body.removeChild(textarea);
+        if (!copied) throw new Error("Clipboard copy failed");
+        return true;
       }
       let filePreviewSequence = 0;
       let autoAdvanceAfterFileSelect = false;
@@ -7038,6 +7119,7 @@
       function buildDiagnosticCandidateItems(report, options = {}) {
         const perCategoryLimit = Math.max(1, Math.floor(Number(options.perCategoryLimit) || 10));
         const totalLimit = Math.max(1, Math.floor(Number(options.totalLimit) || 30));
+        const kindFilter = options.kindFilter || "all";
         const items = [];
         const addPointItems = (kind, points = [], detailFormatter = null) => {
           points.slice(0, perCategoryLimit).forEach((point, localIndex) => {
@@ -7064,28 +7146,49 @@
           });
         };
 
-        addPointItems(
-          "Z外れ値",
-          report?.zOutliers?.candidates || [],
-          (point) => `#${point.index} Z=${point.z.toFixed(2)}`,
-        );
-        addPointItems(
-          "孤立候補",
-          report?.isolatedPoints?.candidates || [],
-          (point) => `#${point.index} 近傍${point.neighborCount ?? 0}`,
-        );
-        addCellItems(
-          "欠測セル",
-          report?.densityGrid?.emptyInteriorCells || [],
-          (cell) => `r${cell.row} c${cell.column}`,
-        );
-        addCellItems(
-          "密度スパイク",
-          report?.densityGrid?.densitySpikeCells || [],
-          (cell) => `r${cell.row} c${cell.column} ${cell.count}点`,
-        );
+        const shouldIncludeKind = (kind) => kindFilter === "all" || kindFilter === kind;
+        if (shouldIncludeKind("Z外れ値")) {
+          addPointItems(
+            "Z外れ値",
+            report?.zOutliers?.candidates || [],
+            (point) => `#${point.index} Z=${point.z.toFixed(2)}`,
+          );
+        }
+        if (shouldIncludeKind("孤立候補")) {
+          addPointItems(
+            "孤立候補",
+            report?.isolatedPoints?.candidates || [],
+            (point) => `#${point.index} 近傍${point.neighborCount ?? 0}`,
+          );
+        }
+        if (shouldIncludeKind("欠測セル")) {
+          addCellItems(
+            "欠測セル",
+            report?.densityGrid?.emptyInteriorCells || [],
+            (cell) => `r${cell.row} c${cell.column}`,
+          );
+        }
+        if (shouldIncludeKind("密度スパイク")) {
+          addCellItems(
+            "密度スパイク",
+            report?.densityGrid?.densitySpikeCells || [],
+            (cell) => `r${cell.row} c${cell.column} ${cell.count}点`,
+          );
+        }
 
         return items.slice(0, totalLimit);
+      }
+
+      function buildDiagnosticCandidateSummary(report) {
+        const byKind = {
+          "Z外れ値": report?.zOutliers?.candidates?.length || 0,
+          "孤立候補": report?.isolatedPoints?.candidates?.length || 0,
+          "欠測セル": report?.densityGrid?.emptyInteriorCells?.length || 0,
+          "密度スパイク": report?.densityGrid?.densitySpikeCells?.length || 0,
+        };
+        const total = Object.values(byKind).reduce((sum, count) => sum + count, 0);
+        const activeKind = statsData.diagnosticCandidateFilterKind || "all";
+        return { total, byKind, activeKind };
       }
 
       function sourceToDisplayPoint(source, header = statsData.header) {
@@ -7166,9 +7269,58 @@
         });
       };
 
+      window.setDiagnosticCandidateFilter = function (kind) {
+        const allowedKinds = ["all", "Z外れ値", "孤立候補", "欠測セル", "密度スパイク"];
+        statsData.diagnosticCandidateFilterKind = allowedKinds.includes(kind) ? kind : "all";
+        renderDiagnosticCandidateList(
+          statsData.diagnosticsReport,
+          document.getElementById("diagnosticCandidateList"),
+        );
+      };
+
+      async function copySelectedDiagnosticCandidate() {
+        const key = statsData.selectedDiagnosticCandidateKey;
+        const candidate = key ? statsData.diagnosticCandidateMap?.[key] : null;
+        if (!candidate) {
+          showToast("コピー対象の候補を選択してください。", "warning");
+          return { ok: false, reason: "No candidate selected" };
+        }
+        const payload = {
+          kind: candidate.kind,
+          detail: candidate.detail,
+          index: candidate.point?.index ?? null,
+          row: candidate.cell?.row ?? null,
+          column: candidate.cell?.column ?? null,
+        };
+        const text = JSON.stringify(payload, null, 2);
+        try {
+          await copyTextToClipboard(text);
+          showToast("選択中の候補をコピーしました。", "success");
+          return { ok: true, text };
+        } catch (error) {
+          showToast("候補コピーに失敗しました。", "warning");
+          return { ok: false, reason: error?.message || "copy failed", text };
+        }
+      }
+
+      async function copyDiagnosticCandidateSummary() {
+        const summary = buildDiagnosticCandidateSummary(statsData.diagnosticsReport);
+        const text = JSON.stringify(summary, null, 2);
+        try {
+          await copyTextToClipboard(text);
+          showToast("候補要約をコピーしました。", "success");
+          return { ok: true, text };
+        } catch (error) {
+          showToast("候補要約コピーに失敗しました。", "warning");
+          return { ok: false, reason: error?.message || "copy failed", text };
+        }
+      }
+
       function renderDiagnosticCandidateList(report, container) {
         if (!container) return [];
-        const items = buildDiagnosticCandidateItems(report);
+        const items = buildDiagnosticCandidateItems(report, {
+          kindFilter: statsData.diagnosticCandidateFilterKind || "all",
+        });
         statsData.diagnosticCandidateMap = {};
         if (!items.length) {
           container.innerHTML =
@@ -10235,6 +10387,7 @@
           disposeDiagnosticCandidateMarker();
           statsData.selectedDiagnosticCandidateKey = null;
           statsData.diagnosticCandidateMap = {};
+          statsData.diagnosticCandidateFilterKind = "all";
           statsData.sectionProfile = null;
           if (!pointCloud) return;
 
@@ -17371,6 +17524,19 @@
           if (el) el.textContent = value;
         });
 
+        const candidateSummary = buildDiagnosticCandidateSummary(report);
+        const summaryEl = document.getElementById("diagnosticCandidateSummary");
+        if (summaryEl) {
+          const label = candidateSummary.activeKind === "all"
+            ? "全候補"
+            : candidateSummary.activeKind;
+          summaryEl.textContent = `${label} ${candidateSummary.total.toLocaleString()}件`;
+        }
+        const filterEl = document.getElementById("diagnosticCandidateFilter");
+        if (filterEl && filterEl.value !== candidateSummary.activeKind) {
+          filterEl.value = candidateSummary.activeKind;
+        }
+
         renderDensityHeatmap(
           report,
           document.getElementById("densityHeatmapCanvas"),
@@ -17793,7 +17959,11 @@
           buildPointCloudDiagnostics,
           renderDensityHeatmap,
           buildDiagnosticCandidateItems,
+          buildDiagnosticCandidateSummary,
           selectDiagnosticCandidate,
+          setDiagnosticCandidateFilter: window.setDiagnosticCandidateFilter,
+          copySelectedDiagnosticCandidate,
+          copyDiagnosticCandidateSummary,
           extractSectionPoints,
           buildSectionProfile,
           renderSectionProfile,

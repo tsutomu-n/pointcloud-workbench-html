@@ -1053,6 +1053,10 @@ test("manual diagnostic report omits point cloud payloads and file names", () =>
     step: "quality-select",
     selectedQuality: "low",
   });
+  expect(report.diagnosticsCandidates).toMatchObject({
+    total: 0,
+    activeKind: "all",
+  });
   expect(reportText).not.toContain("private-site-survey");
   expect(reportText).not.toContain("points\":[");
 });
@@ -1370,6 +1374,56 @@ test("buildDiagnosticCandidateItems limits categories and total results", () => 
   expect(items).toHaveLength(8);
   expect(items.filter((item) => item.kind === "Z外れ値")).toHaveLength(3);
   expect(items.filter((item) => item.kind === "孤立候補")).toHaveLength(3);
+});
+
+test("buildDiagnosticCandidateItems can filter by candidate kind", () => {
+  const context = createContext();
+  context.__report = {
+    zOutliers: {
+      candidates: [{ index: 1, x: 0, y: 0, z: 10 }],
+    },
+    isolatedPoints: {
+      candidates: [{ index: 2, x: 0, y: 0, z: 1, neighborCount: 0 }],
+    },
+    densityGrid: {
+      emptyInteriorCells: [{ row: 1, column: 1 }],
+      densitySpikeCells: [{ row: 2, column: 2, count: 6 }],
+    },
+  };
+
+  const items = vm.runInContext(
+    "window.__pcwTestApi.buildDiagnosticCandidateItems(__report, { kindFilter: '欠測セル' })",
+    context,
+  );
+
+  expect(items).toHaveLength(1);
+  expect(items[0].kind).toBe("欠測セル");
+});
+
+test("buildDiagnosticCandidateSummary returns per-kind counts and total", () => {
+  const context = createContext();
+  context.__report = {
+    zOutliers: { candidates: [{ index: 1 }, { index: 2 }] },
+    isolatedPoints: { candidates: [{ index: 3 }] },
+    densityGrid: {
+      emptyInteriorCells: [{ row: 1, column: 1 }],
+      densitySpikeCells: [{ row: 2, column: 2 }, { row: 3, column: 3 }],
+    },
+  };
+
+  const summary = vm.runInContext(
+    "window.__pcwTestApi.buildDiagnosticCandidateSummary(__report)",
+    context,
+  );
+
+  expect(summary.total).toBe(6);
+  expect(summary.byKind).toEqual({
+    "Z外れ値": 2,
+    "孤立候補": 1,
+    "欠測セル": 1,
+    "密度スパイク": 2,
+  });
+  expect(summary.activeKind).toBe("all");
 });
 
 test("buildSectionProfile summarizes count, ground ratio, and z range", () => {
