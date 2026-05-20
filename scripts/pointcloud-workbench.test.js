@@ -1135,6 +1135,344 @@ test("PointCloudData summarizes counts, bounds, and coordinate basis", () => {
   expect(data.coordinateBasis.offset).toEqual({ x: 100, y: 200, z: 300 });
 });
 
+test("buildDensityGrid reports missing and spike density cells from displayed points", () => {
+  const context = createContext();
+  context.__points = [
+    { x: 0, y: 0, z: 1 },
+    { x: 0.1, y: 0.1, z: 1 },
+    { x: 0.2, y: 0.1, z: 1 },
+    { x: 0.2, y: 0.2, z: 1 },
+    { x: 0.3, y: 0.2, z: 1 },
+    { x: 9, y: 9, z: 2 },
+    { x: 9.2, y: 9.1, z: 2 },
+  ];
+  context.__bounds = { minX: 0, maxX: 10, minY: 0, maxY: 10, minZ: 1, maxZ: 2 };
+
+  const grid = vm.runInContext(
+    "window.__pcwTestApi.buildDensityGrid(__points, __bounds, { gridSize: 4 })",
+    context,
+  );
+
+  expect(grid.summary.occupiedCells).toBe(2);
+  expect(grid.summary.emptyInteriorCells).toBeGreaterThan(0);
+  expect(grid.summary.densitySpikeCells).toBeGreaterThan(0);
+  expect(grid.status).toBe("warn");
+});
+
+test("detectZOutliers uses robust quartile thresholds", () => {
+  const context = createContext();
+  context.__points = [
+    { x: 0, y: 0, z: 10 },
+    { x: 1, y: 0, z: 11 },
+    { x: 2, y: 0, z: 12 },
+    { x: 3, y: 0, z: 13 },
+    { x: 4, y: 0, z: 14 },
+    { x: 5, y: 0, z: 100 },
+  ];
+
+  const result = vm.runInContext(
+    "window.__pcwTestApi.detectZOutliers(__points)",
+    context,
+  );
+
+  expect(result.status).toBe("warn");
+  expect(result.candidates.map((point) => point.z)).toEqual([100]);
+  expect(result.upperThreshold).toBeLessThan(100);
+});
+
+test("detectIsolatedPoints finds displayed points with too few neighbors", () => {
+  const context = createContext();
+  context.__points = [
+    { x: 0, y: 0, z: 1 },
+    { x: 0.2, y: 0.1, z: 1 },
+    { x: 0.3, y: 0.2, z: 1 },
+    { x: 10, y: 10, z: 1 },
+  ];
+
+  const result = vm.runInContext(
+    `
+      const index = window.__pcwTestApi.buildSpatialDiagnosticsIndex(__points);
+      window.__pcwTestApi.detectIsolatedPoints(__points, index, {
+        radius: 1,
+        minNeighbors: 1,
+      });
+    `,
+    context,
+  );
+
+  expect(result.status).toBe("warn");
+  expect(result.candidates.map((point) => point.index)).toEqual([3]);
+});
+
+test("extractSectionPoints applies width and ground-only filters", () => {
+  const context = createContext();
+  context.__points = [
+    { x: 0, y: 0, z: 1, classification: 2 },
+    { x: 5, y: 0.4, z: 1, classification: 2 },
+    { x: 5, y: 0.4, z: 1, classification: 5 },
+    { x: 5, y: 3, z: 1, classification: 2 },
+  ];
+  context.__section = {
+    start: { a: 0, b: 0 },
+    end: { a: 10, b: 0 },
+  };
+
+  const all = vm.runInContext(
+    "window.__pcwTestApi.extractSectionPoints(__points, __section, { width: 1, plane: 'xy' })",
+    context,
+  );
+  const groundOnly = vm.runInContext(
+    "window.__pcwTestApi.extractSectionPoints(__points, __section, { width: 1, plane: 'xy', groundOnly: true })",
+    context,
+  );
+
+  expect(all.points.map((point) => point.index)).toEqual([0, 1, 2]);
+  expect(groundOnly.points.map((point) => point.index)).toEqual([0, 1]);
+  expect(groundOnly.status).toBe("ok");
+});
+
+test("renderDensityHeatmap uses simpleheat when available", () => {
+  const context = createContext();
+  context.__calls = [];
+  context.simpleheat = () => ({
+    data(data) {
+      context.__calls.push(["data", data.length]);
+      return this;
+    },
+    max(value) {
+      context.__calls.push(["max", value]);
+      return this;
+    },
+    radius(value) {
+      context.__calls.push(["radius", value]);
+      return this;
+    },
+    gradient(value) {
+      context.__calls.push(["gradient", !!value]);
+      return this;
+    },
+    draw(value) {
+      context.__calls.push(["draw", value]);
+      return this;
+    },
+  });
+  context.__canvas = {
+    width: 120,
+    height: 60,
+    getContext() {
+      return {
+        clearRect() {},
+        fillRect() {},
+      };
+    },
+  };
+  context.__report = {
+    densityGrid: {
+      gridSize: 2,
+      cells: [
+        { row: 0, column: 0, count: 4 },
+        { row: 0, column: 1, count: 0 },
+        { row: 1, column: 0, count: 2 },
+        { row: 1, column: 1, count: 1 },
+      ],
+    },
+  };
+
+  const result = vm.runInContext(
+    "window.__pcwTestApi.renderDensityHeatmap(__report, __canvas)",
+    context,
+  );
+
+  expect(result).toEqual({ rendered: true, mode: "simpleheat" });
+  expect(context.__calls.map((call) => call[0])).toEqual([
+    "data",
+    "max",
+    "radius",
+    "gradient",
+    "draw",
+  ]);
+});
+
+test("renderDensityHeatmap falls back without simpleheat", () => {
+  const context = createContext();
+  context.__draws = 0;
+  context.__canvas = {
+    width: 120,
+    height: 60,
+    getContext() {
+      return {
+        clearRect() {},
+        fillRect() {
+          context.__draws++;
+        },
+      };
+    },
+  };
+  context.__report = {
+    densityGrid: {
+      gridSize: 2,
+      cells: [
+        { row: 0, column: 0, count: 4 },
+        { row: 0, column: 1, count: 0 },
+        { row: 1, column: 0, count: 2 },
+        { row: 1, column: 1, count: 1 },
+      ],
+    },
+  };
+
+  const result = vm.runInContext(
+    "window.__pcwTestApi.renderDensityHeatmap(__report, __canvas)",
+    context,
+  );
+
+  expect(result).toEqual({ rendered: true, mode: "fallback" });
+  expect(context.__draws).toBeGreaterThan(0);
+});
+
+test("buildDiagnosticCandidateItems limits categories and total results", () => {
+  const context = createContext();
+  context.__report = {
+    zOutliers: {
+      candidates: Array.from({ length: 12 }, (_, index) => ({
+        index,
+        x: index,
+        y: 0,
+        z: index + 100,
+      })),
+    },
+    isolatedPoints: {
+      candidates: Array.from({ length: 12 }, (_, index) => ({
+        index: index + 100,
+        x: index,
+        y: 0,
+        z: 1,
+        neighborCount: 0,
+      })),
+    },
+    densityGrid: {
+      emptyInteriorCells: Array.from({ length: 12 }, (_, index) => ({
+        row: index,
+        column: 0,
+      })),
+      densitySpikeCells: Array.from({ length: 12 }, (_, index) => ({
+        row: index,
+        column: 1,
+        count: index + 3,
+      })),
+    },
+  };
+
+  const items = vm.runInContext(
+    "window.__pcwTestApi.buildDiagnosticCandidateItems(__report, { perCategoryLimit: 3, totalLimit: 8 })",
+    context,
+  );
+
+  expect(items).toHaveLength(8);
+  expect(items.filter((item) => item.kind === "Z外れ値")).toHaveLength(3);
+  expect(items.filter((item) => item.kind === "孤立候補")).toHaveLength(3);
+});
+
+test("buildSectionProfile summarizes count, ground ratio, and z range", () => {
+  const context = createContext();
+  context.__sectionResult = {
+    width: 2,
+    points: [
+      { sectionPosition: 0, z: 10, classification: 2 },
+      { sectionPosition: 4, z: 14, classification: 2 },
+      { sectionPosition: 8, z: 18, classification: 5 },
+    ],
+  };
+
+  const profile = vm.runInContext(
+    "window.__pcwTestApi.buildSectionProfile(__sectionResult)",
+    context,
+  );
+
+  expect(profile.count).toBe(3);
+  expect(profile.groundCount).toBe(2);
+  expect(profile.groundRatio).toBeCloseTo(66.666, 2);
+  expect(profile.zRange).toBe(8);
+  expect(profile.densityEstimate).toBeCloseTo(3 / 16, 4);
+});
+
+test("renderSectionProfile handles empty data without crashing", () => {
+  const context = createContext();
+  context.__canvas = {
+    width: 120,
+    height: 60,
+    getContext() {
+      return {
+        clearRect() {},
+        fillRect() {},
+        fillText() {},
+        beginPath() {},
+        moveTo() {},
+        lineTo() {},
+        stroke() {},
+      };
+    },
+  };
+
+  const result = vm.runInContext(
+    "window.__pcwTestApi.renderSectionProfile(__canvas, null)",
+    context,
+  );
+
+  expect(result).toBe(false);
+});
+
+test("buildDiagnosticsScore deducts for CRS, density, outlier, and isolation warnings", () => {
+  const context = createContext();
+  context.__report = {
+    crsDiagnostics: { status: "missing-horizontal-crs" },
+    densityGrid: { summary: { emptyInteriorCells: 2, densitySpikeCells: 1 } },
+    zOutliers: { candidates: [{ index: 1 }] },
+    isolatedPoints: { candidates: [{ index: 2 }] },
+    classificationStats: { quality: "poor" },
+    displayRatio: 1.5,
+  };
+
+  const score = vm.runInContext(
+    "window.__pcwTestApi.buildDiagnosticsScore(__report)",
+    context,
+  );
+
+  expect(score.score).toBeLessThan(50);
+  expect(score.status).toBe("danger");
+  expect(score.reasons).toContain("CRS確認");
+  expect(score.reasons).toContain("欠測候補");
+});
+
+test("buildPointCloudDiagnostics falls back when optional OSS helpers are not loaded", () => {
+  const context = createContext();
+  context.__pointCloudData = {
+    points: [
+      { x: 0, y: 0, z: 1, classification: 2 },
+      { x: 0.2, y: 0.1, z: 1, classification: 2 },
+      { x: 5, y: 5, z: 20, classification: 1 },
+      { x: 10, y: 10, z: 200, classification: 1 },
+    ],
+    bounds: { minX: 0, maxX: 10, minY: 0, maxY: 10, minZ: 1, maxZ: 200 },
+    pointCounts: { displayCount: 4, displayRatio: 100 },
+  };
+
+  const report = vm.runInContext(
+    `
+      window.__pcwTestApi.buildPointCloudDiagnostics({
+        pointCloudData: __pointCloudData,
+        classificationCounts: { 1: 2, 2: 2 },
+        crsDiagnostics: { status: "complete-crs-metadata" },
+      })
+    `,
+    context,
+  );
+
+  expect(report.basis).toBe("displayed-points");
+  expect(report.usesFlatbush).toBe(false);
+  expect(report.densityGrid.summary.occupiedCells).toBeGreaterThan(0);
+  expect(Number.isFinite(report.score.score)).toBe(true);
+});
+
 test("startDataLoading restarts memory monitoring before load", async () => {
   const context = createContext();
 

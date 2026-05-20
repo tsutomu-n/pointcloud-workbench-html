@@ -41,7 +41,7 @@
 
 補足:
 - `PointCloudWorkbench.html` は単一 HTML で動作します。
-- `three.js` と `laz-perf` は CDN から読み込むため、通常はネットワーク接続が必要です。
+- `three.js`、`laz-perf`、`simple-statistics`、`Flatbush`、`simpleheat` は CDN から読み込むため、通常はネットワーク接続が必要です。
 
 ## 動作条件
 
@@ -53,7 +53,7 @@
 
 ## 制約
 
-- `three.js` と `laz-perf` は CDN から読み込むため、通常はネットワーク接続が必要です。
+- `three.js`、`laz-perf`、`simple-statistics`、`Flatbush`、`simpleheat` は CDN から読み込むため、通常はネットワーク接続が必要です。
 - 選択した LAS/LAZ ファイルはブラウザー内で処理され、アプリケーションサーバーへアップロードされません。
 - CRS 診断はローカルメタデータの表示だけを行います。座標変換、ジオコーディング、EPSG DB 参照、地図照合、サーバー側 CRS 処理は行いません。
 - CRS 診断は LAS header / VLR / EVLR を上限付き `slice()` で読み、LAS/LAZ ファイルやローカルファイル名を問い合わせ文に含めません。

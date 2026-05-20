@@ -9,6 +9,10 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <!-- LAZ decoder (laz-perf WASM) for legacy viewer diagnostics -->
     <script src="https://cdn.jsdelivr.net/npm/laz-perf@0.0.7/lib/laz-perf.js"></script>
+    <!-- Lightweight diagnostics helpers: statistics + static XY spatial index -->
+    <script src="https://cdn.jsdelivr.net/npm/simple-statistics@7.8.9/dist/simple-statistics.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatbush@4.5.0/flatbush.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/simpleheat@0.4.0/simpleheat.min.js"></script>
     <script>
       // OrbitControls のインライン実装
       THREE.OrbitControls = function (object, domElement) {
@@ -1535,6 +1539,58 @@
         color: var(--ec-accent);
         font-weight: bold;
         font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
+      }
+
+      .diagnostics-canvas {
+        width: 100%;
+        height: 96px;
+        display: block;
+        margin-top: 8px;
+        border: 1px solid rgba(2, 132, 199, 0.35);
+        border-radius: 6px;
+        background: rgba(2, 6, 23, 0.72);
+      }
+
+      .diagnostic-candidate-list {
+        display: grid;
+        gap: 6px;
+        margin-top: 8px;
+      }
+
+      .diagnostic-candidate-btn {
+        width: 100%;
+        min-height: 34px;
+        display: grid;
+        grid-template-columns: minmax(74px, 0.8fr) minmax(0, 1.5fr);
+        gap: 8px;
+        align-items: center;
+        padding: 7px 8px;
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        border-radius: 6px;
+        background: rgba(15, 23, 42, 0.84);
+        color: var(--ec-muted);
+        font-size: 11px;
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .diagnostic-candidate-btn:hover,
+      .diagnostic-candidate-btn.active {
+        border-color: var(--ec-accent);
+        background: rgba(2, 132, 199, 0.16);
+        color: #f8fafc;
+      }
+
+      .diagnostic-candidate-kind {
+        color: var(--ec-accent-light);
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .diagnostic-candidate-detail {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
 
       .stats-toggle {
@@ -4232,6 +4288,32 @@
                     3D戻る
                   </button>
                 </div>
+                <div class="slice-range-container" style="margin-top: 10px">
+                  <div class="slice-range-label">
+                    <span>断面幅</span>
+                    <span class="slice-value" id="sectionWidthValue">5.0m相当</span>
+                  </div>
+                  <input
+                    type="range"
+                    id="sectionWidthRange"
+                    min="1"
+                    max="50"
+                    step="1"
+                    value="5"
+                    oninput="updateSectionWidthControl(this.value)"
+                  />
+                  <label style="display:flex; gap:6px; align-items:center; margin-top:6px; font-size:11px; color:var(--ec-muted);">
+                    <input
+                      type="checkbox"
+                      id="sectionGroundOnly"
+                      onchange="update2DSectionDiagnostics()"
+                    />
+                    groundのみ
+                  </label>
+                  <div class="slice-hint" id="sectionDiagnosticsStatus">
+                    2D表示時に幅内の表示点数を確認できます
+                  </div>
+                </div>
               </div>
 
               <div class="panel-section">
@@ -4828,6 +4910,60 @@
                 <div class="stats-item">
                   推奨モード:
                   <span class="stats-value" id="recommendedMode">-</span>
+                </div>
+              </div>
+              <div class="stats-tile">
+                <div class="stats-tile-title">診断 / 異常候補</div>
+                <div class="stats-item">
+                  総合目安:
+                  <span class="stats-value" id="diagnosticsScore">-</span>
+                </div>
+                <div class="stats-item">
+                  密度:
+                  <span class="stats-value" id="densityDiagnostics">-</span>
+                </div>
+                <div class="stats-item">
+                  欠測候補:
+                  <span class="stats-value" id="missingDensityCells">-</span>
+                </div>
+                <div class="stats-item">
+                  Z外れ値:
+                  <span class="stats-value" id="zOutlierCandidates">-</span>
+                </div>
+                <div class="stats-item">
+                  孤立候補:
+                  <span class="stats-value" id="isolatedPointCandidates">-</span>
+                </div>
+                <div class="stats-item">
+                  密度スパイク:
+                  <span class="stats-value" id="densitySpikeCandidates">-</span>
+                </div>
+                <div class="stats-item">
+                  注意:
+                  <span class="stats-value" id="diagnosticsWarnings">表示点ベース</span>
+                </div>
+                <canvas
+                  class="diagnostics-canvas"
+                  id="densityHeatmapCanvas"
+                  width="220"
+                  height="96"
+                  aria-label="表示点ベース密度ヒートマップ"
+                ></canvas>
+                <div
+                  class="diagnostic-candidate-list"
+                  id="diagnosticCandidateList"
+                  aria-label="異常候補一覧"
+                ></div>
+                <canvas
+                  class="diagnostics-canvas"
+                  id="sectionProfileCanvas"
+                  width="220"
+                  height="96"
+                  aria-label="断面プロファイル"
+                ></canvas>
+                <div class="stats-item">
+                  断面:
+                  <span class="stats-value" id="sectionProfileSummary">2D表示時に更新</span>
                 </div>
               </div>
               <div class="stats-tile">
@@ -5990,7 +6126,12 @@
         estimatedPeakMemoryMB: 0,
         loadRiskLevel: "ok",
         pointCloudData: null,
+        diagnosticsReport: null,
+        diagnosticCandidateMap: {},
+        selectedDiagnosticCandidateKey: null,
+        sectionProfile: null,
       };
+      let diagnosticCandidateMarker = null;
 
       let statsVisible = false;
       let fpsCounter = 0;
@@ -6388,6 +6529,823 @@
           return null;
         }
         return safeDisplayPoints / safeArea;
+      }
+
+      function getStatisticsToolkit() {
+        const globalStats =
+          (typeof ss !== "undefined" && ss) ||
+          (typeof window !== "undefined" && window.ss) ||
+          null;
+
+        const quantileSortedFallback = (sortedValues, probability) => {
+          if (!sortedValues.length) return null;
+          const position = (sortedValues.length - 1) * probability;
+          const lower = Math.floor(position);
+          const upper = Math.ceil(position);
+          if (lower === upper) return sortedValues[lower];
+          const weight = position - lower;
+          return sortedValues[lower] * (1 - weight) + sortedValues[upper] * weight;
+        };
+
+        return {
+          quantileSorted(values, probability) {
+            const sorted = Array.from(values || [])
+              .map(Number)
+              .filter(Number.isFinite)
+              .sort((a, b) => a - b);
+            if (globalStats?.quantileSorted) {
+              return globalStats.quantileSorted(sorted, probability);
+            }
+            return quantileSortedFallback(sorted, probability);
+          },
+          mean(values) {
+            const safeValues = Array.from(values || [])
+              .map(Number)
+              .filter(Number.isFinite);
+            if (!safeValues.length) return null;
+            if (globalStats?.mean) return globalStats.mean(safeValues);
+            return safeValues.reduce((sum, value) => sum + value, 0) / safeValues.length;
+          },
+        };
+      }
+
+      function toDiagnosticsPoint(point, index = 0) {
+        if (!point) return null;
+        const x = Number(point.x);
+        const y = Number(point.y);
+        const z = Number(point.z);
+        if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) {
+          return null;
+        }
+        return {
+          index: Number.isFinite(Number(point.index))
+            ? Math.floor(Number(point.index))
+            : index,
+          x,
+          y,
+          z,
+          classification: Number.isFinite(Number(point.classification))
+            ? Math.floor(Number(point.classification))
+            : null,
+        };
+      }
+
+      function normalizeDiagnosticsPoints(points = []) {
+        const normalized = [];
+        for (let i = 0; i < points.length; i++) {
+          const point = toDiagnosticsPoint(points[i], i);
+          if (point) normalized.push(point);
+        }
+        return normalized;
+      }
+
+      function buildSpatialDiagnosticsIndex(points = []) {
+        const indexedPoints = normalizeDiagnosticsPoints(points);
+        const FlatbushCtor =
+          (typeof Flatbush !== "undefined" && Flatbush) ||
+          (typeof window !== "undefined" && window.Flatbush) ||
+          null;
+        let index = null;
+
+        if (FlatbushCtor && indexedPoints.length) {
+          try {
+            index = new FlatbushCtor(indexedPoints.length);
+            indexedPoints.forEach((point) => {
+              index.add(point.x, point.y, point.x, point.y);
+            });
+            index.finish();
+          } catch (error) {
+            console.warn("Flatbush diagnostics index fallback:", error.message);
+            index = null;
+          }
+        }
+
+        const search = (minX, minY, maxX, maxY) => {
+          if (index?.search) return index.search(minX, minY, maxX, maxY);
+          const ids = [];
+          indexedPoints.forEach((point, pointIndex) => {
+            if (
+              point.x >= minX &&
+              point.x <= maxX &&
+              point.y >= minY &&
+              point.y <= maxY
+            ) {
+              ids.push(pointIndex);
+            }
+          });
+          return ids;
+        };
+
+        const neighbors = (x, y, maxResults = 5, maxDistance = Infinity) => {
+          if (index?.neighbors) {
+            return index.neighbors(x, y, maxResults, maxDistance);
+          }
+          return indexedPoints
+            .map((point, pointIndex) => ({
+              pointIndex,
+              distance: Math.hypot(point.x - x, point.y - y),
+            }))
+            .filter((entry) => entry.distance <= maxDistance)
+            .sort((a, b) => a.distance - b.distance)
+            .slice(0, maxResults)
+            .map((entry) => entry.pointIndex);
+        };
+
+        return {
+          points: indexedPoints,
+          usesFlatbush: !!index,
+          search,
+          neighbors,
+        };
+      }
+
+      function buildDensityGrid(points = [], bounds = null, options = {}) {
+        const safePoints = normalizeDiagnosticsPoints(points);
+        const safeBounds = bounds || calculatePointBounds(safePoints);
+        if (!safePoints.length || !safeBounds) {
+          return {
+            status: "unknown",
+            cells: [],
+            summary: {
+              occupiedCells: 0,
+              emptyInteriorCells: 0,
+              lowDensityCells: 0,
+              densitySpikeCells: 0,
+              meanDensity: null,
+            },
+          };
+        }
+
+        const xRange = Math.max(0, safeBounds.maxX - safeBounds.minX);
+        const yRange = Math.max(0, safeBounds.maxY - safeBounds.minY);
+        if (xRange <= 0 || yRange <= 0) {
+          return {
+            status: "unknown",
+            cells: [],
+            summary: {
+              occupiedCells: 0,
+              emptyInteriorCells: 0,
+              lowDensityCells: 0,
+              densitySpikeCells: 0,
+              meanDensity: null,
+            },
+          };
+        }
+
+        const requestedGridSize = Math.floor(Number(options.gridSize) || 0);
+        const gridSize = Math.max(4, Math.min(64, requestedGridSize || 24));
+        const cellWidth = xRange / gridSize;
+        const cellHeight = yRange / gridSize;
+        const cellArea = cellWidth * cellHeight;
+        const counts = new Array(gridSize * gridSize).fill(0);
+
+        safePoints.forEach((point) => {
+          const column = Math.min(
+            gridSize - 1,
+            Math.max(0, Math.floor((point.x - safeBounds.minX) / cellWidth)),
+          );
+          const row = Math.min(
+            gridSize - 1,
+            Math.max(0, Math.floor((point.y - safeBounds.minY) / cellHeight)),
+          );
+          counts[row * gridSize + column]++;
+        });
+
+        const cells = counts.map((count, index) => {
+          const row = Math.floor(index / gridSize);
+          const column = index % gridSize;
+          const minX = safeBounds.minX + column * cellWidth;
+          const minY = safeBounds.minY + row * cellHeight;
+          return {
+            row,
+            column,
+            count,
+            density: cellArea > 0 ? count / cellArea : 0,
+            minX,
+            minY,
+            maxX: minX + cellWidth,
+            maxY: minY + cellHeight,
+            centerX: minX + cellWidth / 2,
+            centerY: minY + cellHeight / 2,
+          };
+        });
+
+        const occupied = cells.filter((cell) => cell.count > 0);
+        const densities = occupied.map((cell) => cell.density);
+        const stats = getStatisticsToolkit();
+        const q1 = stats.quantileSorted(densities, 0.25);
+        const q3 = stats.quantileSorted(densities, 0.75);
+        const iqr = Number.isFinite(q1) && Number.isFinite(q3) ? q3 - q1 : 0;
+        const lowThreshold = Number.isFinite(q1) ? q1 : 0;
+        const iqrSpikeThreshold = Number.isFinite(q3)
+          ? q3 + Math.max(iqr * 1.5, q3 * 1.5)
+          : Infinity;
+        const meanDensity = stats.mean(densities);
+        const meanSpikeThreshold = Number.isFinite(meanDensity)
+          ? meanDensity * 1.25
+          : Infinity;
+        const spikeThreshold = Math.min(iqrSpikeThreshold, meanSpikeThreshold);
+
+        const hasOccupiedNeighbor = (row, column) => {
+          for (let dr = -1; dr <= 1; dr++) {
+            for (let dc = -1; dc <= 1; dc++) {
+              if (dr === 0 && dc === 0) continue;
+              const r = row + dr;
+              const c = column + dc;
+              if (r < 0 || c < 0 || r >= gridSize || c >= gridSize) continue;
+              if (counts[r * gridSize + c] > 0) return true;
+            }
+          }
+          return false;
+        };
+
+        const lowDensityCells = occupied.filter(
+          (cell) => cell.density < lowThreshold && cell.count <= 2,
+        );
+        const densitySpikeCells = occupied.filter(
+          (cell) => cell.density > spikeThreshold && cell.count >= 3,
+        );
+        const emptyInteriorCells = cells.filter(
+          (cell) =>
+            cell.count === 0 &&
+            cell.row > 0 &&
+            cell.column > 0 &&
+            cell.row < gridSize - 1 &&
+            cell.column < gridSize - 1 &&
+            hasOccupiedNeighbor(cell.row, cell.column),
+        );
+
+        return {
+          status:
+            emptyInteriorCells.length || densitySpikeCells.length
+              ? "warn"
+              : "ok",
+          gridSize,
+          cellWidth,
+          cellHeight,
+          cells,
+          summary: {
+            occupiedCells: occupied.length,
+            emptyInteriorCells: emptyInteriorCells.length,
+            lowDensityCells: lowDensityCells.length,
+            densitySpikeCells: densitySpikeCells.length,
+            meanDensity,
+          },
+          lowDensityCells,
+          emptyInteriorCells,
+          densitySpikeCells,
+        };
+      }
+
+      function detectZOutliers(points = [], options = {}) {
+        const safePoints = normalizeDiagnosticsPoints(points);
+        const zValues = safePoints.map((point) => point.z);
+        if (zValues.length < 4) {
+          return {
+            status: "unknown",
+            candidates: [],
+            lowerThreshold: null,
+            upperThreshold: null,
+          };
+        }
+
+        const stats = getStatisticsToolkit();
+        const q1 = stats.quantileSorted(zValues, 0.25);
+        const q3 = stats.quantileSorted(zValues, 0.75);
+        const multiplier = Number(options.iqrMultiplier) || 1.5;
+        const iqr = q3 - q1;
+        const lowerThreshold = q1 - iqr * multiplier;
+        const upperThreshold = q3 + iqr * multiplier;
+        const candidates = safePoints.filter(
+          (point) => point.z < lowerThreshold || point.z > upperThreshold,
+        );
+
+        return {
+          status: candidates.length ? "warn" : "ok",
+          candidates,
+          lowerThreshold,
+          upperThreshold,
+        };
+      }
+
+      function detectIsolatedPoints(points = [], spatialIndex = null, options = {}) {
+        const index = spatialIndex || buildSpatialDiagnosticsIndex(points);
+        const safePoints = index.points || [];
+        if (safePoints.length < 3) {
+          return { status: "unknown", candidates: [], radius: null };
+        }
+
+        const bounds = calculatePointBounds(safePoints);
+        const xRange = bounds ? bounds.maxX - bounds.minX : 0;
+        const yRange = bounds ? bounds.maxY - bounds.minY : 0;
+        const defaultRadius =
+          Math.max(xRange, yRange) / Math.max(4, Math.sqrt(safePoints.length)) * 0.8;
+        const radius = Number(options.radius) > 0 ? Number(options.radius) : defaultRadius;
+        const minNeighbors = Math.max(1, Math.floor(Number(options.minNeighbors) || 2));
+        const maxCandidates = Math.max(1, Math.floor(Number(options.maxCandidates) || 200));
+        const candidates = [];
+
+        for (const point of safePoints) {
+          const nearby = index.search(
+            point.x - radius,
+            point.y - radius,
+            point.x + radius,
+            point.y + radius,
+          );
+          let neighborCount = 0;
+          for (const candidateIndex of nearby) {
+            const candidate = safePoints[candidateIndex];
+            if (!candidate || candidate.index === point.index) continue;
+            if (Math.hypot(candidate.x - point.x, candidate.y - point.y) <= radius) {
+              neighborCount++;
+            }
+          }
+          if (neighborCount < minNeighbors) {
+            candidates.push({ ...point, neighborCount });
+            if (candidates.length >= maxCandidates) break;
+          }
+        }
+
+        return {
+          status: candidates.length ? "warn" : "ok",
+          candidates,
+          radius,
+        };
+      }
+
+      function buildDiagnosticsScore({
+        crsDiagnostics = null,
+        densityGrid = null,
+        zOutliers = null,
+        isolatedPoints = null,
+        classificationStats = null,
+        displayRatio = 100,
+      } = {}) {
+        let score = 100;
+        const reasons = [];
+
+        const deduct = (points, reason) => {
+          if (points <= 0) return;
+          score -= points;
+          reasons.push(reason);
+        };
+
+        if (
+          crsDiagnostics &&
+          ["missing-horizontal-crs", "unknown", "parse-warning"].includes(
+            crsDiagnostics.status,
+          )
+        ) {
+          deduct(15, "CRS確認");
+        }
+        if (classificationStats?.quality === "poor") deduct(10, "分類品質");
+        else if (classificationStats?.quality === "limited") deduct(5, "分類限定");
+
+        const safeDisplayRatio = Number(displayRatio);
+        if (Number.isFinite(safeDisplayRatio) && safeDisplayRatio < 5) {
+          deduct(8, "表示率低");
+        }
+        if (densityGrid?.summary?.emptyInteriorCells) deduct(12, "欠測候補");
+        if (densityGrid?.summary?.densitySpikeCells) deduct(8, "密度スパイク");
+        if (zOutliers?.candidates?.length) deduct(8, "Z外れ値");
+        if (isolatedPoints?.candidates?.length) deduct(6, "孤立候補");
+
+        score = Math.max(0, Math.round(score));
+        let status = "ok";
+        if (score < 50) status = "danger";
+        else if (score < 75) status = "warn";
+        else if (reasons.length) status = "info";
+
+        return { score, status, reasons };
+      }
+
+      function buildPointCloudDiagnostics({
+        pointCloudData = null,
+        classificationCounts = {},
+        crsDiagnostics = null,
+      } = {}) {
+        const points = pointCloudData?.points || [];
+        const bounds = pointCloudData?.bounds || calculatePointBounds(points);
+        const spatialIndex = buildSpatialDiagnosticsIndex(points);
+        const densityGrid = buildDensityGrid(points, bounds);
+        const zOutliers = detectZOutliers(points);
+        const isolatedPoints = detectIsolatedPoints(points, spatialIndex);
+        const classificationStats = buildClassificationStats(
+          classificationCounts,
+          pointCloudData?.pointCounts?.displayCount || points.length,
+        );
+        const score = buildDiagnosticsScore({
+          crsDiagnostics,
+          densityGrid,
+          zOutliers,
+          isolatedPoints,
+          classificationStats,
+          displayRatio: pointCloudData?.pointCounts?.displayRatio ?? 100,
+        });
+
+        return {
+          basis: "displayed-points",
+          usesFlatbush: spatialIndex.usesFlatbush,
+          densityGrid,
+          zOutliers,
+          isolatedPoints,
+          classificationStats,
+          score,
+        };
+      }
+
+      function getSimpleheatFactory() {
+        return (
+          (typeof simpleheat !== "undefined" && simpleheat) ||
+          (typeof window !== "undefined" && window.simpleheat) ||
+          null
+        );
+      }
+
+      function drawFallbackDensityHeatmap(canvas, densityGrid) {
+        const ctx = canvas?.getContext?.("2d");
+        if (!ctx || !densityGrid?.cells?.length) return false;
+        const width = canvas.width || 220;
+        const height = canvas.height || 96;
+        ctx.clearRect(0, 0, width, height);
+        const maxCount = Math.max(
+          1,
+          ...densityGrid.cells.map((cell) => Number(cell.count) || 0),
+        );
+        const cellWidth = width / densityGrid.gridSize;
+        const cellHeight = height / densityGrid.gridSize;
+        densityGrid.cells.forEach((cell) => {
+          if (!cell.count) return;
+          const intensity = Math.min(1, cell.count / maxCount);
+          ctx.fillStyle = `rgba(${Math.round(56 + intensity * 220)}, ${Math.round(189 - intensity * 90)}, ${Math.round(248 - intensity * 180)}, ${0.22 + intensity * 0.62})`;
+          ctx.fillRect(
+            cell.column * cellWidth,
+            cell.row * cellHeight,
+            Math.max(1, cellWidth - 1),
+            Math.max(1, cellHeight - 1),
+          );
+        });
+        return true;
+      }
+
+      function renderDensityHeatmap(report, canvas) {
+        const densityGrid = report?.densityGrid;
+        const ctx = canvas?.getContext?.("2d");
+        if (!canvas || !ctx) return { rendered: false, mode: "none" };
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (!densityGrid?.cells?.length || !densityGrid.gridSize) {
+          return { rendered: false, mode: "empty" };
+        }
+
+        const maxCount = Math.max(
+          1,
+          ...densityGrid.cells.map((cell) => Number(cell.count) || 0),
+        );
+        const heatData = densityGrid.cells
+          .filter((cell) => cell.count > 0)
+          .map((cell) => [
+            ((cell.column + 0.5) / densityGrid.gridSize) * canvas.width,
+            ((cell.row + 0.5) / densityGrid.gridSize) * canvas.height,
+            cell.count,
+          ]);
+        const simpleheatFactory = getSimpleheatFactory();
+        if (simpleheatFactory && heatData.length) {
+          try {
+            const radius = Math.max(8, Math.min(24, canvas.width / densityGrid.gridSize));
+            simpleheatFactory(canvas)
+              .data(heatData)
+              .max(maxCount)
+              .radius(radius, Math.max(6, radius * 0.7))
+              .gradient({
+                0.25: "#0369a1",
+                0.55: "#22c55e",
+                0.78: "#facc15",
+                1.0: "#ef4444",
+              })
+              .draw(0.08);
+            return { rendered: true, mode: "simpleheat" };
+          } catch (error) {
+            console.warn("simpleheat rendering fallback:", error.message);
+          }
+        }
+
+        return {
+          rendered: drawFallbackDensityHeatmap(canvas, densityGrid),
+          mode: "fallback",
+        };
+      }
+
+      function buildDiagnosticCandidateItems(report, options = {}) {
+        const perCategoryLimit = Math.max(1, Math.floor(Number(options.perCategoryLimit) || 10));
+        const totalLimit = Math.max(1, Math.floor(Number(options.totalLimit) || 30));
+        const items = [];
+        const addPointItems = (kind, points = [], detailFormatter = null) => {
+          points.slice(0, perCategoryLimit).forEach((point, localIndex) => {
+            items.push({
+              key: `${kind}-${point.index ?? localIndex}`,
+              kind,
+              label: kind,
+              detail: detailFormatter ? detailFormatter(point) : `#${point.index ?? localIndex}`,
+              point,
+            });
+          });
+        };
+        const addCellItems = (kind, cells = [], detailFormatter = null) => {
+          cells.slice(0, perCategoryLimit).forEach((cell) => {
+            items.push({
+              key: `${kind}-${cell.row}-${cell.column}`,
+              kind,
+              label: kind,
+              detail: detailFormatter
+                ? detailFormatter(cell)
+                : `r${cell.row} c${cell.column}`,
+              cell,
+            });
+          });
+        };
+
+        addPointItems(
+          "Z外れ値",
+          report?.zOutliers?.candidates || [],
+          (point) => `#${point.index} Z=${point.z.toFixed(2)}`,
+        );
+        addPointItems(
+          "孤立候補",
+          report?.isolatedPoints?.candidates || [],
+          (point) => `#${point.index} 近傍${point.neighborCount ?? 0}`,
+        );
+        addCellItems(
+          "欠測セル",
+          report?.densityGrid?.emptyInteriorCells || [],
+          (cell) => `r${cell.row} c${cell.column}`,
+        );
+        addCellItems(
+          "密度スパイク",
+          report?.densityGrid?.densitySpikeCells || [],
+          (cell) => `r${cell.row} c${cell.column} ${cell.count}点`,
+        );
+
+        return items.slice(0, totalLimit);
+      }
+
+      function sourceToDisplayPoint(source, header = statsData.header) {
+        const point = toDiagnosticsPoint(source);
+        if (!point || !header) return null;
+        const centerX = (Number(header.maxX) + Number(header.minX)) / 2;
+        const centerY = (Number(header.maxY) + Number(header.minY)) / 2;
+        const minZ = Number(header.minZ);
+        if (!Number.isFinite(centerX) || !Number.isFinite(centerY) || !Number.isFinite(minZ)) {
+          return null;
+        }
+        return new THREE.Vector3(
+          point.x - centerX,
+          point.z - minZ,
+          -(point.y - centerY),
+        );
+      }
+
+      function disposeDiagnosticCandidateMarker() {
+        if (!diagnosticCandidateMarker) return;
+        if (diagnosticCandidateMarker.parent) {
+          diagnosticCandidateMarker.parent.remove(diagnosticCandidateMarker);
+        }
+        disposeObject3D(diagnosticCandidateMarker);
+        diagnosticCandidateMarker = null;
+      }
+
+      function createDiagnosticCandidateMarker(displayPoint) {
+        if (!THREE.Points || !THREE.PointsMaterial || !THREE.BufferGeometry) {
+          return null;
+        }
+        const geometry = new THREE.BufferGeometry().setFromPoints([displayPoint]);
+        const material = new THREE.PointsMaterial({
+          color: 0xff3b30,
+          depthTest: false,
+          depthWrite: false,
+          size: 42,
+          sizeAttenuation: false,
+          transparent: true,
+          opacity: 0.95,
+        });
+        const marker = new THREE.Points(geometry, material);
+        marker.name = "diagnosticCandidateMarker";
+        marker.renderOrder = 30;
+        return marker;
+      }
+
+      function selectDiagnosticCandidate(candidate) {
+        statsData.selectedDiagnosticCandidateKey = candidate?.key || null;
+        disposeDiagnosticCandidateMarker();
+        if (!candidate || !scene || !THREE.Vector3) return false;
+
+        let source = candidate.point || null;
+        if (!source && candidate.cell) {
+          const zMid =
+            ((statsData.pointCloudData?.bounds?.minZ ?? statsData.header?.minZ ?? 0) +
+              (statsData.pointCloudData?.bounds?.maxZ ?? statsData.header?.maxZ ?? 0)) /
+            2;
+          source = {
+            x: candidate.cell.centerX,
+            y: candidate.cell.centerY,
+            z: zMid,
+          };
+        }
+        const displayPoint = sourceToDisplayPoint(source);
+        if (!displayPoint) return false;
+        diagnosticCandidateMarker = createDiagnosticCandidateMarker(displayPoint);
+        if (!diagnosticCandidateMarker) return false;
+        scene.add(diagnosticCandidateMarker);
+        return true;
+      }
+
+      window.selectDiagnosticCandidateByKey = function (key) {
+        const candidate = statsData.diagnosticCandidateMap?.[key] || null;
+        const selected = selectDiagnosticCandidate(candidate);
+        document.querySelectorAll(".diagnostic-candidate-btn").forEach((button) => {
+          button.classList.toggle("active", selected && button.dataset.key === key);
+        });
+      };
+
+      function renderDiagnosticCandidateList(report, container) {
+        if (!container) return [];
+        const items = buildDiagnosticCandidateItems(report);
+        statsData.diagnosticCandidateMap = {};
+        if (!items.length) {
+          container.innerHTML =
+            '<div class="stats-item">候補なし</div>';
+          return [];
+        }
+        container.innerHTML = items
+          .map((item) => {
+            statsData.diagnosticCandidateMap[item.key] = item;
+            const active = item.key === statsData.selectedDiagnosticCandidateKey ? " active" : "";
+            return `<button class="diagnostic-candidate-btn${active}" type="button" data-key="${escapeHtml(item.key)}" onclick="selectDiagnosticCandidateByKey('${escapeHtml(item.key)}')"><span class="diagnostic-candidate-kind">${escapeHtml(item.label)}</span><span class="diagnostic-candidate-detail">${escapeHtml(item.detail)}</span></button>`;
+          })
+          .join("");
+        return items;
+      }
+
+      function projectSectionPoint(point, plane = "xy", index = 0) {
+        const safePoint = toDiagnosticsPoint(point, index);
+        if (!safePoint) return null;
+        switch (plane) {
+          case "xz":
+            return { a: safePoint.x, b: safePoint.z, source: safePoint };
+          case "yz":
+            return { a: safePoint.y, b: safePoint.z, source: safePoint };
+          case "xy":
+          default:
+            return { a: safePoint.x, b: safePoint.y, source: safePoint };
+        }
+      }
+
+      function extractSectionPoints(points = [], section = {}, options = {}) {
+        const width = Math.max(0, Number(options.width) || 0);
+        const halfWidth = width / 2;
+        const plane = options.plane || "xy";
+        const groundOnly = !!options.groundOnly;
+        const start = section.start || {};
+        const end = section.end || {};
+        const ax = Number(start.a);
+        const ay = Number(start.b);
+        const bx = Number(end.a);
+        const by = Number(end.b);
+        const lineDx = bx - ax;
+        const lineDy = by - ay;
+        const lineLengthSquared = lineDx * lineDx + lineDy * lineDy;
+
+        if (
+          !Number.isFinite(ax) ||
+          !Number.isFinite(ay) ||
+          !Number.isFinite(bx) ||
+          !Number.isFinite(by) ||
+          lineLengthSquared <= 0 ||
+          width <= 0
+        ) {
+          return { status: "unknown", points: [], width, plane };
+        }
+
+        const selected = [];
+        for (let i = 0; i < points.length; i++) {
+          const projected = projectSectionPoint(points[i], plane, i);
+          if (!projected) continue;
+          if (groundOnly && projected.source.classification !== 2) continue;
+
+          const pointDx = projected.a - ax;
+          const pointDy = projected.b - ay;
+          const t = Math.max(
+            0,
+            Math.min(1, (pointDx * lineDx + pointDy * lineDy) / lineLengthSquared),
+          );
+          const closestA = ax + t * lineDx;
+          const closestB = ay + t * lineDy;
+          const distance = Math.hypot(projected.a - closestA, projected.b - closestB);
+          if (distance <= halfWidth) {
+            selected.push({
+              ...projected.source,
+              sectionDistance: distance,
+              sectionPosition: Math.sqrt(lineLengthSquared) * t,
+            });
+          }
+        }
+
+        return {
+          status: selected.length ? "ok" : "warn",
+          points: selected,
+          width,
+          plane,
+        };
+      }
+
+      function buildSectionProfile(sectionResult = {}) {
+        const points = Array.isArray(sectionResult.points)
+          ? sectionResult.points
+          : [];
+        if (!points.length) {
+          return {
+            status: "unknown",
+            count: 0,
+            groundCount: 0,
+            groundRatio: 0,
+            minZ: null,
+            maxZ: null,
+            zRange: null,
+            densityEstimate: null,
+            samples: [],
+          };
+        }
+
+        let groundCount = 0;
+        let minZ = Number.POSITIVE_INFINITY;
+        let maxZ = Number.NEGATIVE_INFINITY;
+        let maxPosition = 0;
+        const samples = points.map((point) => {
+          if (point.classification === 2) groundCount++;
+          minZ = Math.min(minZ, point.z);
+          maxZ = Math.max(maxZ, point.z);
+          maxPosition = Math.max(maxPosition, point.sectionPosition || 0);
+          return {
+            x: point.sectionPosition || 0,
+            z: point.z,
+            classification: point.classification,
+          };
+        });
+
+        const width = Math.max(0, Number(sectionResult.width) || 0);
+        const profileArea = maxPosition > 0 && width > 0 ? maxPosition * width : 0;
+        return {
+          status: "ok",
+          count: points.length,
+          groundCount,
+          groundRatio: (groundCount / points.length) * 100,
+          minZ,
+          maxZ,
+          zRange: maxZ - minZ,
+          densityEstimate: profileArea > 0 ? points.length / profileArea : null,
+          samples,
+        };
+      }
+
+      function renderSectionProfile(canvas, profile) {
+        const ctx = canvas?.getContext?.("2d");
+        if (!canvas || !ctx) return false;
+        const width = canvas.width || 220;
+        const height = canvas.height || 96;
+        ctx.clearRect(0, 0, width, height);
+        ctx.fillStyle = "rgba(2, 6, 23, 0.72)";
+        ctx.fillRect(0, 0, width, height);
+        const samples = profile?.samples || [];
+        if (!samples.length || !Number.isFinite(profile.minZ) || !Number.isFinite(profile.maxZ)) {
+          ctx.fillStyle = "rgba(148, 163, 184, 0.75)";
+          ctx.font = "12px sans-serif";
+          ctx.fillText("2D断面で更新", 12, 52);
+          return false;
+        }
+
+        const padding = 10;
+        const maxX = Math.max(1, ...samples.map((sample) => Number(sample.x) || 0));
+        const zRange = Math.max(0.000001, profile.maxZ - profile.minZ);
+        ctx.strokeStyle = "rgba(148, 163, 184, 0.35)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(padding, height - padding);
+        ctx.lineTo(width - padding, height - padding);
+        ctx.moveTo(padding, padding);
+        ctx.lineTo(padding, height - padding);
+        ctx.stroke();
+
+        samples.slice(0, 1200).forEach((sample) => {
+          const x = padding + ((Number(sample.x) || 0) / maxX) * (width - padding * 2);
+          const y =
+            height -
+            padding -
+            ((sample.z - profile.minZ) / zRange) * (height - padding * 2);
+          ctx.fillStyle = sample.classification === 2
+            ? "rgba(34, 197, 94, 0.75)"
+            : "rgba(56, 189, 248, 0.6)";
+          ctx.fillRect(x - 1, y - 1, 2, 2);
+        });
+        return true;
       }
 
       function formatCountWithPercent(count, total) {
@@ -9274,6 +10232,10 @@
       function clearPointCloud() {
         try {
           clearMeasurement();
+          disposeDiagnosticCandidateMarker();
+          statsData.selectedDiagnosticCandidateKey = null;
+          statsData.diagnosticCandidateMap = {};
+          statsData.sectionProfile = null;
           if (!pointCloud) return;
 
           if (scene) {
@@ -12272,6 +13234,16 @@
           statsData.classificationCounts,
           statsData.displayPoints,
         );
+        try {
+          statsData.diagnosticsReport = buildPointCloudDiagnostics({
+            pointCloudData: statsData.pointCloudData,
+            classificationCounts: statsData.classificationCounts,
+            crsDiagnostics: statsData.crsDiagnostics || header.crsDiagnostics,
+          });
+        } catch (diagnosticsError) {
+          console.warn("点群診断の更新に失敗（処理続行）:", diagnosticsError);
+          statsData.diagnosticsReport = null;
+        }
         const classificationTypes = qualityAnalysis.types;
         const unclassifiedPercent = qualityAnalysis.unclassifiedPercent;
 
@@ -12522,6 +13494,40 @@
               statsData.decodedPoints || currentCount,
               targetCount,
             );
+            if (statsData.pointCloudData) {
+              const nextPoints = [];
+              if (newSourcePositions) {
+                for (let i = 0; i < targetCount; i++) {
+                  nextPoints.push({
+                    x: newSourcePositions[i * 3],
+                    y: newSourcePositions[i * 3 + 1],
+                    z: newSourcePositions[i * 3 + 2],
+                    classification: newClassification ? newClassification[i] : 1,
+                  });
+                }
+              }
+              statsData.pointCloudData = {
+                ...statsData.pointCloudData,
+                points: nextPoints.length
+                  ? nextPoints
+                  : statsData.pointCloudData.points.slice(0, targetCount),
+                pointCounts: buildPointCountSummary(
+                  statsData.originalPoints || currentCount,
+                  targetCount,
+                  statsData.decodedPoints || currentCount,
+                ),
+                bounds: calculatePointBounds(
+                  nextPoints.length
+                    ? nextPoints
+                    : statsData.pointCloudData.points.slice(0, targetCount),
+                ),
+              };
+            }
+            statsData.diagnosticsReport = buildPointCloudDiagnostics({
+              pointCloudData: statsData.pointCloudData,
+              classificationCounts: statsData.classificationCounts,
+              crsDiagnostics: statsData.crsDiagnostics,
+            });
           }
 
           const loadedPointsEl = document.getElementById("loadedPoints");
@@ -12746,6 +13752,7 @@
         current2DView = view;
         apply2DView(view);
         update2DButtons();
+        update2DSectionDiagnostics();
       };
 
       window.exit2DView = function () {
@@ -12761,6 +13768,7 @@
           controls.update();
         }
         update2DButtons();
+        update2DSectionDiagnostics();
       };
 
       function update2DButtons() {
@@ -12781,6 +13789,83 @@
             rightBtn.classList.add("active");
         }
       }
+
+      function buildDefaultSectionForView(view, bounds) {
+        if (!bounds) return null;
+        const centerX = (bounds.minX + bounds.maxX) / 2;
+        const centerY = (bounds.minY + bounds.maxY) / 2;
+        const centerZ = (bounds.minZ + bounds.maxZ) / 2;
+        switch (view) {
+          case "front":
+            return {
+              plane: "xz",
+              start: { a: bounds.minX, b: centerZ },
+              end: { a: bounds.maxX, b: centerZ },
+            };
+          case "right":
+            return {
+              plane: "yz",
+              start: { a: bounds.minY, b: centerZ },
+              end: { a: bounds.maxY, b: centerZ },
+            };
+          case "top":
+          default:
+            return {
+              plane: "xy",
+              start: { a: bounds.minX, b: centerY },
+              end: { a: bounds.maxX, b: centerY },
+            };
+        }
+      }
+
+      window.updateSectionWidthControl = function (value) {
+        const numeric = Math.max(1, Number(value) || 1);
+        const label = document.getElementById("sectionWidthValue");
+        if (label) label.textContent = `${numeric.toFixed(1)}m相当`;
+        update2DSectionDiagnostics();
+      };
+
+      window.update2DSectionDiagnostics = function () {
+        const statusEl = document.getElementById("sectionDiagnosticsStatus");
+        if (!statusEl) return;
+        if (!is2DMode || !statsData.pointCloudData) {
+          statsData.sectionProfile = null;
+          statusEl.textContent = "2D表示時に幅内の表示点数を確認できます";
+          renderSectionProfile(
+            document.getElementById("sectionProfileCanvas"),
+            null,
+          );
+          return;
+        }
+
+        const section = buildDefaultSectionForView(
+          current2DView,
+          statsData.pointCloudData.bounds,
+        );
+        const width = Number(document.getElementById("sectionWidthRange")?.value) || 5;
+        const groundOnly = !!document.getElementById("sectionGroundOnly")?.checked;
+        const result = extractSectionPoints(
+          statsData.pointCloudData.points,
+          section,
+          {
+            width,
+            plane: section?.plane || "xy",
+            groundOnly,
+          },
+        );
+        statsData.sectionProfile = buildSectionProfile(result);
+        statusEl.textContent =
+          `断面対象: ${result.points.length.toLocaleString()}点 / 幅 ${width.toFixed(1)}m相当${groundOnly ? " / groundのみ" : ""}`;
+        renderSectionProfile(
+          document.getElementById("sectionProfileCanvas"),
+          statsData.sectionProfile,
+        );
+        const summaryEl = document.getElementById("sectionProfileSummary");
+        if (summaryEl && statsData.sectionProfile?.count) {
+          summaryEl.textContent =
+            `${statsData.sectionProfile.count.toLocaleString()}点 / ground ${statsData.sectionProfile.groundRatio.toFixed(1)}% / Z幅 ${statsData.sectionProfile.zRange.toFixed(2)}m相当`;
+        }
+      };
 
       // 読み込み完了
       function completeLoading(loadSessionId = activeLoadSessionId) {
@@ -16247,6 +17332,66 @@
         });
       }
 
+      function updateDiagnosticsSummaryDisplay(report) {
+        const mappings = {
+          diagnosticsScore: "-",
+          densityDiagnostics: "-",
+          missingDensityCells: "-",
+          zOutlierCandidates: "-",
+          isolatedPointCandidates: "-",
+          densitySpikeCandidates: "-",
+          diagnosticsWarnings: "表示点ベース",
+        };
+
+        if (report) {
+          const score = report.score || {};
+          const densitySummary = report.densityGrid?.summary || {};
+          const zCount = report.zOutliers?.candidates?.length || 0;
+          const isolatedCount = report.isolatedPoints?.candidates?.length || 0;
+          const reasons = Array.isArray(score.reasons) ? score.reasons : [];
+          mappings.diagnosticsScore = Number.isFinite(score.score)
+            ? `${score.score}/100 (${score.status || "ok"})`
+            : "-";
+          mappings.densityDiagnostics = Number.isFinite(densitySummary.meanDensity)
+            ? `平均 ${densitySummary.meanDensity.toFixed(1)}点/m²`
+            : "-";
+          mappings.missingDensityCells =
+            `${densitySummary.emptyInteriorCells || 0}セル`;
+          mappings.zOutlierCandidates = `${zCount.toLocaleString()}点`;
+          mappings.isolatedPointCandidates = `${isolatedCount.toLocaleString()}点`;
+          mappings.densitySpikeCandidates =
+            `${densitySummary.densitySpikeCells || 0}セル`;
+          mappings.diagnosticsWarnings = reasons.length
+            ? `表示点ベース / ${reasons.join(", ")}`
+            : "表示点ベース / 大きな注意なし";
+        }
+
+        Object.entries(mappings).forEach(([id, value]) => {
+          const el = document.getElementById(id);
+          if (el) el.textContent = value;
+        });
+
+        renderDensityHeatmap(
+          report,
+          document.getElementById("densityHeatmapCanvas"),
+        );
+        renderDiagnosticCandidateList(
+          report,
+          document.getElementById("diagnosticCandidateList"),
+        );
+        renderSectionProfile(
+          document.getElementById("sectionProfileCanvas"),
+          statsData.sectionProfile,
+        );
+        const sectionEl = document.getElementById("sectionProfileSummary");
+        if (sectionEl) {
+          const profile = statsData.sectionProfile;
+          sectionEl.textContent = profile?.count
+            ? `${profile.count.toLocaleString()}点 / ground ${profile.groundRatio.toFixed(1)}% / Z幅 ${profile.zRange.toFixed(2)}m相当`
+            : "2D表示時に更新";
+        }
+      }
+
       // 統計情報更新
       function updateStatsDisplay() {
         if (!statsData.header) return;
@@ -16282,6 +17427,7 @@
             : "-";
         }
         updateCrsDiagnosticsDisplay(statsData.crsDiagnostics || header.crsDiagnostics);
+        updateDiagnosticsSummaryDisplay(statsData.diagnosticsReport);
 
         // 点群統計
         document.getElementById("originalPoints").textContent =
@@ -16639,6 +17785,18 @@
           checkFileSizeLimits,
           buildLoadProfile,
           getFileReadTimeoutMs,
+          buildSpatialDiagnosticsIndex,
+          buildDensityGrid,
+          detectZOutliers,
+          detectIsolatedPoints,
+          buildDiagnosticsScore,
+          buildPointCloudDiagnostics,
+          renderDensityHeatmap,
+          buildDiagnosticCandidateItems,
+          selectDiagnosticCandidate,
+          extractSectionPoints,
+          buildSectionProfile,
+          renderSectionProfile,
           getClassificationStats,
           hideAllPanels,
           initThreeJS,

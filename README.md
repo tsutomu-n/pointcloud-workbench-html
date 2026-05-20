@@ -77,7 +77,7 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 
 ## Constraints
 
-- `three.js` and `laz-perf` are loaded from CDNs, so normal operation requires network access.
+- `three.js`, `laz-perf`, `simple-statistics`, `Flatbush`, and `simpleheat` are loaded from CDNs, so normal operation requires network access.
 - The server path is static-only. It must not add Workers, Pages Functions, APIs, telemetry, DB writes, or server-side point cloud processing.
 - Selected point cloud files stay on the user's device. Network access is for application assets and optional map tiles, not LAS/LAZ upload.
 - CRS diagnostics are local metadata inspection only. They do not perform coordinate conversion, geocoding, EPSG database lookup, map matching, or server-side CRS processing.
@@ -130,6 +130,6 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 
 ## CDN / Network Notes
 
-- Runtime depends on `three.js` and `laz-perf` served from CDNs.
+- Runtime depends on `three.js`, `laz-perf`, `simple-statistics`, `Flatbush`, and `simpleheat` served from CDNs.
 - Normal usage requires network access. If the CDN is unreachable, the app may fail to initialize.
 - The GitHub Pages demo has the same CDN dependency.
