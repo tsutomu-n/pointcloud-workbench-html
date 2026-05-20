@@ -4970,6 +4970,27 @@
                   注意:
                   <span class="stats-value" id="diagnosticsWarnings">表示点ベース</span>
                 </div>
+                <div class="stats-item">
+                  警告コード:
+                  <span class="stats-value" id="diagnosticsWarningCodes">-</span>
+                </div>
+                <div class="stats-item">
+                  配点:
+                  <span class="stats-value" id="diagnosticsScoreWeights">-</span>
+                </div>
+                <details class="stats-item">
+                  <summary>警告コードの意味</summary>
+                  <div style="margin-top:4px;font-size:11px;line-height:1.45;">
+                    CRS_MISSING: 座標参照系が不明<br>
+                    CLASSIFICATION_POOR: 分類品質が低い<br>
+                    CLASSIFICATION_LIMITED: 分類種類が限定的<br>
+                    DISPLAY_RATIO_LOW: 表示率が低い<br>
+                    DENSITY_HOLES: 欠測候補あり<br>
+                    DENSITY_SPIKES: 密度スパイクあり<br>
+                    Z_OUTLIERS: Z外れ値あり<br>
+                    ISOLATED_POINTS: 孤立候補あり
+                  </div>
+                </details>
                 <canvas
                   class="diagnostics-canvas"
                   id="densityHeatmapCanvas"
@@ -6954,6 +6975,63 @@
         };
       }
 
+      const DIAGNOSTIC_WARNING_LABELS = {
+        CRS_MISSING: "CRS確認",
+        CLASSIFICATION_POOR: "分類品質",
+        CLASSIFICATION_LIMITED: "分類限定",
+        DISPLAY_RATIO_LOW: "表示率低",
+        DENSITY_HOLES: "欠測候補",
+        DENSITY_SPIKES: "密度スパイク",
+        Z_OUTLIERS: "Z外れ値",
+        ISOLATED_POINTS: "孤立候補",
+      };
+      const DIAGNOSTICS_SCORE_WEIGHTS = {
+        reliability: 30,
+        basicStats: 10,
+        density: 15,
+        classification: 10,
+        terrain: 15,
+        measurability: 10,
+        anomalies: 10,
+      };
+
+      function buildDiagnosticsWarningCodes({
+        crsDiagnostics = null,
+        densityGrid = null,
+        zOutliers = null,
+        isolatedPoints = null,
+        classificationStats = null,
+        displayRatio = 100,
+      } = {}) {
+        const codes = [];
+        if (
+          crsDiagnostics &&
+          ["missing-horizontal-crs", "unknown", "parse-warning"].includes(
+            crsDiagnostics.status,
+          )
+        ) {
+          codes.push("CRS_MISSING");
+        }
+        if (classificationStats?.quality === "poor") codes.push("CLASSIFICATION_POOR");
+        else if (classificationStats?.quality === "limited") codes.push("CLASSIFICATION_LIMITED");
+        if (Number.isFinite(Number(displayRatio)) && Number(displayRatio) < 5) {
+          codes.push("DISPLAY_RATIO_LOW");
+        }
+        if (densityGrid?.summary?.emptyInteriorCells) codes.push("DENSITY_HOLES");
+        if (densityGrid?.summary?.densitySpikeCells) codes.push("DENSITY_SPIKES");
+        if (zOutliers?.candidates?.length) codes.push("Z_OUTLIERS");
+        if (isolatedPoints?.candidates?.length) codes.push("ISOLATED_POINTS");
+        return codes;
+      }
+
+      /**
+       * @typedef {Object} DiagnosticsScoreResult
+       * @property {number} score
+       * @property {"ok"|"info"|"warn"|"danger"} status
+       * @property {string[]} reasons
+       * @property {string[]} warningCodes
+       * @property {Record<string, number>} sectionWeights
+       */
       function buildDiagnosticsScore({
         crsDiagnostics = null,
         densityGrid = null,
@@ -6963,12 +7041,20 @@
         displayRatio = 100,
       } = {}) {
         let score = 100;
-        const reasons = [];
+        const warningCodes = buildDiagnosticsWarningCodes({
+          crsDiagnostics,
+          densityGrid,
+          zOutliers,
+          isolatedPoints,
+          classificationStats,
+          displayRatio,
+        });
+        const reasons = warningCodes.map((code) => DIAGNOSTIC_WARNING_LABELS[code] || code);
 
         const deduct = (points, reason) => {
           if (points <= 0) return;
           score -= points;
-          reasons.push(reason);
+          if (!reasons.includes(reason)) reasons.push(reason);
         };
 
         if (
@@ -6997,7 +7083,13 @@
         else if (score < 75) status = "warn";
         else if (reasons.length) status = "info";
 
-        return { score, status, reasons };
+        return {
+          score,
+          status,
+          reasons,
+          warningCodes,
+          sectionWeights: { ...DIAGNOSTICS_SCORE_WEIGHTS },
+        };
       }
 
       function buildPointCloudDiagnostics({
@@ -7032,6 +7124,7 @@
           isolatedPoints,
           classificationStats,
           score,
+          warningCodes: score.warningCodes || [],
         };
       }
 
@@ -17494,6 +17587,8 @@
           isolatedPointCandidates: "-",
           densitySpikeCandidates: "-",
           diagnosticsWarnings: "表示点ベース",
+          diagnosticsWarningCodes: "-",
+          diagnosticsScoreWeights: "-",
         };
 
         if (report) {
@@ -17502,6 +17597,12 @@
           const zCount = report.zOutliers?.candidates?.length || 0;
           const isolatedCount = report.isolatedPoints?.candidates?.length || 0;
           const reasons = Array.isArray(score.reasons) ? score.reasons : [];
+          const warningCodes = Array.isArray(score.warningCodes)
+            ? score.warningCodes
+            : Array.isArray(report.warningCodes)
+              ? report.warningCodes
+              : [];
+          const weights = score.sectionWeights || {};
           mappings.diagnosticsScore = Number.isFinite(score.score)
             ? `${score.score}/100 (${score.status || "ok"})`
             : "-";
@@ -17517,6 +17618,12 @@
           mappings.diagnosticsWarnings = reasons.length
             ? `表示点ベース / ${reasons.join(", ")}`
             : "表示点ベース / 大きな注意なし";
+          mappings.diagnosticsWarningCodes = warningCodes.length
+            ? warningCodes.join(", ")
+            : "なし";
+          mappings.diagnosticsScoreWeights = Object.keys(weights).length
+            ? `信${weights.reliability || 0}/基${weights.basicStats || 0}/密${weights.density || 0}/分${weights.classification || 0}/地${weights.terrain || 0}/測${weights.measurability || 0}/異${weights.anomalies || 0}`
+            : "-";
         }
 
         Object.entries(mappings).forEach(([id, value]) => {
@@ -17955,6 +18062,7 @@
           buildDensityGrid,
           detectZOutliers,
           detectIsolatedPoints,
+          buildDiagnosticsWarningCodes,
           buildDiagnosticsScore,
           buildPointCloudDiagnostics,
           renderDensityHeatmap,

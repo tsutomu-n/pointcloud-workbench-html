@@ -1501,6 +1501,34 @@ test("buildDiagnosticsScore deducts for CRS, density, outlier, and isolation war
   expect(score.status).toBe("danger");
   expect(score.reasons).toContain("CRS確認");
   expect(score.reasons).toContain("欠測候補");
+  expect(score.warningCodes).toContain("CRS_MISSING");
+  expect(score.warningCodes).toContain("DENSITY_HOLES");
+  expect(score.sectionWeights.reliability).toBe(30);
+});
+
+test("buildDiagnosticsWarningCodes returns normalized warning codes", () => {
+  const context = createContext();
+  context.__report = {
+    crsDiagnostics: { status: "unknown" },
+    densityGrid: { summary: { emptyInteriorCells: 1, densitySpikeCells: 0 } },
+    zOutliers: { candidates: [{ index: 1 }] },
+    isolatedPoints: { candidates: [] },
+    classificationStats: { quality: "limited" },
+    displayRatio: 2.4,
+  };
+
+  const codes = vm.runInContext(
+    "window.__pcwTestApi.buildDiagnosticsWarningCodes(__report)",
+    context,
+  );
+
+  expect(codes).toEqual([
+    "CRS_MISSING",
+    "CLASSIFICATION_LIMITED",
+    "DISPLAY_RATIO_LOW",
+    "DENSITY_HOLES",
+    "Z_OUTLIERS",
+  ]);
 });
 
 test("buildPointCloudDiagnostics falls back when optional OSS helpers are not loaded", () => {
