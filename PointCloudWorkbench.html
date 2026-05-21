@@ -6250,6 +6250,148 @@
         };
       }
 
+      function buildLineageReport(header = statsData.header) {
+        const safeHeader = header && typeof header === "object" ? header : {};
+        const systemIdentifier = String(safeHeader.systemIdentifier || "").trim();
+        const generatingSoftware = String(safeHeader.generatingSoftware || "").trim();
+        const warnings = [];
+        if (!systemIdentifier) warnings.push("LINEAGE_SYSTEM_IDENTIFIER_MISSING");
+        if (!generatingSoftware) warnings.push("LINEAGE_GENERATOR_MISSING");
+        if ((safeHeader.numberOfExtendedVariableLengthRecords || 0) > 0) {
+          warnings.push("LINEAGE_EVRL_OR_VLR_WARNING");
+        } else if (Array.isArray(safeHeader.crsDiagnosticsWarnings) && safeHeader.crsDiagnosticsWarnings.length) {
+          warnings.push("LINEAGE_EVRL_OR_VLR_WARNING");
+        }
+
+        return {
+          source: "header",
+          projectId: String(safeHeader.projectId || "").trim() || "unknown",
+          systemIdentifier: systemIdentifier || "unknown",
+          generatingSoftware: generatingSoftware || "unknown",
+          fileCreationDayOfYear: Number.isFinite(Number(safeHeader.fileCreationDayOfYear))
+            && Number(safeHeader.fileCreationDayOfYear) > 0
+            ? Number(safeHeader.fileCreationDayOfYear)
+            : null,
+          fileCreationYear: Number.isFinite(Number(safeHeader.fileCreationYear))
+            && Number(safeHeader.fileCreationYear) > 0
+            ? Number(safeHeader.fileCreationYear)
+            : null,
+          pointDataRecordFormat: Number.isFinite(Number(safeHeader.pointDataRecordFormat))
+            ? Number(safeHeader.pointDataRecordFormat)
+            : null,
+          pointDataRecordLength: Number.isFinite(Number(safeHeader.pointDataRecordLength))
+            ? Number(safeHeader.pointDataRecordLength)
+            : null,
+          vlrCount: Number.isFinite(Number(safeHeader.numberOfVariableLengthRecords))
+            ? Number(safeHeader.numberOfVariableLengthRecords)
+            : 0,
+          evlrCount: Number.isFinite(Number(safeHeader.numberOfExtendedVariableLengthRecords))
+            ? Number(safeHeader.numberOfExtendedVariableLengthRecords)
+            : 0,
+          isCompressedPointFormat: Boolean(safeHeader.isCompressedPointFormat),
+          warnings: uniqueStrings(warnings),
+        };
+      }
+
+      function buildAttributeAvailabilityReport(header = statsData.header) {
+        const safeHeader = header && typeof header === "object" ? header : {};
+        const pointDataRecordFormat = Number.isFinite(Number(safeHeader.pointDataRecordFormat))
+          ? Number(safeHeader.pointDataRecordFormat)
+          : null;
+        const pointDataRecordLength = Number.isFinite(Number(safeHeader.pointDataRecordLength))
+          ? Number(safeHeader.pointDataRecordLength)
+          : null;
+        const warnings = [];
+        if (pointDataRecordFormat === null || pointDataRecordLength === null) {
+          return {
+            pointDataRecordFormat,
+            pointDataRecordLength,
+            available: [],
+            extraBytesLength: 0,
+            warnings,
+          };
+        }
+
+        const available = ["xyz", "intensity", "return", "classification", "scanAngle"];
+        if ([1, 3, 4, 5, 6, 7, 8, 9, 10].includes(pointDataRecordFormat)) {
+          available.push("gpsTime");
+        }
+        if ([2, 3, 5, 7, 8, 10].includes(pointDataRecordFormat)) {
+          available.push("rgb");
+        }
+        if ([8, 10].includes(pointDataRecordFormat)) {
+          available.push("nir");
+        }
+        if ([4, 5, 9, 10].includes(pointDataRecordFormat)) {
+          available.push("waveform");
+        }
+        if ([6, 7, 8, 9, 10].includes(pointDataRecordFormat)) {
+          available.push("scannerChannel", "classificationFlags");
+        }
+
+        const baseRecordLength = {
+          0: 20,
+          1: 28,
+          2: 26,
+          3: 34,
+          4: 57,
+          5: 63,
+          6: 30,
+          7: 36,
+          8: 38,
+          9: 59,
+          10: 67,
+        };
+        const baseline = baseRecordLength[pointDataRecordFormat];
+        let extraBytesLength = 0;
+        if (!Number.isFinite(baseline)) {
+          warnings.push("ATTRIBUTES_POINT_FORMAT_UNKNOWN");
+        } else {
+          extraBytesLength = Math.max(0, pointDataRecordLength - baseline);
+          if (extraBytesLength > 0) warnings.push("ATTRIBUTES_EXTRA_BYTES_PRESENT");
+          if (pointDataRecordLength < baseline) warnings.push("ATTRIBUTES_RECORD_LENGTH_SHORT");
+        }
+
+        return {
+          pointDataRecordFormat,
+          pointDataRecordLength,
+          available: uniqueStrings(available),
+          extraBytesLength,
+          warnings: uniqueStrings(warnings),
+        };
+      }
+
+      function buildAcquisitionQualityReport(header = statsData.header) {
+        const attributes = buildAttributeAvailabilityReport(header);
+        const availableSet = new Set(attributes.available || []);
+        const requiredSignals = ["return", "scanAngle", "gpsTime"];
+        const availableSignals = requiredSignals.filter((signal) => availableSet.has(signal));
+        const missingSignals = requiredSignals.filter((signal) => !availableSet.has(signal));
+        const warnings = [];
+        if (!availableSet.has("return")) warnings.push("ACQ_RETURN_MISSING");
+        if (!availableSet.has("scanAngle")) warnings.push("ACQ_SCAN_ANGLE_MISSING");
+        if (!availableSet.has("gpsTime")) warnings.push("ACQ_GPS_TIME_MISSING");
+
+        let score = 0;
+        if (availableSet.has("return")) score += 40;
+        if (availableSet.has("scanAngle")) score += 30;
+        if (availableSet.has("gpsTime")) score += 30;
+
+        let status = "unknown";
+        if (!attributes.available?.length) status = "unknown";
+        else if (score >= 90) status = "high";
+        else if (score >= 60) status = "medium";
+        else status = "low";
+
+        return {
+          status,
+          score,
+          availableSignals,
+          missingSignals,
+          warnings: uniqueStrings(warnings),
+        };
+      }
+
       function buildManualDiagnosticReport() {
         const runtime = buildRuntimeStatus();
         const selectedFile = workflowState.selectedFile || null;
@@ -6291,6 +6433,9 @@
             displayRatio: Number(statsData.displayRatio || 0),
             pointCloudSummary,
           },
+          lineage: buildLineageReport(statsData.header),
+          attributes: buildAttributeAvailabilityReport(statsData.header),
+          acquisitionQuality: buildAcquisitionQualityReport(statsData.header),
           diagnosticsCandidates: diagnosticCandidates,
           recentErrors,
         };
@@ -12180,6 +12325,21 @@
         return new TextDecoder().decode(array.slice(0, end)).trim();
       }
 
+      function decodeFixedAsciiFromView(view, offset, length) {
+        if (!view || offset < 0 || length <= 0 || offset + length > view.byteLength) return "";
+        return decodeLasString(new Uint8Array(view.buffer, offset, length));
+      }
+
+      function formatLasProjectId(view) {
+        if (!view || view.byteLength < 24) return "";
+        const data1 = view.getUint32(8, true).toString(16).padStart(8, "0");
+        const data2 = view.getUint16(12, true).toString(16).padStart(4, "0");
+        const data3 = view.getUint16(14, true).toString(16).padStart(4, "0");
+        const bytes = new Uint8Array(view.buffer, 16, 8);
+        const tail = Array.from(bytes).map((byte) => byte.toString(16).padStart(2, "0"));
+        return `${data1}-${data2}-${data3}-${tail.slice(0, 2).join("")}-${tail.slice(2).join("")}`;
+      }
+
       function getLasProjectionRecordType(record) {
         if (!record || record.userId !== "LASF_Projection") return null;
         const types = {
@@ -12726,10 +12886,15 @@
           : 0;
         const header = {
           signature: signature,
+          projectId: formatLasProjectId(view),
           globalEncoding: view.getUint16(6, true),
           wktGlobalEncodingBit: Boolean(view.getUint16(6, true) & 0x10),
           versionMajor,
           versionMinor,
+          systemIdentifier: decodeFixedAsciiFromView(view, 26, 32),
+          generatingSoftware: decodeFixedAsciiFromView(view, 58, 32),
+          fileCreationDayOfYear: view.getUint16(90, true),
+          fileCreationYear: view.getUint16(92, true),
           headerSize: view.getUint16(94, true),
           pointDataOffset: view.getUint32(96, true),
           numberOfVariableLengthRecords: view.getUint32(100, true),
@@ -18209,6 +18374,9 @@
           selectRuntimeMode,
           buildRuntimeStatus,
           updateRuntimeStatusPanel,
+          buildLineageReport,
+          buildAttributeAvailabilityReport,
+          buildAcquisitionQualityReport,
           buildManualDiagnosticReport,
           copyManualDiagnosticReport,
           resolvePointCloudReader,

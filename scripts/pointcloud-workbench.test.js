@@ -394,6 +394,10 @@ function createLasHeaderBuffer({
   startOfFirstExtendedVariableLengthRecord = 0n,
   numberOfExtendedVariableLengthRecords = 0,
   pointCount64 = 0n,
+  systemIdentifier = "",
+  generatingSoftware = "",
+  fileCreationDayOfYear = 0,
+  fileCreationYear = 0,
 } = {}) {
   const buffer = new ArrayBuffer(512);
   const view = new DataView(buffer);
@@ -402,6 +406,10 @@ function createLasHeaderBuffer({
   view.setUint16(6, globalEncoding, true);
   view.setUint8(24, versionMajor);
   view.setUint8(25, versionMinor);
+  encodeFixedAscii(view, 26, 32, systemIdentifier);
+  encodeFixedAscii(view, 58, 32, generatingSoftware);
+  view.setUint16(90, fileCreationDayOfYear, true);
+  view.setUint16(92, fileCreationYear, true);
   view.setUint16(94, headerSize, true);
   view.setUint32(96, pointDataOffset, true);
   view.setUint32(100, numberOfVariableLengthRecords, true);
@@ -537,6 +545,40 @@ test("parseLASHeader keeps EVLR fields empty for legacy headers", () => {
 
   expect(header.startOfFirstExtendedVariableLengthRecord).toBe(0);
   expect(header.numberOfExtendedVariableLengthRecords).toBe(0);
+});
+
+test("parseLASHeader extracts lineage metadata fields from header", () => {
+  const context = createContext();
+  context.__buffer = createLasHeaderBuffer({
+    versionMajor: 1,
+    versionMinor: 4,
+    systemIdentifier: "RIEGL VQ-1560",
+    generatingSoftware: "TerraScan 023.001",
+    fileCreationDayOfYear: 145,
+    fileCreationYear: 2026,
+  });
+  vm.runInContext(
+    `
+      const view = new DataView(__buffer);
+      view.setUint32(8, 0x12345678, true);
+      view.setUint16(12, 0x9abc, true);
+      view.setUint16(14, 0xdef0, true);
+      const projectTail = new Uint8Array(__buffer, 16, 8);
+      projectTail.set([0x11, 0x22, 0x33, 0x44, 0xaa, 0xbb, 0xcc, 0xdd]);
+    `,
+    context,
+  );
+
+  const header = vm.runInContext(
+    "window.__pcwTestApi.parseLASHeader(__buffer)",
+    context,
+  );
+
+  expect(header.systemIdentifier).toBe("RIEGL VQ-1560");
+  expect(header.generatingSoftware).toBe("TerraScan 023.001");
+  expect(header.fileCreationDayOfYear).toBe(145);
+  expect(header.fileCreationYear).toBe(2026);
+  expect(header.projectId).toBe("12345678-9abc-def0-1122-3344aabbccdd");
 });
 
 test("readLASProjectionRecords reads bounded VLR projection records without point data", async () => {
@@ -1063,8 +1105,141 @@ test("manual diagnostic report omits point cloud payloads and file names", () =>
       "密度スパイク": 0,
     },
   });
+  expect(report.lineage).toMatchObject({
+    projectId: "unknown",
+    systemIdentifier: "unknown",
+    generatingSoftware: "unknown",
+    fileCreationYear: null,
+    fileCreationDayOfYear: null,
+    source: "header",
+    warnings: [
+      "LINEAGE_SYSTEM_IDENTIFIER_MISSING",
+      "LINEAGE_GENERATOR_MISSING",
+    ],
+  });
+  expect(report.attributes).toMatchObject({
+    pointDataRecordFormat: null,
+    pointDataRecordLength: null,
+    available: [],
+    warnings: [],
+  });
+  expect(report.acquisitionQuality).toMatchObject({
+    status: "unknown",
+    score: 0,
+    availableSignals: [],
+    missingSignals: ["return", "scanAngle", "gpsTime"],
+  });
   expect(reportText).not.toContain("private-site-survey");
   expect(reportText).not.toContain("points\":[");
+});
+
+test("buildLineageReport summarizes header provenance and warnings", () => {
+  const context = createContext();
+  context.__header = {
+    projectId: "12345678-9abc-def0-1122-3344aabbccdd",
+    systemIdentifier: "RIEGL",
+    generatingSoftware: "TerraScan",
+    fileCreationDayOfYear: 145,
+    fileCreationYear: 2026,
+    pointDataRecordFormat: 8,
+    pointDataRecordLength: 38,
+    numberOfVariableLengthRecords: 3,
+    numberOfExtendedVariableLengthRecords: 1,
+    isCompressedPointFormat: false,
+    crsDiagnosticsWarnings: [{ code: "evlr-skipped", message: "skip" }],
+  };
+  const report = vm.runInContext(
+    "window.__pcwTestApi.buildLineageReport(__header)",
+    context,
+  );
+  expect(report).toMatchObject({
+    projectId: "12345678-9abc-def0-1122-3344aabbccdd",
+    systemIdentifier: "RIEGL",
+    generatingSoftware: "TerraScan",
+    fileCreationDayOfYear: 145,
+    fileCreationYear: 2026,
+    pointDataRecordFormat: 8,
+    pointDataRecordLength: 38,
+    vlrCount: 3,
+    evlrCount: 1,
+    isCompressedPointFormat: false,
+  });
+  expect(report.warnings).toContain("LINEAGE_EVRL_OR_VLR_WARNING");
+  expect(report.warnings).not.toContain("LINEAGE_GENERATOR_MISSING");
+});
+
+test("buildAttributeAvailabilityReport infers attributes from point format and record length", () => {
+  const context = createContext();
+  context.__header = {
+    pointDataRecordFormat: 8,
+    pointDataRecordLength: 38,
+  };
+  const report = vm.runInContext(
+    "window.__pcwTestApi.buildAttributeAvailabilityReport(__header)",
+    context,
+  );
+  expect(report.available).toEqual([
+    "xyz",
+    "intensity",
+    "return",
+    "classification",
+    "scanAngle",
+    "gpsTime",
+    "rgb",
+    "nir",
+    "scannerChannel",
+    "classificationFlags",
+  ]);
+  expect(report.warnings).toEqual([]);
+});
+
+test("buildAttributeAvailabilityReport warns when record length exceeds known format baseline", () => {
+  const context = createContext();
+  context.__header = {
+    pointDataRecordFormat: 6,
+    pointDataRecordLength: 40,
+  };
+  const report = vm.runInContext(
+    "window.__pcwTestApi.buildAttributeAvailabilityReport(__header)",
+    context,
+  );
+  expect(report.available).toContain("gpsTime");
+  expect(report.extraBytesLength).toBe(10);
+  expect(report.warnings).toContain("ATTRIBUTES_EXTRA_BYTES_PRESENT");
+});
+
+test("buildAcquisitionQualityReport rates quality high when return, scan angle, and gps time are available", () => {
+  const context = createContext();
+  context.__header = {
+    pointDataRecordFormat: 7,
+    pointDataRecordLength: 36,
+  };
+  const report = vm.runInContext(
+    "window.__pcwTestApi.buildAcquisitionQualityReport(__header)",
+    context,
+  );
+  expect(report.status).toBe("high");
+  expect(report.score).toBe(100);
+  expect(report.availableSignals).toEqual(["return", "scanAngle", "gpsTime"]);
+  expect(report.missingSignals).toEqual([]);
+  expect(report.warnings).toEqual([]);
+});
+
+test("buildAcquisitionQualityReport emits warnings when key acquisition signals are missing", () => {
+  const context = createContext();
+  context.__header = {
+    pointDataRecordFormat: 0,
+    pointDataRecordLength: 20,
+  };
+  const report = vm.runInContext(
+    "window.__pcwTestApi.buildAcquisitionQualityReport(__header)",
+    context,
+  );
+  expect(report.status).toBe("medium");
+  expect(report.score).toBe(70);
+  expect(report.availableSignals).toEqual(["return", "scanAngle"]);
+  expect(report.missingSignals).toEqual(["gpsTime"]);
+  expect(report.warnings).toContain("ACQ_GPS_TIME_MISSING");
 });
 
 test("ReaderRegistry exposes LAS and LAZ local readers", () => {
