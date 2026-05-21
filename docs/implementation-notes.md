@@ -1,0 +1,2 @@
+- 2026-05-21T12:06:16+09:00 run_id=20260521-120616 command=cdx next task=T1 status=failed verification=`rg --files` または同等手段でファイル一覧確認:ng;対象ファイルをread-onlyで閲覧して要点をメモ化:ng
+- 2026-05-21T12:06:30+09:00 run_id=20260521-120630 command=cdx rush task=T1 status=failed verification=`rg --files` または同等手段でファイル一覧確認:ng;対象ファイルをread-onlyで閲覧して要点をメモ化:ng
