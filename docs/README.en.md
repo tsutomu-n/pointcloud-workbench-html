@@ -18,17 +18,17 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 - `assets/preflight-panel.png`: App state immediately after selecting the bundled sample, with the pre-flight panel visible and enough detail to read the load path, risk indicator, file size, source point count, estimated display ratio, and quality presets.
 - `assets/workspace-3d.png`: Main 3D workspace after load, showing a point cloud rendered with visible depth and density, the primary control panels, and a viewpoint that makes the browser-native single-file experience feel production-ready rather than experimental.
 - `assets/workspace-2d-slice-stats.png`: 2D or slice-oriented inspection state with the statistics panel open, making it obvious that the tool supports cross-section inspection, classification review, and quantitative validation in addition to 3D viewing.
-- Detailed image briefs for future screenshots are documented in [`assets/README.md`](./assets/README.md).
+- Detailed image briefs for future screenshots are documented in [`assets/README.md`](../assets/README.md).
 
 ## Japanese README
 
-- Japanese README: [`./docs/README.ja.md`](./docs/README.ja.md)
-- Quickstart: [`./docs/quickstart.ja.md`](./docs/quickstart.ja.md)
-- Junior engineer guide: [`./docs/for-junior-se.ja.md`](./docs/for-junior-se.ja.md)
-- Runtime model: [`./docs/runtime-model.ja.md`](./docs/runtime-model.ja.md)
-- Troubleshooting: [`./docs/troubleshooting.ja.md`](./docs/troubleshooting.ja.md)
-- FAQ: [`./docs/faq.ja.md`](./docs/faq.ja.md)
-- Glossary: [`./docs/glossary.ja.md`](./docs/glossary.ja.md)
+- Japanese README: [`./README.ja.md`](./README.ja.md)
+- Quickstart: [`./quickstart.ja.md`](./quickstart.ja.md)
+- Junior engineer guide: [`./for-junior-se.ja.md`](./for-junior-se.ja.md)
+- Runtime model: [`./runtime-model.ja.md`](./runtime-model.ja.md)
+- Troubleshooting: [`./troubleshooting.ja.md`](./troubleshooting.ja.md)
+- FAQ: [`./faq.ja.md`](./faq.ja.md)
+- Glossary: [`./glossary.ja.md`](./glossary.ja.md)
 
 ## Why PointCloudWorkbench
 
@@ -118,9 +118,9 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 - JavaScript/TypeScript execution and tests assume `bun`.
 - `scripts/` is for development-time regression tests and README checks, not for running the app.
 - Update the related operation and implementation documents when behavior changes.
-- Contribution guidelines: [`CONTRIBUTING.md`](./CONTRIBUTING.md)
-- Security policy: [`SECURITY.md`](./SECURITY.md)
-- Code of conduct: [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md)
+- Contribution guidelines: [`CONTRIBUTING.md`](../CONTRIBUTING.md)
+- Security policy: [`SECURITY.md`](../SECURITY.md)
+- Code of conduct: [`CODE_OF_CONDUCT.md`](../CODE_OF_CONDUCT.md)
 
 ## Testing
 

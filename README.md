@@ -54,8 +54,8 @@
 - LAS/LAZ 読み込み
 - LAS / LAZ ローカル reader を選ぶ ReaderRegistry dispatch
 - 点数、bounds、LAS scale/offset 基準をまとめる PointCloudData summary
-- 大容量ファイルの負荷を平準化する chunked LAS loading
-- メモリ重複を減らす LAZ chunked read + WASM heap writes
+- LAS の chunked 読み込みによる大容量ファイル負荷の平準化（chunked LAS loading）
+- LAZ の chunked read + WASM ヒープ直書きによるメモリ重複の抑制（WASM heap writes）
 - 読み込み前のヘッダー先読みと正確な表示率プレビュー
 - 読み込み経路と推定ピーク RAM リスクの表示
 - Hosted / Portable / renderer / isolation capability を示す Runtime mode summary
@@ -77,8 +77,8 @@
 
 ## ブラウザ / 実行条件
 
-- 対応ブラウザ: Chrome / Edge の最新版のみ
-- 非対応ブラウザ: Safari and Firefox are intentionally unsupported。古いブラウザーも対象外です。
+- 対応ブラウザ: Chrome / Edge の最新版のみ対応
+- 非対応ブラウザ: Safari、Firefox、古いブラウザーは対応対象外です。Safari and Firefox are intentionally unsupported。
 - 必須 API: WebGL、File API、ArrayBuffer
 - 対応入力: `.las`, `.laz`
 - 実装上の上限: LAS は 3GB超、LAZ は 2GB超で読み込み不可。LAS files above 3GB and LAZ files above 2GB are rejected.
@@ -87,8 +87,8 @@
 
 - `three.js`、`laz-perf`、`simple-statistics`、`Flatbush`、`simpleheat` は CDN から読み込むため、通常利用にはネットワーク接続が必要です。
 - サーバー経路は static-only です。Workers、Pages Functions、APIs、telemetry、DB 書き込み、サーバー側点群処理を追加しません。
-- 選択した点群ファイルはユーザーの端末内に留まります。ネットワークアクセスはアプリ資産や任意の地図タイル取得のためであり、LAS/LAZ upload ではありません。Selected LAS/LAZ files are processed locally in the browser and are not uploaded.
-- CRS diagnostics はローカル metadata の確認だけを行います。coordinate conversion、geocoding、EPSG database lookup、map matching、server-side CRS processing は行いません。
+- 選択した点群ファイルはユーザーの端末内に留まります。ネットワークアクセスはアプリ資産や任意の地図タイル取得のためであり、LAS/LAZ upload ではありません。no LAS/LAZ upload。Selected LAS/LAZ files are processed locally in the browser and are not uploaded.
+- CRS diagnostics はローカル metadata の確認だけを行います。座標変換、coordinate conversion、geocoding、EPSG database lookup、map matching、サーバー側 CRS 処理は行いません。server-side CRS processing は行いません。
 - CRS diagnostics は LAS header / VLR / EVLR を上限付きで読み、LAS/LAZ ファイルやローカルファイル名をアップロードまたは問い合わせ文へコピーしません。
 - 取得品質はローカルの属性 coverage 補助です。アプリが使う LAS 1.4 R15 point-record layout に従い、PDRF 0-5 と PDRF 6+ の return / scan-angle interpretation を分け、GPS-time monotonicity は測量級証明ではなく warning signal として扱います。
 - 地表候補アシストは近似的で、表示点ベースです。測量成果 DTM、設計面、切盛根拠、納品用地形モデルではありません。
