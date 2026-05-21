@@ -6985,6 +6985,7 @@
         Z_OUTLIERS: "Z外れ値",
         ISOLATED_POINTS: "孤立候補",
       };
+      const DIAGNOSTIC_WARNING_CODE_ORDER = Object.keys(DIAGNOSTIC_WARNING_LABELS);
       const DIAGNOSTICS_SCORE_WEIGHTS = {
         reliability: 30,
         basicStats: 10,
@@ -6994,6 +6995,29 @@
         measurability: 10,
         anomalies: 10,
       };
+
+      function normalizeDiagnosticsWarningCodes(rawCodes = []) {
+        if (!Array.isArray(rawCodes) || !rawCodes.length) return [];
+        const allowed = new Set(DIAGNOSTIC_WARNING_CODE_ORDER);
+        const seen = new Set();
+        const normalized = [];
+
+        rawCodes.forEach((rawCode) => {
+          const normalizedCode = String(rawCode || "")
+            .trim()
+            .toUpperCase()
+            .replace(/[^A-Z0-9]+/g, "_");
+          if (!allowed.has(normalizedCode) || seen.has(normalizedCode)) return;
+          seen.add(normalizedCode);
+          normalized.push(normalizedCode);
+        });
+
+        return normalized.sort(
+          (a, b) =>
+            DIAGNOSTIC_WARNING_CODE_ORDER.indexOf(a) -
+            DIAGNOSTIC_WARNING_CODE_ORDER.indexOf(b),
+        );
+      }
 
       function buildDiagnosticsWarningCodes({
         crsDiagnostics = null,
@@ -7021,7 +7045,7 @@
         if (densityGrid?.summary?.densitySpikeCells) codes.push("DENSITY_SPIKES");
         if (zOutliers?.candidates?.length) codes.push("Z_OUTLIERS");
         if (isolatedPoints?.candidates?.length) codes.push("ISOLATED_POINTS");
-        return codes;
+        return normalizeDiagnosticsWarningCodes(codes);
       }
 
       /**
@@ -17597,11 +17621,12 @@
           const zCount = report.zOutliers?.candidates?.length || 0;
           const isolatedCount = report.isolatedPoints?.candidates?.length || 0;
           const reasons = Array.isArray(score.reasons) ? score.reasons : [];
-          const warningCodes = Array.isArray(score.warningCodes)
+          const warningCodesRaw = Array.isArray(score.warningCodes)
             ? score.warningCodes
             : Array.isArray(report.warningCodes)
               ? report.warningCodes
               : [];
+          const warningCodes = normalizeDiagnosticsWarningCodes(warningCodesRaw);
           const weights = score.sectionWeights || {};
           mappings.diagnosticsScore = Number.isFinite(score.score)
             ? `${score.score}/100 (${score.status || "ok"})`

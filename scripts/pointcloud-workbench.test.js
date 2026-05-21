@@ -1531,6 +1531,53 @@ test("buildDiagnosticsWarningCodes returns normalized warning codes", () => {
   ]);
 });
 
+test("updateDiagnosticsSummaryDisplay normalizes warning code set, order, and dedup", () => {
+  const context = createContext();
+  vm.runInContext(
+    `
+      const canvas = document.getElementById("sectionProfileCanvas");
+      if (canvas) {
+        canvas.getContext = () => ({
+          clearRect() {},
+          fillRect() {},
+          fillText() {},
+          beginPath() {},
+          moveTo() {},
+          lineTo() {},
+          stroke() {},
+        });
+      }
+    `,
+    context,
+  );
+  context.__report = {
+    score: {
+      score: 42,
+      status: "warn",
+      reasons: ["CRS確認"],
+      warningCodes: [
+        " density_holes ",
+        "CRS_MISSING",
+        "DENSITY_HOLES",
+        "crs_missing",
+        "UNKNOWN_CODE",
+      ],
+      sectionWeights: {},
+    },
+    densityGrid: { summary: {} },
+    zOutliers: { candidates: [] },
+    isolatedPoints: { candidates: [] },
+  };
+
+  vm.runInContext("updateDiagnosticsSummaryDisplay(__report)", context);
+  const codesText = vm.runInContext(
+    "document.getElementById('diagnosticsWarningCodes').textContent",
+    context,
+  );
+
+  expect(codesText).toBe("CRS_MISSING, DENSITY_HOLES");
+});
+
 test("buildPointCloudDiagnostics falls back when optional OSS helpers are not loaded", () => {
   const context = createContext();
   context.__pointCloudData = {
