@@ -1,6 +1,6 @@
 # PointCloudWorkbench 運用手順書
 
-更新日時: 2026-05-19 00:00:00 JST
+更新日時: 2026-05-21 00:00:00 JST
 
 ## 1. 目的
 - 対象: `PointCloudWorkbench.html` の日常運用を担当する利用者、運用担当、検証担当
@@ -151,27 +151,27 @@
 
 | 関数 | 行番号リンク | 参照用途 |
 |---|---|---|
-| `loadSampleData` | [PointCloudWorkbench.html#L6728](PointCloudWorkbench.html#L6728) | サンプルデータ選択 |
-| `proceedToQualitySelection` | [PointCloudWorkbench.html#L6787](PointCloudWorkbench.html#L6787) | 品質設定画面への遷移 |
-| `applyQualitySelection` | [PointCloudWorkbench.html#L6857](PointCloudWorkbench.html#L6857) | 品質選択反映 |
-| `startDataLoading` | [PointCloudWorkbench.html#L7157](PointCloudWorkbench.html#L7157) | 読み込み開始 |
-| `cancelLoading` | [PointCloudWorkbench.html#L7296](PointCloudWorkbench.html#L7296) | 読み込みキャンセル |
-| `loadLASFileActual` | [PointCloudWorkbench.html#L7560](PointCloudWorkbench.html#L7560) | 実ファイル読み込み本体 |
-| `completeLoading` | [PointCloudWorkbench.html#L9688](PointCloudWorkbench.html#L9688) | 読み込み完了遷移 |
-| `goBackToFileSelect` | [PointCloudWorkbench.html#L6955](PointCloudWorkbench.html#L6955) | ファイル選択に戻る |
-| `goHome` | [PointCloudWorkbench.html#L7142](PointCloudWorkbench.html#L7142) | ホーム復帰 |
-| `set2DView` | [PointCloudWorkbench.html#L9644](PointCloudWorkbench.html#L9644) | 2D表示切替 |
-| `exit2DView` | [PointCloudWorkbench.html#L9653](PointCloudWorkbench.html#L9653) | 3D表示へ復帰 |
-| `setColorMode` | [PointCloudWorkbench.html#L9907](PointCloudWorkbench.html#L9907) | 色分けモード切替 |
-| `toggleLegendPanel` | [PointCloudWorkbench.html#L10311](PointCloudWorkbench.html#L10311) | 凡例表示切替（開発者コンソール/API向け） |
-| `toggleSlicing` | [PointCloudWorkbench.html#L10639](PointCloudWorkbench.html#L10639) | スライス表示開始/停止 |
-| `show2DSliceView` | [PointCloudWorkbench.html#L11215](PointCloudWorkbench.html#L11215) | 2D断面表示 |
-| `resetSlicing` | [PointCloudWorkbench.html#L11191](PointCloudWorkbench.html#L11191) | スライス設定リセット |
-| `toggleCADMode` | [PointCloudWorkbench.html#L10968](PointCloudWorkbench.html#L10968) | CADモード切替 |
-| `autoClassify` | [PointCloudWorkbench.html#L12091](PointCloudWorkbench.html#L12091) | 自動分類実行 |
-| `toggleStatsPanel` | [PointCloudWorkbench.html#L13159](PointCloudWorkbench.html#L13159) | 統計パネル切替 |
-| `toggleControlsPanel` | [PointCloudWorkbench.html#L13178](PointCloudWorkbench.html#L13178) | 制御パネル表示切替 |
-| `performFinalCleanup` | [PointCloudWorkbench.html#L13513](PointCloudWorkbench.html#L13513) | 緊急クリーンアップ |
+| `loadSampleData` | [PointCloudWorkbench.html#L9998](PointCloudWorkbench.html#L9998) | サンプルデータ選択 |
+| `proceedToQualitySelection` | [PointCloudWorkbench.html#L10075](PointCloudWorkbench.html#L10075) | 品質設定画面への遷移 |
+| `applyQualitySelection` | [PointCloudWorkbench.html#L10145](PointCloudWorkbench.html#L10145) | 品質選択反映 |
+| `startDataLoading` | [PointCloudWorkbench.html#L11356](PointCloudWorkbench.html#L11356) | 読み込み開始 |
+| `cancelLoading` | [PointCloudWorkbench.html#L11495](PointCloudWorkbench.html#L11495) | 読み込みキャンセル |
+| `loadLASFileActual` | [PointCloudWorkbench.html#L11876](PointCloudWorkbench.html#L11876) | 実ファイル読み込み本体 |
+| `completeLoading` | [PointCloudWorkbench.html#L14991](PointCloudWorkbench.html#L14991) | 読み込み完了遷移 |
+| `goBackToFileSelect` | [PointCloudWorkbench.html#L10252](PointCloudWorkbench.html#L10252) | ファイル選択に戻る |
+| `goHome` | [PointCloudWorkbench.html#L11341](PointCloudWorkbench.html#L11341) | ホーム復帰 |
+| `set2DView` | [PointCloudWorkbench.html#L14868](PointCloudWorkbench.html#L14868) | 2D表示切替 |
+| `exit2DView` | [PointCloudWorkbench.html#L14878](PointCloudWorkbench.html#L14878) | 3D表示へ復帰 |
+| `setColorMode` | [PointCloudWorkbench.html#L15222](PointCloudWorkbench.html#L15222) | 色分けモード切替 |
+| `toggleLegendPanel` | [PointCloudWorkbench.html#L15558](PointCloudWorkbench.html#L15558) | 凡例表示切替（開発者コンソール/API向け） |
+| `toggleSlicing` | [PointCloudWorkbench.html#L15886](PointCloudWorkbench.html#L15886) | スライス表示開始/停止 |
+| `show2DSliceView` | [PointCloudWorkbench.html#L16462](PointCloudWorkbench.html#L16462) | 2D断面表示 |
+| `resetSlicing` | [PointCloudWorkbench.html#L16438](PointCloudWorkbench.html#L16438) | スライス設定リセット |
+| `toggleCADMode` | [PointCloudWorkbench.html#L16215](PointCloudWorkbench.html#L16215) | CADモード切替 |
+| `autoClassify` | [PointCloudWorkbench.html#L17333](PointCloudWorkbench.html#L17333) | 自動分類実行 |
+| `toggleStatsPanel` | [PointCloudWorkbench.html#L18408](PointCloudWorkbench.html#L18408) | 統計パネル切替 |
+| `toggleControlsPanel` | [PointCloudWorkbench.html#L18427](PointCloudWorkbench.html#L18427) | 制御パネル表示切替 |
+| `performFinalCleanup` | [PointCloudWorkbench.html#L18891](PointCloudWorkbench.html#L18891) | 緊急クリーンアップ |
 
 ## 12. ユースケース別ガイド（事実ベース）
 

@@ -9,6 +9,9 @@ test(".gitignore ignores transient test artifacts but keeps scripts tracked", ()
   expect(gitignore).toContain("/test-results/");
   expect(gitignore).toContain("/.serena/");
   expect(gitignore).toContain("/.tmp/");
+  expect(gitignore).toContain(".plan/");
+  expect(gitignore).toContain("samples/test.las");
+  expect(gitignore).toContain("samples/test.laz");
   expect(gitignore).toContain("/node_modules/");
   expect(gitignore).toContain("/coverage/");
   expect(gitignore).not.toContain("/scripts/");
