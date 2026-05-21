@@ -4967,6 +4967,14 @@
                   <span class="stats-value" id="densitySpikeCandidates">-</span>
                 </div>
                 <div class="stats-item">
+                  地表候補:
+                  <span class="stats-value" id="groundCandidateStatus">参考 / 未計算</span>
+                </div>
+                <div class="stats-item">
+                  地表方式:
+                  <span class="stats-value" id="groundCandidateMethod">-</span>
+                </div>
+                <div class="stats-item">
                   注意:
                   <span class="stats-value" id="diagnosticsWarnings">表示点ベース</span>
                 </div>
@@ -6216,6 +6224,7 @@
         pointCloudData: null,
         diagnosticsReport: null,
         acquisitionMetrics: null,
+        groundCandidateReport: null,
         diagnosticCandidateMap: {},
         selectedDiagnosticCandidateKey: null,
         diagnosticCandidateFilterKind: "all",
@@ -6512,6 +6521,31 @@
         };
       }
 
+      function summarizeGroundCandidateReport(report = statsData.groundCandidateReport) {
+        if (!report) {
+          return {
+            status: "unknown",
+            method: "unknown",
+            validCellRatio: 0,
+            confidence: "low",
+            groundPointCount: 0,
+            nonGroundPointCount: 0,
+            warnings: [],
+          };
+        }
+        return {
+          status: report.status || "unknown",
+          method: report.method || "unknown",
+          validCellRatio: Number.isFinite(Number(report.summary?.validCellRatio))
+            ? Number(report.summary.validCellRatio)
+            : 0,
+          confidence: report.summary?.confidence || "low",
+          groundPointCount: Number(report.summary?.groundPointCount || 0),
+          nonGroundPointCount: Number(report.summary?.nonGroundPointCount || 0),
+          warnings: uniqueStrings(report.warnings || []),
+        };
+      }
+
       function buildManualDiagnosticReport() {
         const runtime = buildRuntimeStatus();
         const selectedFile = workflowState.selectedFile || null;
@@ -6559,6 +6593,7 @@
             statsData.header,
             statsData.acquisitionMetrics,
           ),
+          groundCandidate: summarizeGroundCandidateReport(statsData.groundCandidateReport),
           diagnosticsCandidates: diagnosticCandidates,
           recentErrors,
         };
@@ -6665,6 +6700,11 @@
         const diagnosticsCandidates = buildDiagnosticCandidateSummary(
           statsData.diagnosticsReport,
         );
+        const groundCandidate = summarizeGroundCandidateReport(
+          statsData.groundCandidateReport ||
+            statsData.diagnosticsReport?.groundCandidate ||
+            null,
+        );
         const sectionWidth = Number(document.getElementById("sectionWidthRange")?.value);
         const groundOnly = !!document.getElementById("sectionGroundOnly")?.checked;
 
@@ -6711,6 +6751,7 @@
             selectedCandidate: getWorkAssistSelectedCandidate(),
             summary: diagnosticsCandidates,
           },
+          groundCandidate,
           acquisitionQuality: {
             status: acquisitionQuality.status,
             score: acquisitionQuality.score,
@@ -7326,6 +7367,179 @@
         };
       }
 
+      function buildGroundCandidateGrid(points = [], bounds = null, options = {}) {
+        const safePoints = normalizeDiagnosticsPoints(points);
+        const safeBounds = bounds || calculatePointBounds(safePoints);
+        const emptyReport = (warnings = []) => ({
+          status: "unknown",
+          method: "unknown",
+          grid: {
+            cellSize: null,
+            cols: 0,
+            rows: 0,
+            originX: null,
+            originY: null,
+            sampleRatio: 1,
+          },
+          cells: [],
+          summary: {
+            validCellRatio: 0,
+            groundPointCount: 0,
+            nonGroundPointCount: 0,
+            averageHeightAboveGround: null,
+            confidence: "low",
+          },
+          warnings: uniqueStrings(warnings),
+        });
+
+        if (!safePoints.length || !safeBounds) {
+          return emptyReport(["GROUND_ESTIMATE_LOW_CONFIDENCE"]);
+        }
+
+        const xRange = Math.max(0, safeBounds.maxX - safeBounds.minX);
+        const yRange = Math.max(0, safeBounds.maxY - safeBounds.minY);
+        if (xRange <= 0 || yRange <= 0) {
+          return emptyReport(["GROUND_ESTIMATE_LOW_CONFIDENCE"]);
+        }
+
+        const maxCells = Math.max(16, Math.floor(Number(options.maxCells) || 120 * 120));
+        const requestedCellSize = Number(options.cellSize);
+        const defaultCellSize = Math.max(xRange, yRange) / 80;
+        let cellSize = Number.isFinite(requestedCellSize) && requestedCellSize > 0
+          ? requestedCellSize
+          : defaultCellSize;
+        if (!Number.isFinite(cellSize) || cellSize <= 0) {
+          return emptyReport(["GROUND_ESTIMATE_LOW_CONFIDENCE"]);
+        }
+
+        let cols = Math.max(1, Math.ceil(xRange / cellSize));
+        let rows = Math.max(1, Math.ceil(yRange / cellSize));
+        if (cols * rows > maxCells) {
+          const scale = Math.sqrt((cols * rows) / maxCells);
+          cellSize *= scale;
+          cols = Math.max(1, Math.ceil(xRange / cellSize));
+          rows = Math.max(1, Math.ceil(yRange / cellSize));
+        }
+
+        const totalCells = cols * rows;
+        const buckets = Array.from({ length: totalCells }, () => ({
+          points: [],
+          groundPoints: [],
+        }));
+        let groundPointCount = 0;
+        let nonGroundPointCount = 0;
+
+        safePoints.forEach((point) => {
+          const ix = Math.min(
+            cols - 1,
+            Math.max(0, Math.floor((point.x - safeBounds.minX) / cellSize)),
+          );
+          const iy = Math.min(
+            rows - 1,
+            Math.max(0, Math.floor((point.y - safeBounds.minY) / cellSize)),
+          );
+          const bucket = buckets[iy * cols + ix];
+          bucket.points.push(point);
+          if (point.classification === 2) {
+            groundPointCount += 1;
+            bucket.groundPoints.push(point);
+          } else {
+            nonGroundPointCount += 1;
+          }
+        });
+
+        const groundRatio = groundPointCount / safePoints.length;
+        const minGroundRatio = Number.isFinite(Number(options.minGroundRatio))
+          ? Number(options.minGroundRatio)
+          : 0.08;
+        const method = groundPointCount > 0 && groundRatio >= minGroundRatio
+          ? "classification_ground"
+          : "low_percentile_grid";
+        const stats = getStatisticsToolkit();
+        const warnings = [];
+        if (groundPointCount === 0) warnings.push("GROUND_CLASS_MISSING");
+        else if (method !== "classification_ground") warnings.push("GROUND_CLASS_SPARSE");
+
+        const cells = buckets.map((bucket, index) => {
+          const ix = index % cols;
+          const iy = Math.floor(index / cols);
+          const pointsForSurface =
+            method === "classification_ground" && bucket.groundPoints.length
+              ? bucket.groundPoints
+              : bucket.points;
+          const zValues = bucket.points.map((point) => point.z);
+          const surfaceZValues = pointsForSurface.map((point) => point.z);
+          const zMin = zValues.length
+            ? zValues.reduce((min, value) => Math.min(min, value), Number.POSITIVE_INFINITY)
+            : null;
+          const zMedian = zValues.length ? stats.quantileSorted(zValues, 0.5) : null;
+          const zP05 = zValues.length ? stats.quantileSorted(zValues, 0.05) : null;
+          const groundCandidateZ = surfaceZValues.length
+            ? (method === "classification_ground"
+                ? stats.quantileSorted(surfaceZValues, 0.5)
+                : stats.quantileSorted(surfaceZValues, 0.05))
+            : null;
+          let confidence = "empty";
+          if (groundCandidateZ !== null) {
+            if (method === "classification_ground" && bucket.groundPoints.length >= 2) {
+              confidence = "high";
+            } else if (method === "classification_ground") {
+              confidence = "medium";
+            } else {
+              confidence = bucket.points.length >= 3 ? "medium" : "low";
+            }
+          }
+          return {
+            ix,
+            iy,
+            pointCount: bucket.points.length,
+            groundPointCount: bucket.groundPoints.length,
+            groundCandidateZ,
+            zMin,
+            zMedian,
+            zP05,
+            zP95: zValues.length ? stats.quantileSorted(zValues, 0.95) : null,
+            confidence,
+          };
+        });
+
+        const validCells = cells.filter((cell) => cell.groundCandidateZ !== null);
+        const validCellRatio = totalCells > 0 ? validCells.length / totalCells : 0;
+        if (validCellRatio < 0.5) warnings.push("GROUND_GRID_HOLES");
+        if (method !== "classification_ground") warnings.push("GROUND_ESTIMATE_LOW_CONFIDENCE");
+
+        let confidence = "low";
+        if (method === "classification_ground" && validCellRatio >= 0.7 && groundRatio >= 0.2) {
+          confidence = "high";
+        } else if (validCellRatio >= 0.5 && (groundPointCount > 0 || safePoints.length >= 10)) {
+          confidence = "medium";
+        }
+
+        return {
+          status: confidence === "low" || warnings.length ? "warn" : "ok",
+          method,
+          grid: {
+            cellSize,
+            cols,
+            rows,
+            originX: safeBounds.minX,
+            originY: safeBounds.minY,
+            sampleRatio: Number.isFinite(Number(options.sampleRatio))
+              ? Number(options.sampleRatio)
+              : 1,
+          },
+          cells,
+          summary: {
+            validCellRatio,
+            groundPointCount,
+            nonGroundPointCount,
+            averageHeightAboveGround: null,
+            confidence,
+          },
+          warnings: uniqueStrings(warnings),
+        };
+      }
+
       function detectZOutliers(points = [], options = {}) {
         const safePoints = normalizeDiagnosticsPoints(points);
         const zValues = safePoints.map((point) => point.z);
@@ -7601,6 +7815,7 @@
         const bounds = pointCloudData?.bounds || calculatePointBounds(points);
         const spatialIndex = buildSpatialDiagnosticsIndex(points);
         const densityGrid = buildDensityGrid(points, bounds);
+        const groundCandidate = buildGroundCandidateGrid(points, bounds);
         const zOutliers = detectZOutliers(points);
         const isolatedPoints = detectIsolatedPoints(points, spatialIndex);
         const classificationStats = buildClassificationStats(
@@ -7620,6 +7835,7 @@
           basis: "displayed-points",
           usesFlatbush: spatialIndex.usesFlatbush,
           densityGrid,
+          groundCandidate,
           zOutliers,
           isolatedPoints,
           classificationStats,
@@ -14139,9 +14355,12 @@
             classificationCounts: statsData.classificationCounts,
             crsDiagnostics: statsData.crsDiagnostics || header.crsDiagnostics,
           });
+          statsData.groundCandidateReport =
+            statsData.diagnosticsReport?.groundCandidate || null;
         } catch (diagnosticsError) {
           console.warn("点群診断の更新に失敗（処理続行）:", diagnosticsError);
           statsData.diagnosticsReport = null;
+          statsData.groundCandidateReport = null;
         }
         const classificationTypes = qualityAnalysis.types;
         const unclassifiedPercent = qualityAnalysis.unclassifiedPercent;
@@ -14427,6 +14646,8 @@
               classificationCounts: statsData.classificationCounts,
               crsDiagnostics: statsData.crsDiagnostics,
             });
+            statsData.groundCandidateReport =
+              statsData.diagnosticsReport?.groundCandidate || null;
           }
 
           const loadedPointsEl = document.getElementById("loadedPoints");
@@ -18239,6 +18460,8 @@
           zOutlierCandidates: "-",
           isolatedPointCandidates: "-",
           densitySpikeCandidates: "-",
+          groundCandidateStatus: "参考 / 未計算",
+          groundCandidateMethod: "-",
           diagnosticsWarnings: "表示点ベース",
           diagnosticsWarningCodes: "-",
           diagnosticsScoreWeights: "-",
@@ -18247,6 +18470,9 @@
         if (report) {
           const score = report.score || {};
           const densitySummary = report.densityGrid?.summary || {};
+          const groundSummary = summarizeGroundCandidateReport(
+            statsData.groundCandidateReport || report.groundCandidate,
+          );
           const zCount = report.zOutliers?.candidates?.length || 0;
           const isolatedCount = report.isolatedPoints?.candidates?.length || 0;
           const reasons = Array.isArray(score.reasons) ? score.reasons : [];
@@ -18269,6 +18495,14 @@
           mappings.isolatedPointCandidates = `${isolatedCount.toLocaleString()}点`;
           mappings.densitySpikeCandidates =
             `${densitySummary.densitySpikeCells || 0}セル`;
+          mappings.groundCandidateStatus =
+            `参考 / ${groundSummary.confidence} / 有効${(groundSummary.validCellRatio * 100).toFixed(1)}%`;
+          mappings.groundCandidateMethod =
+            groundSummary.method === "classification_ground"
+              ? "class 2 ground"
+              : groundSummary.method === "low_percentile_grid"
+                ? "p05推定"
+                : "-";
           mappings.diagnosticsWarnings = reasons.length
             ? `表示点ベース / ${reasons.join(", ")}`
             : "表示点ベース / 大きな注意なし";
@@ -18714,6 +18948,7 @@
           getFileReadTimeoutMs,
           buildSpatialDiagnosticsIndex,
           buildDensityGrid,
+          buildGroundCandidateGrid,
           detectZOutliers,
           detectIsolatedPoints,
           buildDiagnosticsWarningCodes,

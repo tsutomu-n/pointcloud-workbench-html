@@ -11,20 +11,20 @@
 
 `.tmp/done-up?.md` の 8〜15 は、現時点では **13 来歴、12 属性、11 取得品質、15 作業補助の一部が実装済みまたは一部実装済み**です。
 
-一方で、仕様の中核である **8 地表候補DTM、9 勾配、10 土量、14 差分** はまだ未実装です。既存の密度グリッド、断面、計測、診断候補は基礎部品として利用できますが、`.tmp/done-up?.md` が求める「共通XYグリッド → DTM → 勾配/土量/差分」にはまだ到達していません。
+一方で、仕様の中核である **9 勾配、10 土量、14 差分** はまだ未実装です。**8 地表候補DTM** は、表示点ベースの「地表候補アシスト」として一部実装済みです。ただし、`.tmp/done-up?.md` が求める「共通XYグリッド → 成果品に近いDTM → 勾配/土量/差分」にはまだ到達していません。
 
 総合判定:
 
 | 分類 | 項目 |
 |---|---|
 | 実装済み | 13 来歴のMVP相当、12 属性のヘッダ/点形式ベース判定、11 取得品質のavailability + sampled coverage、診断コピーへの反映 |
-| 一部実装済み | 15 作業補助、共通グリッドの一部、断面/計測/異常候補の作業メモ化 |
-| 未実装 | 8 地表候補DTM、9 勾配、10 土量、14 差分、ROI保存、視点保存、断面保存、JSON import/export |
+| 一部実装済み | 8 地表候補アシスト、15 作業補助、共通グリッドの一部、断面/計測/異常候補の作業メモ化 |
+| 未実装 | 9 勾配、10 土量、14 差分、ROI保存、視点保存、断面保存、JSON import/export |
 
 実務者向けの重要な見方:
 
 - 現実装は「診断・確認・コピー」の段階まで進んでいる。
-- 「解析成果を作る」段階、特に DTM / 勾配 / 土量 / 差分はまだ始まっていない。
+- 「解析成果を作る」段階、特に 勾配 / 土量 / 差分はまだ始まっていない。DTMは参考地表候補の初期段階に限る。
 - `15 作業補助` は「保存機能」ではなく、現時点では「作業メモコピー」に限定されたv1である。
 - `11 取得品質` は実装済みだが、原案の source ID 別統計、return比率詳細、scan angle p95、GPS discontinuity までは未実装である。
 
@@ -52,7 +52,7 @@
 
 | No | 項目 | 現判定 | 実装済みの範囲 | 不足している範囲 |
 |---:|---|---|---|---|
-| 8 | 地表候補: 簡易DTM・地表/非地表分離 | 未実装 | class 2 ground の分類統計、断面の groundOnly、密度グリッドは存在 | `GroundCandidateReport`、DTMグリッド、p05/p10、3x3 smoothing、HAG、地表/非地表表示切替がない |
+| 8 | 地表候補: 簡易DTM・地表/非地表分離 | 一部実装済み | 表示点ベースの `buildGroundCandidateGrid()`、`classification_ground`、`low_percentile_grid`、valid cell ratio、confidence、手動診断JSON/作業メモ要約、統計パネル表示 | 3x3 smoothing、HAG、地表/非地表表示切替、DTMメッシュ、ROI詳細解析、成果品DTM相当の品質管理は未実装 |
 | 9 | 勾配: 法面・排水・急変箇所 | 未実装 | 2点計測で dZ / 水平距離は取得可能 | DTM中央差分、slopePercent、法勾配1:n、急変セル、排水注意候補、勾配ヒートマップがない |
 | 10 | 土量: 概算体積・切盛差分 | 未実装 | 計測履歴、断面、密度候補はある | ROI、基準面、cut/fill/net、VolumeReport、有効セル率、信頼度表示がない |
 | 11 | 取得品質: return / scan angle / GPS time / source ID | 一部実装済みから実装済み寄り | return / scanAngle / gpsTime の有無、sampled coverage、GPS monotonic warning、手動診断JSON反映 | return比率詳細、scan angle p95、高角度比率、GPS duration/discontinuity、source ID 別統計/色分けは未実装 |
@@ -253,33 +253,38 @@
 
 ---
 
-## 6. 未実装として明確に残るもの
+## 6. 一部実装済み / 未実装として残るもの
 
 ### 6.1 8 地表候補DTM
 
-未実装の主要要件:
+実装済み:
 
 - `GroundCandidateReport`
 - `GroundCell[]`
 - class 2 ground 優先グリッド化
-- p05/p10 下位パーセンタイル方式
+- p05 下位パーセンタイル方式
+- `GROUND_*` warning codes
+- 手動診断JSON / 作業メモJSONへの要約追加
+- 統計パネルへの方式、confidence、有効セル率表示
+
+未実装の主要要件:
+
+- p10 切替
 - 最低点 + 3x3 median smoothing
 - 欠損セル補間
 - `heightAboveGround` 計算
 - 地表候補/非地表候補表示切替
 - HAG色分け
 - DTMメッシュ表示
-- `GROUND_*` warning codes
+- ROI詳細解析
 
-現実装の関連部品:
+現実装の注意点:
 
-- classification class 2 の集計はある。
-- 断面の groundOnly はある。
-- 密度グリッドはある。
+- 表示点ベースの参考地表候補であり、測量成果DTMではない。
+- `classification_ground` と `low_percentile_grid` の2方式に限定している。
+- smooth / HAG / 表示切替を入れていないため、9 勾配、10 土量、14 差分の根拠にはまだ弱い。
 
-ただし、これはDTMではない。
-
-判定: **未実装**。
+判定: **一部実装済み**。
 
 ### 6.2 9 勾配
 
@@ -400,42 +405,40 @@
 - 不正確: `属性パネル実装済み`
 - 正確: `属性availability診断を実装済み。属性表示UIは未実装`
 
-### 7.4 8〜10/14 は「部品あり」と「機能あり」を混同しやすい
+### 7.4 8〜10/14 は「参考地表候補」と「解析基盤完成」を混同しやすい
 
-密度グリッドや断面はあるが、DTM/勾配/土量/差分そのものではない。
+地表候補アシストはあるが、成果品DTMや勾配/土量/差分の解析基盤完成ではない。
 
 言い換え推奨:
 
 - 不正確: `地表候補/勾配/土量/差分の基盤は完成`
-- 正確: `密度・断面・計測の基礎部品はあるが、共通解析グリッドとDTMは未実装`
+- 正確: `表示点ベースの地表候補アシストは一部実装済み。HAG、平滑化、ROI、勾配、土量、差分は未実装`
 
 ---
 
 ## 8. 次に実装するなら何からか
 
-原案の依存関係は正しいため、次は **8 地表候補DTM** を推奨する。
+原案の依存関係は正しいため、次は **8 地表候補DTMの強化** を推奨する。
 
 理由:
 
 - 9 勾配、10 土量、14 差分の全てがDTMに依存する。
 - 15のROI保存を先に大きく作っても、解析対象がまだないため価値が出にくい。
-- 既存の `buildDensityGrid()` と `extractSectionPoints()` を参考に、表示点ベースの小さい `GroundCandidateReport` から始められる。
+- 既存の `buildGroundCandidateGrid()` を平滑化とHAG要約へ拡張できる。
 
 推奨する次スライス:
 
 ```txt
-8A. buildGroundCandidateGrid(points, bounds, options)
-  - class 2 ground が十分なら classification_ground
-  - ground が薄ければ low_percentile_grid
-  - cellSize は既定値または自動簡易値
-  - validCellRatio / confidence / warnings を返す
-
 8B. buildHeightAboveGroundSummary(points, groundGrid)
   - HAG統計だけ出す
   - 点ごとの永続HAG付与や表示切替は後回し
 
-8C. 統計パネルまたは手動診断JSONへ要約だけ追加
-  - DTM成果品ではなく「地表候補アシスト」と明記
+8C. smoothGroundCandidateGrid(report)
+  - 3x3 median smoothing
+  - low-noise候補はwarning扱い
+
+8D. 地表候補/非地表候補の表示切替
+  - HAGしきい値は参考値としてUIに明記
 ```
 
 この順なら、9 勾配に進む前に DTM の品質とリスクを確認できる。
@@ -472,10 +475,10 @@
 
 ```txt
 bun test scripts/pointcloud-workbench.test.js
-=> 88 pass / 0 fail
+=> 90 pass / 0 fail
 
 bun test scripts/pointcloud-workbench.test.js scripts/documentation-consistency.test.js
-=> 91 pass / 0 fail
+=> 93 pass / 0 fail
 
 bun scripts/check-readme.js
 => README チェック OK
@@ -490,4 +493,4 @@ bunx --package playwright node scripts/e2e/run-diagnostics-smoke.mjs --las sampl
 
 この状態を実務者に見せる場合の短い説明:
 
-> 13/12/11は、原案の「診断基盤」としてかなり実装済みです。特に来歴、属性availability、取得品質coverage、手動診断JSONへの反映はテスト付きで確認できます。15は作業補助v1として、現在状態の作業メモコピーまで入りました。ただし、原案の保存/読込/ROI/メモ機能ではありません。8/9/10/14は未実装です。密度グリッド、断面、計測はありますが、共通DTM・勾配・土量・差分の解析機能とはまだ別物です。次に進めるなら、8の地表候補DTMを最小スライスで作るのが妥当です。
+> 13/12/11は、原案の「診断基盤」としてかなり実装済みです。特に来歴、属性availability、取得品質coverage、手動診断JSONへの反映はテスト付きで確認できます。15は作業補助v1として、現在状態の作業メモコピーまで入りました。ただし、原案の保存/読込/ROI/メモ機能ではありません。8は表示点ベースの地表候補アシストとして一部実装済みです。9/10/14は未実装です。次に進めるなら、8のHAG要約、平滑化、地表/非地表表示切替を足してから、9の勾配へ進むのが妥当です。

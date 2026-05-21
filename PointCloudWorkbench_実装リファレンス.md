@@ -154,6 +154,15 @@
 - `buildWorkAssistSnapshot()` は `schemaVersion: 1` の作業メモ JSON を作り、表示、断面、計測履歴、異常候補、取得品質を要約する。ファイル名、点群配列、元LAS座標配列、ROI geometry の永続化情報は含めない
 - `copyWorkAssistSnapshot()` は `copyTextToClipboard()` 経由で作業メモ JSON をコピーする。外部送信、ファイル書き込み、サーバー処理は行わない
 
+## 7.8 地表候補アシスト
+- `buildGroundCandidateGrid(points, bounds, options)` は表示点ベースの参考地表候補を作る。測量成果DTM、設計面、土量根拠は作らない
+- `classification_ground` は class 2 ground が一定比率以上ある場合に使い、セル内 ground 点の median Z を `groundCandidateZ` にする
+- `low_percentile_grid` は ground 分類がない、または薄い場合に使い、セル内全点の p05 Z を `groundCandidateZ` にする
+- `GroundCandidateReport` 相当の object は `method`, `grid`, `cells`, `summary`, `warnings` を持つ。`summary` は `validCellRatio`, `groundPointCount`, `nonGroundPointCount`, `confidence` を返す
+- warning は `GROUND_CLASS_MISSING`, `GROUND_CLASS_SPARSE`, `GROUND_GRID_HOLES`, `GROUND_ESTIMATE_LOW_CONFIDENCE` を返す
+- `buildPointCloudDiagnostics()` は `groundCandidate` を含め、`buildManualDiagnosticReport()` と `buildWorkAssistSnapshot()` は要約のみを出す
+- HAG点属性付与、DTMメッシュ表示、地表/非地表表示切替、勾配、土量、差分は未実装の後続拡張
+
 ## 8. 点群生成と描画
 
 ### 8.1 `createPointCloudFromData()`

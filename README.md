@@ -60,6 +60,7 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 - Manual diagnostic report copy with no telemetry, no LAS/LAZ upload, and no file name included
 - CRS diagnostics from local LAS/LAZ header, VLR, and EVLR metadata, including WKT / GeoTIFF / EPSG candidates and cautious height-basis warnings
 - Acquisition quality summary in the manual report, based on LAS point format signal availability and sampled return / scan-angle / GPS-time coverage
+- Ground candidate assist for displayed points, choosing class 2 ground when available and falling back to low-percentile grid estimates when ground classes are sparse
 - Work-assist memo copy for the current view, section, measurement, diagnostics, and acquisition-quality state without file names or point payloads
 - Load quality selection (`LOW` / `MEDIUM` / `HIGH` / `MAX`)
 - 3D and 2D view switching
@@ -87,6 +88,7 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 - CRS diagnostics are local metadata inspection only. They do not perform coordinate conversion, geocoding, EPSG database lookup, map matching, or server-side CRS processing.
 - CRS diagnostics read bounded LAS header / VLR / EVLR slices and do not upload LAS/LAZ files or copy local file names into CRS inquiry text.
 - Acquisition quality is a local dimension-coverage aid. It follows the stable LAS 1.4 R15 point-record layout used by the app, keeps PDRF 0-5 and PDRF 6+ return / scan-angle interpretation separate, and treats GPS-time monotonicity as a warning signal rather than survey-grade proof.
+- Ground candidate assist is approximate and displayed-point based. It is not a survey-grade DTM, design surface, cut/fill basis, or deliverable terrain model.
 - Work-assist memo copy is temporary in-page context for handoff and review. It does not save ROI geometry, write files, upload LAS/LAZ data, or include source point coordinates.
 - LAS files in the `2GB to 3GB` range are experimental. Start from `LOW` quality and verify memory use and responsiveness.
 - LAZ has a narrower safety margin because the decoder consumes extra memory. Files above `2GB` are rejected.

@@ -1129,6 +1129,12 @@ test("manual diagnostic report omits point cloud payloads and file names", () =>
     availableSignals: [],
     missingSignals: ["return", "scanAngle", "gpsTime"],
   });
+  expect(report.groundCandidate).toMatchObject({
+    status: "unknown",
+    method: "unknown",
+    validCellRatio: 0,
+    confidence: "low",
+  });
   expect(reportText).not.toContain("private-site-survey");
   expect(reportText).not.toContain("points\":[");
 });
@@ -1172,6 +1178,17 @@ test("work assist snapshot summarizes current work without file names or point p
         zRange: 4.75309,
         densityEstimate: 0.123456,
         samples: [{ x: 1, z: 2, classification: 2 }],
+      };
+      statsData.groundCandidateReport = {
+        status: "ok",
+        method: "classification_ground",
+        summary: {
+          validCellRatio: 0.75,
+          groundPointCount: 9,
+          nonGroundPointCount: 3,
+          confidence: "high",
+        },
+        warnings: [],
       };
       statsData.diagnosticsReport = {
         score: {
@@ -1269,6 +1286,13 @@ test("work assist snapshot summarizes current work without file names or point p
     kind: "欠測セル",
     row: 2,
     column: 3,
+  });
+  expect(snapshot.groundCandidate).toMatchObject({
+    status: "ok",
+    method: "classification_ground",
+    validCellRatio: 0.75,
+    confidence: "high",
+    groundPointCount: 9,
   });
   expect(snapshot.acquisitionQuality).toMatchObject({
     status: "high",
@@ -1826,6 +1850,71 @@ test("buildDensityGrid reports missing and spike density cells from displayed po
   expect(grid.summary.emptyInteriorCells).toBeGreaterThan(0);
   expect(grid.summary.densitySpikeCells).toBeGreaterThan(0);
   expect(grid.status).toBe("warn");
+});
+
+test("buildGroundCandidateGrid uses class 2 ground when available", () => {
+  const context = createContext();
+  context.__points = [
+    { x: 0.2, y: 0.2, z: 10, classification: 2 },
+    { x: 0.4, y: 0.3, z: 11, classification: 2 },
+    { x: 1.2, y: 0.2, z: 15, classification: 1 },
+    { x: 1.4, y: 0.4, z: 16, classification: 1 },
+    { x: 0.2, y: 1.2, z: 12, classification: 2 },
+    { x: 0.4, y: 1.4, z: 13, classification: 2 },
+  ];
+  context.__bounds = { minX: 0, maxX: 2, minY: 0, maxY: 2, minZ: 10, maxZ: 16 };
+
+  const report = vm.runInContext(
+    "window.__pcwTestApi.buildGroundCandidateGrid(__points, __bounds, { cellSize: 1 })",
+    context,
+  );
+
+  expect(report.status).toBe("ok");
+  expect(report.method).toBe("classification_ground");
+  expect(report.grid).toMatchObject({
+    cellSize: 1,
+    cols: 2,
+    rows: 2,
+    originX: 0,
+    originY: 0,
+  });
+  expect(report.summary.groundPointCount).toBe(4);
+  expect(report.summary.nonGroundPointCount).toBe(2);
+  expect(report.summary.validCellRatio).toBeGreaterThan(0);
+  expect(report.summary.confidence).toBe("high");
+  expect(report.cells.find((cell) => cell.ix === 0 && cell.iy === 0)).toMatchObject({
+    pointCount: 2,
+    groundCandidateZ: 10.5,
+    zMin: 10,
+    confidence: "high",
+  });
+});
+
+test("buildGroundCandidateGrid falls back to p05 when ground class is sparse", () => {
+  const context = createContext();
+  context.__points = [
+    { x: 0.2, y: 0.2, z: 100, classification: 1 },
+    { x: 0.3, y: 0.2, z: 102, classification: 1 },
+    { x: 0.4, y: 0.3, z: 110, classification: 1 },
+    { x: 1.2, y: 0.2, z: 50, classification: 1 },
+    { x: 1.3, y: 0.3, z: 70, classification: 1 },
+  ];
+  context.__bounds = { minX: 0, maxX: 2, minY: 0, maxY: 1, minZ: 50, maxZ: 110 };
+
+  const report = vm.runInContext(
+    "window.__pcwTestApi.buildGroundCandidateGrid(__points, __bounds, { cellSize: 1 })",
+    context,
+  );
+
+  const firstCell = report.cells.find((cell) => cell.ix === 0 && cell.iy === 0);
+  expect(report.method).toBe("low_percentile_grid");
+  expect(report.status).toBe("warn");
+  expect(report.summary.groundPointCount).toBe(0);
+  expect(report.summary.confidence).toBe("low");
+  expect(report.warnings).toContain("GROUND_CLASS_MISSING");
+  expect(report.warnings).toContain("GROUND_ESTIMATE_LOW_CONFIDENCE");
+  expect(firstCell.zP05).toBe(100.2);
+  expect(firstCell.groundCandidateZ).toBe(100.2);
 });
 
 test("detectZOutliers uses robust quartile thresholds", () => {
