@@ -13,7 +13,11 @@
     <script src="https://cdn.jsdelivr.net/npm/simple-statistics@7.8.9/dist/simple-statistics.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatbush@4.5.0/flatbush.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/simpleheat@0.4.0/simpleheat.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/proj4@2.12.1/dist/proj4.js"></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/proj4@2.12.1/dist/proj4.js"
+      integrity="sha384-eCfO4pOi+VsP6z/nsQni5JF69AVBgkaI2kwPfFh+J64UMLNVDIBVvowHHM9Q62TF"
+      crossorigin="anonymous"
+    ></script>
     <script>
       // OrbitControls のインライン実装
       THREE.OrbitControls = function (object, domElement) {
@@ -4876,6 +4880,10 @@
                   中心緯度経度:
                   <span class="stats-value" id="crsCenterLatLon">未変換</span>
                 </div>
+                <div class="stats-item">
+                  X/Y入れ替え候補:
+                  <span class="stats-value" id="crsAlternateLatLon">未変換</span>
+                </div>
                 <div class="stats-item" id="crsMapLinksRow">
                   地図:
                   <a
@@ -4893,6 +4901,29 @@
                     target="_blank"
                     rel="noopener noreferrer"
                   >地理院地図</a>
+                </div>
+                <div class="stats-item" id="crsAlternateMapLinksRow">
+                  入れ替え候補:
+                  <a
+                    class="stats-value"
+                    id="crsAlternateGoogleMapsLink"
+                    href="#"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >Google Maps</a>
+                  /
+                  <a
+                    class="stats-value"
+                    id="crsAlternateGsiMapsLink"
+                    href="#"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >地理院地図</a>
+                </div>
+                <div class="stats-item">
+                  <span class="stats-value" id="crsMapLinkDisclosure">
+                    リンクを開くと緯度経度だけが外部地図へ渡ります。LAS/LAZ本体とファイル名は送信しません。
+                  </span>
                 </div>
                 <button
                   class="control-btn"
@@ -6726,7 +6757,10 @@
         };
       }
 
-      function buildMapLinks(latLon) {
+      const EXTERNAL_MAP_LINK_DISCLOSURE =
+        "リンクを開くと緯度経度だけが外部地図へ渡ります。LAS/LAZ本体とファイル名は送信しません。";
+
+      function buildSingleMapLinks(latLon) {
         if (latLon?.status !== "converted") {
           return {
             googleMaps: null,
@@ -6739,6 +6773,57 @@
           googleMaps: `https://www.google.com/maps/search/?api=1&query=${latitude}%2C${longitude}`,
           gsiMaps: `https://maps.gsi.go.jp/#16/${latitude}/${longitude}/&base=std&ls=std&disp=1&vs=c1j0h0k0l0u0t0z0r0s0m0f1`,
         };
+      }
+
+      function buildMapLinks(latLon) {
+        const primary = buildSingleMapLinks(latLon?.primary || latLon);
+        const alternateAxis = buildSingleMapLinks(latLon?.alternateAxis);
+        return {
+          ...primary,
+          alternateAxis,
+          externalDisclosure: EXTERNAL_MAP_LINK_DISCLOSURE,
+        };
+      }
+
+      function buildDiagnosticLatLonCandidate({
+        assumption,
+        axisOrder,
+        coordinateOrder,
+        proj4Coordinate,
+        sourceCrs,
+        transformer,
+        definition,
+        crsDiagnostics,
+        bounds,
+      }) {
+        try {
+          const converted = transformer(sourceCrs, "EPSG:4326", proj4Coordinate);
+          const longitude = roundLatLonCoordinate(converted?.[0]);
+          const latitude = roundLatLonCoordinate(converted?.[1]);
+          if (latitude === null || longitude === null) {
+            return buildLatLonUnavailable("invalid-transform-result", "LATLON_INVALID_TRANSFORM_RESULT");
+          }
+          return {
+            status: "converted",
+            assumption,
+            source: "bounds-center",
+            epsg: definition.epsg,
+            crsName: crsDiagnostics?.horizontal?.name || definition.name,
+            axisOrder,
+            coordinateOrder,
+            input: {
+              x: bounds.centerX,
+              y: bounds.centerY,
+              proj4Coordinate,
+            },
+            latitude,
+            longitude,
+            confidence: crsDiagnostics?.confidence || "medium",
+            warnings: ["LATLON_AXIS_ORDER_APPLIED"],
+          };
+        } catch (error) {
+          return buildLatLonUnavailable("transform-failed", "LATLON_TRANSFORM_FAILED");
+        }
       }
 
       function buildDiagnosticLatLonReport(crsDiagnostics, bounds) {
@@ -6769,32 +6854,35 @@
           transformer.defs(sourceCrs, definition.proj4);
         }
 
-        try {
-          const eastingNorthing = [bounds.centerY, bounds.centerX];
-          const converted = transformer(sourceCrs, "EPSG:4326", eastingNorthing);
-          const longitude = roundLatLonCoordinate(converted?.[0]);
-          const latitude = roundLatLonCoordinate(converted?.[1]);
-          if (latitude === null || longitude === null) {
-            return buildLatLonUnavailable("invalid-transform-result", "LATLON_INVALID_TRANSFORM_RESULT");
-          }
-          return {
-            status: "converted",
-            source: "bounds-center",
-            epsg,
-            crsName: crsDiagnostics?.horizontal?.name || definition.name,
-            axisOrder: definition.axisOrder,
-            input: {
-              x: bounds.centerX,
-              y: bounds.centerY,
-            },
-            latitude,
-            longitude,
-            confidence: crsDiagnostics?.confidence || "medium",
-            warnings: ["LATLON_AXIS_ORDER_APPLIED"],
-          };
-        } catch (error) {
-          return buildLatLonUnavailable("transform-failed", "LATLON_TRANSFORM_FAILED");
-        }
+        const primary = buildDiagnosticLatLonCandidate({
+          assumption: "las-x-northing-y-easting",
+          axisOrder: definition.axisOrder,
+          coordinateOrder: "easting-northing",
+          proj4Coordinate: [bounds.centerY, bounds.centerX],
+          sourceCrs,
+          transformer,
+          definition,
+          crsDiagnostics,
+          bounds,
+        });
+        const alternateAxis = buildDiagnosticLatLonCandidate({
+          assumption: "las-x-easting-y-northing",
+          axisOrder: "easting-northing",
+          coordinateOrder: "easting-northing",
+          proj4Coordinate: [bounds.centerX, bounds.centerY],
+          sourceCrs,
+          transformer,
+          definition,
+          crsDiagnostics,
+          bounds,
+        });
+
+        return {
+          ...primary,
+          selectedAssumption: "primary",
+          primary,
+          alternateAxis,
+        };
       }
 
       function buildDiagnosticLocationReport() {
@@ -18726,6 +18814,8 @@
           crsUnits: rows.units,
           crsWarnings: rows.warnings,
           crsCenterLatLon: formatLatLonDisplay(location.latLon),
+          crsAlternateLatLon: formatLatLonDisplay(location.latLon?.alternateAxis),
+          crsMapLinkDisclosure: location.mapLinks?.externalDisclosure || EXTERNAL_MAP_LINK_DISCLOSURE,
         };
         Object.entries(mappings).forEach(([id, value]) => {
           const el = document.getElementById(id);
@@ -18733,6 +18823,8 @@
         });
         setMapLinkState("crsGoogleMapsLink", location.mapLinks?.googleMaps);
         setMapLinkState("crsGsiMapsLink", location.mapLinks?.gsiMaps);
+        setMapLinkState("crsAlternateGoogleMapsLink", location.mapLinks?.alternateAxis?.googleMaps);
+        setMapLinkState("crsAlternateGsiMapsLink", location.mapLinks?.alternateAxis?.gsiMaps);
       }
 
       function updateDiagnosticsSummaryDisplay(report) {

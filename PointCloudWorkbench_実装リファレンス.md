@@ -153,8 +153,10 @@
 - `buildManualDiagnosticReport()` は `lineage`, `attributes`, `acquisitionQuality`, `location`, `diagnosticsCandidates` を含むが、ローカルファイル名、点群 payload、座標配列は含めない
 - `location.coordinateReference` は CRS 診断結果を要約し、`location.bounds` は header または表示点 bounds から座標範囲と中心を丸めて出す
 - `location.latLon` は対応 EPSG が 1 つだけあり、bounds と `proj4js` が利用できる場合に `status: converted` を返す。変換対象は bounds 中心だけで、全点変換や住所逆引きは行わない
-- JGD2011 平面直角座標系は EPSG 側の軸が northing/easting のため、LAS の `centerX/centerY` を `northing/easting` とみなし、`proj4js` へ渡す時は `[centerY, centerX]` に入れ替える
-- `location.mapLinks` は `latLon.status === "converted"` の場合だけ Google Maps と地理院地図の外部リンクを返す。リンクは自動取得せず、ユーザークリック時だけ外部サイトへ緯度経度を渡す
+- JGD2011 平面直角座標系は EPSG 側の軸が northing/easting のため、`location.latLon.primary` は LAS の `centerX/centerY` を `northing/easting` とみなし、`proj4js` へ `[centerY, centerX]` を渡す
+- `location.latLon.alternateAxis` は X/Y 運用が逆のデータを地図で比較するため、`proj4js` へ `[centerX, centerY]` を渡す。アプリは自動断定せず、`selectedAssumption: "primary"` を既定値として残す
+- `location.mapLinks` は `latLon.status === "converted"` の場合に primary の Google Maps / 地理院地図リンクを返し、`location.mapLinks.alternateAxis` に X/Y 入れ替え候補リンクを返す。リンクは自動取得せず、ユーザークリック時だけ外部サイトへ緯度経度を渡す
+- `proj4js` は固定 CDN URL に Subresource Integrity と `crossorigin="anonymous"` を付ける。CDN 未到達または SRI 不一致時は `proj4-unavailable` となり、緯度経度リンクは無効化される
 - CRS 不明、EPSG 複数候補、未対応 EPSG、bounds 不足、`proj4js` 未読込、変換結果不正では `location.latLon.status: unavailable` とし、住所や緯度経度として扱わない
 - `buildWorkAssistSnapshot()` は `schemaVersion: 1` の作業メモ JSON を作り、表示、断面、計測履歴、異常候補、取得品質を要約する。ファイル名、点群配列、元LAS座標配列、ROI geometry の永続化情報は含めない
 - `copyWorkAssistSnapshot()` は `copyTextToClipboard()` 経由で作業メモ JSON をコピーする。外部送信、ファイル書き込み、サーバー処理は行わない

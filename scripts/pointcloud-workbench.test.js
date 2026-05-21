@@ -1249,7 +1249,10 @@ test("manual diagnostic report converts supported JGD2011 bounds center to map l
   context.__proj4Calls = [];
   context.window.proj4 = (from, to, coordinate) => {
     context.__proj4Calls.push({ from, to, coordinate });
-    return [139.767125, 35.681236];
+    if (coordinate[0] === 2300 && coordinate[1] === 1250) {
+      return [139.767125, 35.681236];
+    }
+    return [139.755, 35.69];
   };
   context.proj4 = context.window.proj4;
 
@@ -1306,9 +1309,15 @@ test("manual diagnostic report converts supported JGD2011 bounds center to map l
       to: "EPSG:4326",
       coordinate: [2300, 1250],
     },
+    {
+      from: "EPSG:6677",
+      to: "EPSG:4326",
+      coordinate: [1250, 2300],
+    },
   ]);
   expect(report.location.latLon).toMatchObject({
     status: "converted",
+    selectedAssumption: "primary",
     source: "bounds-center",
     epsg: "6677",
     crsName: "JGD2011 / Japan Plane Rectangular CS IX",
@@ -1318,11 +1327,41 @@ test("manual diagnostic report converts supported JGD2011 bounds center to map l
     confidence: "medium",
     warnings: ["LATLON_AXIS_ORDER_APPLIED"],
   });
+  expect(report.location.latLon.primary).toMatchObject({
+    status: "converted",
+    assumption: "las-x-northing-y-easting",
+    coordinateOrder: "easting-northing",
+    input: {
+      x: 1250,
+      y: 2300,
+      proj4Coordinate: [2300, 1250],
+    },
+    latitude: 35.681236,
+    longitude: 139.767125,
+  });
+  expect(report.location.latLon.alternateAxis).toMatchObject({
+    status: "converted",
+    assumption: "las-x-easting-y-northing",
+    coordinateOrder: "easting-northing",
+    input: {
+      x: 1250,
+      y: 2300,
+      proj4Coordinate: [1250, 2300],
+    },
+    latitude: 35.69,
+    longitude: 139.755,
+  });
   expect(report.location.mapLinks.googleMaps).toBe(
     "https://www.google.com/maps/search/?api=1&query=35.681236%2C139.767125",
   );
   expect(report.location.mapLinks.gsiMaps).toContain(
     "https://maps.gsi.go.jp/#16/35.681236/139.767125/",
+  );
+  expect(report.location.mapLinks.alternateAxis.googleMaps).toBe(
+    "https://www.google.com/maps/search/?api=1&query=35.69%2C139.755",
+  );
+  expect(report.location.mapLinks.externalDisclosure).toContain(
+    "緯度経度だけが外部地図へ渡ります",
   );
 });
 
@@ -1375,6 +1414,12 @@ test("manual diagnostic report does not convert ambiguous or unavailable locatio
   expect(report.location.mapLinks).toEqual({
     googleMaps: null,
     gsiMaps: null,
+    alternateAxis: {
+      googleMaps: null,
+      gsiMaps: null,
+    },
+    externalDisclosure:
+      "リンクを開くと緯度経度だけが外部地図へ渡ります。LAS/LAZ本体とファイル名は送信しません。",
   });
 
   vm.runInContext(
@@ -1396,7 +1441,12 @@ test("manual diagnostic report does not convert ambiguous or unavailable locatio
 
 test("CRS diagnostics display shows converted lat lon and map links", () => {
   const context = createContext();
-  context.window.proj4 = () => [139.767125, 35.681236];
+  context.window.proj4 = (from, to, coordinate) => {
+    if (coordinate[0] === 2300 && coordinate[1] === 1250) {
+      return [139.767125, 35.681236];
+    }
+    return [139.755, 35.69];
+  };
   context.proj4 = context.window.proj4;
   vm.runInContext(
     `
@@ -1432,6 +1482,23 @@ test("CRS diagnostics display shows converted lat lon and map links", () => {
   expect(context.document.getElementById("crsGsiMapsLink").href).toContain(
     "https://maps.gsi.go.jp/#16/35.681236/139.767125/",
   );
+  expect(context.document.getElementById("crsAlternateLatLon").textContent).toBe(
+    "35.690000, 139.755000",
+  );
+  expect(context.document.getElementById("crsAlternateGoogleMapsLink").href).toBe(
+    "https://www.google.com/maps/search/?api=1&query=35.69%2C139.755",
+  );
+  expect(context.document.getElementById("crsMapLinkDisclosure").textContent).toContain(
+    "LAS/LAZ本体とファイル名は送信しません",
+  );
+});
+
+test("proj4js CDN script is pinned with subresource integrity", () => {
+  expect(html).toContain("https://cdn.jsdelivr.net/npm/proj4@2.12.1/dist/proj4.js");
+  expect(html).toContain(
+    'integrity="sha384-eCfO4pOi+VsP6z/nsQni5JF69AVBgkaI2kwPfFh+J64UMLNVDIBVvowHHM9Q62TF"',
+  );
+  expect(html).toContain('crossorigin="anonymous"');
 });
 
 test("work assist snapshot summarizes current work without file names or point payloads", () => {
