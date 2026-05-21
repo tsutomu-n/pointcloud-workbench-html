@@ -10,6 +10,7 @@
 /.serena/
 /.tmp/
 .plan/
+.codex/
 /AGENTS.md
 
 # Test and coverage output

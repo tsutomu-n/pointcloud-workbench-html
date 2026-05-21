@@ -1,153 +1,156 @@
 # PointCloudWorkbench
 
-Browser-native LAS/LAZ point cloud workbench delivered as a single HTML file.
+ブラウザーで動く LAS/LAZ 点群ワークベンチです。単一の HTML ファイルとして配布します。
 
-No install. No build. Open the live demo, load a bundled sample LAS, and inspect point clouds in 3D/2D with slice, classification, and statistics tools.
+インストール不要。ビルド不要。ライブデモを開き、同梱サンプル LAS を読み込み、3D/2D 表示、スライス、分類、統計ツールで点群を確認できます。
 
-## Live Demo
+- English README: [`./docs/README.en.md`](./docs/README.en.md)
 
-- Landing Page: `https://tsutomu-n.github.io/pointcloud-workbench-html/`
-- Launch App Directly: `https://tsutomu-n.github.io/pointcloud-workbench-html/PointCloudWorkbench.html`
-- Bundled Sample LAS: `https://tsutomu-n.github.io/pointcloud-workbench-html/demo/pointcloud-demo-sample.las`
-- The landing page can adapt to your browser language (`ja` / `en` / `zh`) and still exposes a manual language switcher.
+## ライブデモ
 
-## Visual Tour
+- ランディングページ: `https://tsutomu-n.github.io/pointcloud-workbench-html/`
+- アプリを直接開く: `https://tsutomu-n.github.io/pointcloud-workbench-html/PointCloudWorkbench.html`
+- 同梱サンプル LAS: `https://tsutomu-n.github.io/pointcloud-workbench-html/demo/pointcloud-demo-sample.las`
+- ランディングページはブラウザ言語（`ja` / `en` / `zh`）に合わせて表示を切り替えられ、手動の言語切替もできます。
 
-- Planned screenshot assets live under `assets/`.
-- `assets/landing-hero.png`: Full-width GitHub Pages landing-page hero showing the dark terminal-like visual identity, oversized `PointCloudWorkbench.` typography, and the three CTA buttons for app launch, sample LAS download, and repository access.
-- `assets/preflight-panel.png`: App state immediately after selecting the bundled sample, with the pre-flight panel visible and enough detail to read the load path, risk indicator, file size, source point count, estimated display ratio, and quality presets.
-- `assets/workspace-3d.png`: Main 3D workspace after load, showing a point cloud rendered with visible depth and density, the primary control panels, and a viewpoint that makes the browser-native single-file experience feel production-ready rather than experimental.
-- `assets/workspace-2d-slice-stats.png`: 2D or slice-oriented inspection state with the statistics panel open, making it obvious that the tool supports cross-section inspection, classification review, and quantitative validation in addition to 3D viewing.
-- Detailed image briefs for future screenshots are documented in [`assets/README.md`](./assets/README.md).
+## ビジュアルツアー
 
-## Japanese README
+- 将来のスクリーンショット素材は `assets/` に置きます。
+- `assets/landing-hero.png`: GitHub Pages ランディングページのヒーロー画像。暗いターミナル風の見た目、大きな `PointCloudWorkbench.` タイポグラフィ、アプリ起動・サンプル LAS ダウンロード・リポジトリアクセスの3つの CTA を見せます。
+- `assets/preflight-panel.png`: 同梱サンプル選択直後のアプリ画面。読み込み経路、リスク表示、ファイルサイズ、元点数、推定表示率、品質プリセットが読める状態を想定します。
+- `assets/workspace-3d.png`: 読み込み後の 3D ワークスペース。奥行きと密度が分かる点群、主要操作パネル、単一 HTML でも実用に見える視点を想定します。
+- `assets/workspace-2d-slice-stats.png`: 2D またはスライス確認中の画面。統計パネルを開き、断面確認、分類レビュー、定量確認ができることを示します。
+- 画像の詳細な構図メモは [`assets/README.md`](./assets/README.md) にあります。
 
-- Japanese README: [`./docs/README.ja.md`](./docs/README.ja.md)
-- Quickstart: [`./docs/quickstart.ja.md`](./docs/quickstart.ja.md)
-- Junior engineer guide: [`./docs/for-junior-se.ja.md`](./docs/for-junior-se.ja.md)
-- Runtime model: [`./docs/runtime-model.ja.md`](./docs/runtime-model.ja.md)
-- Troubleshooting: [`./docs/troubleshooting.ja.md`](./docs/troubleshooting.ja.md)
+## 関連ドキュメント
+
+- English README: [`./docs/README.en.md`](./docs/README.en.md)
+- クイックスタート: [`./docs/quickstart.ja.md`](./docs/quickstart.ja.md)
+- ジュニアSE向けガイド: [`./docs/for-junior-se.ja.md`](./docs/for-junior-se.ja.md)
+- 実行モデル: [`./docs/runtime-model.ja.md`](./docs/runtime-model.ja.md)
+- トラブルシューティング: [`./docs/troubleshooting.ja.md`](./docs/troubleshooting.ja.md)
 - FAQ: [`./docs/faq.ja.md`](./docs/faq.ja.md)
-- Glossary: [`./docs/glossary.ja.md`](./docs/glossary.ja.md)
+- 用語集: [`./docs/glossary.ja.md`](./docs/glossary.ja.md)
 
-## Why PointCloudWorkbench
+## PointCloudWorkbench の特徴
 
-- Single HTML delivery. The main application is `PointCloudWorkbench.html` with no build step.
-- Client-Max / Server-Zero workflow. Open the file in Chrome / Edge only and start loading `.las` or `.laz`.
-- Selected LAS/LAZ files are processed locally in the browser and are not uploaded to the application server.
-- Landing-page copy can adapt to browser language while keeping explicit user override.
-- Fast evaluation before full load. The app previews headers, load path, risk level, and estimated display ratio before import.
-- Practical inspection workflow. Switch between 3D and 2D, inspect slices, review classifications, and check statistics in one tool.
-- Public demo included. GitHub Pages ships `index.html` as the landing page and the bundled sample LAS for quick validation.
+- 単一 HTML 配布。メインアプリは `PointCloudWorkbench.html` で、ビルド工程はありません。
+- Client-Max / Server-Zero 方針。Chrome / Edge で開き、`.las` または `.laz` をローカルで読み込みます。
+- 選択した LAS/LAZ ファイルはブラウザー内で処理され、アプリケーションサーバーへアップロードされません。
+- ランディングページはブラウザ言語に合わせられ、ユーザーの明示的な言語選択も維持できます。
+- 本読み込み前にヘッダー、読み込み経路、リスク、推定表示率を確認できます。
+- 3D/2D 切替、スライス、分類、統計確認を1つの画面で行えます。
+- GitHub Pages では `index.html` をランディングページとして配信し、同梱サンプル LAS ですぐ検証できます。
 
-## Try It In 60 Seconds
+## 60秒で試す
 
-1. Open the GitHub Pages landing page or launch the app directly.
-2. In the app, choose `サンプルデータを使用` and select the bundled Pages sample, or load your own `.las` / `.laz`.
-3. Review the pre-flight panel for load path, risk level, and estimated display ratio.
-4. Inspect the cloud in 3D / 2D, measure displayed-point distances, try slice mode, and review statistics and classification output.
+1. GitHub Pages のランディングページを開くか、アプリを直接開きます。
+2. アプリで `サンプルデータを使用` を選び、同梱 Pages サンプルを選択します。手元の `.las` / `.laz` も読み込めます。
+3. Preflight 画面で、読み込み経路、リスク、推定表示率を確認します。
+4. 3D/2D で点群を確認し、表示点ベースの距離計測、スライス、統計、分類結果を確認します。
 
-## Key Capabilities
+## 主な機能
 
-- LAS/LAZ loading
-- ReaderRegistry dispatch for LAS and LAZ local readers
-- PointCloudData summary for counts, bounds, and LAS scale/offset basis
-- Chunked LAS loading for large-file pressure smoothing
-- LAZ chunked reads with WASM heap writes to reduce duplicate memory use
-- Header-first preview and accurate display-ratio preview before import
-- Load-path visibility and estimated peak RAM risk display before import
-- Runtime mode summary for Hosted / Portable / renderer / isolation capabilities
-- Manual diagnostic report copy with no telemetry, no LAS/LAZ upload, and no file name included
-- CRS diagnostics from local LAS/LAZ header, VLR, and EVLR metadata, including WKT / GeoTIFF / EPSG candidates and cautious height-basis warnings
-- Acquisition quality summary in the manual report, based on LAS point format signal availability and sampled return / scan-angle / GPS-time coverage
-- Ground candidate assist for displayed points, choosing class 2 ground when available and falling back to low-percentile grid estimates when ground classes are sparse
-- Work-assist memo copy for the current view, section, measurement, diagnostics, and acquisition-quality state without file names or point payloads
-- Load quality selection (`LOW` / `MEDIUM` / `HIGH` / `MAX`)
-- 3D and 2D view switching
-- Displayed-point distance measurement history with 3D distance, horizontal distance, height difference, and source-coordinate dX / dY / dZ
-- Elevation and classification color modes
-- Slice view and 2D cross-section inspection
-- Automatic classification assistance and classification quality review
-- Statistics panel for point counts, class breakdowns, and processing time
-- Diagnostics warning codes are normalized, deduplicated, and emitted in a stable order (`CRS_MISSING`, `CLASSIFICATION_*`, `DISPLAY_RATIO_LOW`, `DENSITY_*`, `Z_OUTLIERS`, `ISOLATED_POINTS`)
-- Diagnostic candidate summary/selected copy payloads include normalized warning codes and score metadata (`score`, `scoreStatus`)
+- LAS/LAZ 読み込み
+- LAS / LAZ ローカル reader を選ぶ ReaderRegistry dispatch
+- 点数、bounds、LAS scale/offset 基準をまとめる PointCloudData summary
+- 大容量ファイルの負荷を平準化する chunked LAS loading
+- メモリ重複を減らす LAZ chunked read + WASM heap writes
+- 読み込み前のヘッダー先読みと正確な表示率プレビュー
+- 読み込み経路と推定ピーク RAM リスクの表示
+- Hosted / Portable / renderer / isolation capability を示す Runtime mode summary
+- telemetry なし、LAS/LAZ upload なし、file name なしの手動診断レポートコピー
+- LAS/LAZ header / VLR / EVLR metadata から WKT / GeoTIFF / EPSG 候補を読む CRS diagnostics
+- 高さ基準を断定しない慎重な CRS 診断表示
+- LAS point format の signal availability と sampled return / scan-angle / GPS-time coverage に基づく取得品質 summary
+- class 2 ground を優先し、分類が薄い場合は low-percentile grid 推定へ fallback する Ground candidate assist
+- 現在表示、断面、計測、診断、取得品質を、file name や point payload なしでコピーする Work-assist memo copy
+- 読み込み品質選択（`LOW` / `MEDIUM` / `HIGH` / `MAX`）
+- 3D / 2D 表示切替
+- 表示点ベースの距離計測履歴（3D距離、水平距離、高低差、元座標 dX / dY / dZ）
+- 標高色分けと分類色分け
+- スライス表示と 2D 断面確認
+- 自動分類補助と分類品質レビュー
+- 点数、分類内訳、処理時間を確認する統計パネル
+- 正規化、重複排除、安定順序化された診断 warning code（`CRS_MISSING`, `CLASSIFICATION_*`, `DISPLAY_RATIO_LOW`, `DENSITY_*`, `Z_OUTLIERS`, `ISOLATED_POINTS`）
+- `score` / `scoreStatus` を含む診断候補 summary / selected copy payload
 
-## Browser / Runtime Requirements
+## ブラウザ / 実行条件
 
-- Supported browsers: Chrome / Edge only, latest versions
-- Unsupported browsers: Safari and Firefox are intentionally unsupported, as are old browsers
-- Required APIs: WebGL, File API, ArrayBuffer
-- Accepted inputs: `.las`, `.laz`
-- Implementation ceiling: LAS files above 3GB and LAZ files above 2GB are rejected
+- 対応ブラウザ: Chrome / Edge の最新版のみ
+- 非対応ブラウザ: Safari and Firefox are intentionally unsupported。古いブラウザーも対象外です。
+- 必須 API: WebGL、File API、ArrayBuffer
+- 対応入力: `.las`, `.laz`
+- 実装上の上限: LAS は 3GB超、LAZ は 2GB超で読み込み不可。LAS files above 3GB and LAZ files above 2GB are rejected.
 
-## Constraints
+## 制約
 
-- `three.js`, `laz-perf`, `simple-statistics`, `Flatbush`, and `simpleheat` are loaded from CDNs, so normal operation requires network access.
-- The server path is static-only. It must not add Workers, Pages Functions, APIs, telemetry, DB writes, or server-side point cloud processing.
-- Selected point cloud files stay on the user's device. Network access is for application assets and optional map tiles, not LAS/LAZ upload.
-- CRS diagnostics are local metadata inspection only. They do not perform coordinate conversion, geocoding, EPSG database lookup, map matching, or server-side CRS processing.
-- CRS diagnostics read bounded LAS header / VLR / EVLR slices and do not upload LAS/LAZ files or copy local file names into CRS inquiry text.
-- Acquisition quality is a local dimension-coverage aid. It follows the stable LAS 1.4 R15 point-record layout used by the app, keeps PDRF 0-5 and PDRF 6+ return / scan-angle interpretation separate, and treats GPS-time monotonicity as a warning signal rather than survey-grade proof.
-- Ground candidate assist is approximate and displayed-point based. It is not a survey-grade DTM, design surface, cut/fill basis, or deliverable terrain model.
-- Work-assist memo copy is temporary in-page context for handoff and review. It does not save ROI geometry, write files, upload LAS/LAZ data, or include source point coordinates.
-- LAS files in the `2GB to 3GB` range are experimental. Start from `LOW` quality and verify memory use and responsiveness.
-- LAZ has a narrower safety margin because the decoder consumes extra memory. Files above `2GB` are rejected.
-- Local LAS uses header-first preview plus chunked point-data reads. Local LAZ uses chunked transfers into WASM. URL loading and some compatibility paths may still use full `ArrayBuffer` reads.
-- Raising file-size acceptance does not change the actual render cap. Confirm `source points / rendered points / render ratio` in the quality screen and statistics panel.
-- Automatic classification is a height-based assist feature, not a survey-grade classification guarantee.
-- Distance measurement snaps to displayed sampled points, not the full source LAS/LAZ point set. Up to 20 measurement results are kept as temporary in-page history. Distances are shown as `m-equivalent` and depend on the source coordinate unit. The load profile includes the extra source-coordinate memory kept for measurement.
+- `three.js`、`laz-perf`、`simple-statistics`、`Flatbush`、`simpleheat` は CDN から読み込むため、通常利用にはネットワーク接続が必要です。
+- サーバー経路は static-only です。Workers、Pages Functions、APIs、telemetry、DB 書き込み、サーバー側点群処理を追加しません。
+- 選択した点群ファイルはユーザーの端末内に留まります。ネットワークアクセスはアプリ資産や任意の地図タイル取得のためであり、LAS/LAZ upload ではありません。Selected LAS/LAZ files are processed locally in the browser and are not uploaded.
+- CRS diagnostics はローカル metadata の確認だけを行います。coordinate conversion、geocoding、EPSG database lookup、map matching、server-side CRS processing は行いません。
+- CRS diagnostics は LAS header / VLR / EVLR を上限付きで読み、LAS/LAZ ファイルやローカルファイル名をアップロードまたは問い合わせ文へコピーしません。
+- 取得品質はローカルの属性 coverage 補助です。アプリが使う LAS 1.4 R15 point-record layout に従い、PDRF 0-5 と PDRF 6+ の return / scan-angle interpretation を分け、GPS-time monotonicity は測量級証明ではなく warning signal として扱います。
+- 地表候補アシストは近似的で、表示点ベースです。測量成果 DTM、設計面、切盛根拠、納品用地形モデルではありません。
+- 作業メモコピーはレビューや引き継ぎのための一時的なページ内 context です。ROI geometry の保存、ファイル書き込み、LAS/LAZ upload、source point coordinates の含有は行いません。
+- LAS の `2GB to 3GB` 帯は experimental です。`LOW` 品質から開始し、メモリ使用量と応答性を確認してください。
+- LAZ は decoder が追加メモリを使うため安全域が狭く、`2GB` 超は拒否します。
+- ローカル LAS は header-first preview と chunked point-data reads を使います。ローカル LAZ は chunked transfers into WASM を使います。URL 読み込みや一部互換経路では full `ArrayBuffer` read を使う場合があります。
+- ファイルサイズ上限を拡張しても、実際の render cap は変わりません。品質画面と統計パネルで `source points / rendered points / render ratio` を確認してください。
+- 自動分類は高さベースの補助機能であり、測量級分類を保証しません。
+- 距離計測は元 LAS/LAZ の全点ではなく、表示中のサンプリング点に snap します。最大20件の計測結果をページ内の一時履歴として保持します。距離は `m-equivalent` として表示され、元データの座標単位に依存します。読み込み profile には計測用に保持する source-coordinate memory も含まれます。
 
-## Repository Layout
+## リポジトリ構成
 
-- `index.html`: GitHub Pages landing page for the public demo
-- `PointCloudWorkbench.html`: single-file application
-- `assets/`: screenshot and visual asset directory for README / Pages presentation
-- `demo/pointcloud-demo-sample.las`: bundled LAS sample for Pages demo
-- `scripts/`: regression tests and README consistency checks
-- `PointCloudWorkbench_ドキュメント索引.md`: Japanese document entry point
-- `PointCloudWorkbench_運用手順書.md`: Japanese operations guide
-- `PointCloudWorkbench_実装リファレンス.md`: Japanese implementation reference
+- `index.html`: GitHub Pages 用ランディングページ
+- `PointCloudWorkbench.html`: 単一ファイルアプリ本体
+- `assets/`: README / Pages 表示用のスクリーンショット・画像素材ディレクトリ
+- `demo/pointcloud-demo-sample.las`: Pages demo 用の同梱 LAS サンプル
+- `scripts/`: regression tests と README consistency checks
+- `PointCloudWorkbench_ドキュメント索引.md`: 日本語ドキュメント入口
+- `PointCloudWorkbench_運用手順書.md`: 日本語運用ガイド
+- `PointCloudWorkbench_実装リファレンス.md`: 日本語実装リファレンス
 
-## License
+## ライセンス
 
-- Licensed under `MIT`. See `LICENSE`.
+- `MIT` ライセンスです。詳細は `LICENSE` を参照してください。
 
-## Development
+## 開発
 
-- Distribution stays single-file. `PointCloudWorkbench.html` is the runtime artifact and there is no build pipeline.
-- JavaScript/TypeScript execution and tests assume `bun`.
-- `scripts/` is for development-time regression tests and README checks, not for running the app.
-- Update the related operation and implementation documents when behavior changes.
+- 配布物は単一ファイルのまま維持します。`PointCloudWorkbench.html` が runtime artifact で、build pipeline はありません。
+- JavaScript / TypeScript の実行とテストは `bun` を前提にしています。
+- `scripts/` は開発時の回帰テストと README チェック用です。アプリ実行には不要です。
+- 挙動を変更した場合は、関連する運用・実装ドキュメントも更新してください。
 - Contribution guidelines: [`CONTRIBUTING.md`](./CONTRIBUTING.md)
 - Security policy: [`SECURITY.md`](./SECURITY.md)
 - Code of conduct: [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md)
 
-## Testing
+## テスト
 
-- Restart-time minimum verification order:
+- 再開時の最小検証順:
   - `bun test scripts/pointcloud-workbench.test.js`
   - `bun scripts/check-readme.js`
   - `bunx --package playwright node scripts/e2e/run-diagnostics-smoke.mjs --las samples/test.las --laz samples/test.laz`
 - `bun test scripts/pointcloud-workbench.test.js scripts/documentation-consistency.test.js scripts/gitignore.test.js scripts/repository-metadata.test.js scripts/public-repo-readiness.test.js scripts/landing-page-i18n.test.js`
 - `bun scripts/check-readme.js`
-- Browser smoke for local LAS/LAZ diagnostics (headless Playwright, no repo dependency install):
+- ローカル LAS/LAZ 診断の browser smoke（headless Playwright、repo への依存 install 不要）:
   - `bunx --package playwright playwright install chromium`
   - `bunx --package playwright node scripts/e2e/run-diagnostics-smoke.mjs --las samples/test.las --laz samples/test.laz`
-  - Output screenshots: `.tmp/e2e/las-diagnostics.png`, `.tmp/e2e/laz-diagnostics.png`
-  - On failure, the smoke runner logs scenario step, `workflowState.step`, and recent page/console/request failures.
-- Optional manual CI job: GitHub Actions `Diagnostics Smoke` (`workflow_dispatch`) runs the same LAS/LAZ smoke and uploads screenshots as artifacts.
-- CI also runs pinned `actionlint` for `.github/workflows/*.yml`; local `actionlint .github/workflows/*.yml` is optional.
+  - 出力スクリーンショット: `.tmp/e2e/las-diagnostics.png`, `.tmp/e2e/laz-diagnostics.png`
+  - 失敗時は scenario step、`workflowState.step`、直近の page / console / request failure をログ出力します。
+- 任意の手動 CI job: GitHub Actions `Diagnostics Smoke`（`workflow_dispatch`）は同じ LAS/LAZ smoke を実行し、スクリーンショットを artifacts としてアップロードします。
+- CI は `.github/workflows/*.yml` に対して pinned `actionlint` も実行します。ローカルの `actionlint .github/workflows/*.yml` は任意です。
 
-## Repository Scope
+## リポジトリの範囲
 
-- The main public deliverable is `PointCloudWorkbench.html` plus the related documentation.
-- GitHub Pages uses `index.html` as the landing page and serves `PointCloudWorkbench.html` directly as the actual app.
-- Cloudflare Pages deployment is expected to stay static-only using `_headers`, `_redirects`, and static manifests under `assets/`.
-- `scripts/` is published as verification assets for development and maintenance.
-- `test-results/` and local helper-tool outputs are not part of the public deliverable.
+- 主要な公開成果物は `PointCloudWorkbench.html` と関連ドキュメントです。
+- GitHub Pages は `index.html` をランディングページとして使い、実アプリの `PointCloudWorkbench.html` を直接配信します。
+- Cloudflare Pages deployment は `_headers`、`_redirects`、`assets/` 配下の static manifests を使う static-only 構成を維持します。
+- `scripts/` は開発・保守用の検証資産として公開します。
+- `test-results/` とローカル補助ツールの出力は公開成果物ではありません。
 
-## CDN / Network Notes
+## CDN / ネットワーク注意
 
-- Runtime depends on `three.js`, `laz-perf`, `simple-statistics`, `Flatbush`, and `simpleheat` served from CDNs.
-- Normal usage requires network access. If the CDN is unreachable, the app may fail to initialize.
-- The GitHub Pages demo has the same CDN dependency.
+- Runtime は CDN 配信の `three.js`、`laz-perf`、`simple-statistics`、`Flatbush`、`simpleheat` に依存します。
+- 通常利用にはネットワーク接続が必要です。CDN に到達できない場合、アプリの初期化に失敗することがあります。
+- GitHub Pages demo も同じ CDN 依存を持ちます。
