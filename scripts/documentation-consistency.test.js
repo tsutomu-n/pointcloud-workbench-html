@@ -78,16 +78,20 @@ test("CRS diagnostics docs keep local-only and no-conversion boundaries aligned"
 
   expect(readme).toContain("CRS diagnostics");
   expect(readme).toContain("coordinate conversion");
+  expect(readme).toContain("bounds 中心変換");
   expect(readme).toContain("no LAS/LAZ upload");
   expect(readmeEn).toContain("CRS diagnostics");
-  expect(readmeEn).toContain("do not perform coordinate conversion");
+  expect(readmeEn).toContain("bounds-center conversion");
+  expect(readmeEn).toContain("do not perform geocoding");
   expect(readmeJa).toContain("CRS 診断");
   expect(readmeJa).toContain("座標変換");
   expect(readmeJa).toContain("サーバー側 CRS 処理は行いません");
   expect(ops).toContain("CRS 診断の確認");
+  expect(ops).toContain("Google Maps / 地理院地図リンク");
   expect(ops).toContain("ローカルファイル名、点群 payload、座標配列は含まれない");
   expect(ref).toContain("readLASProjectionRecordsFromFile()");
-  expect(ref).toContain("座標変換、EPSG DB 参照");
+  expect(ref).toContain("bounds 中心変換");
+  expect(ref).toContain("EPSG DB 参照、ジオイド補正");
   expect(index).toContain("LAS/LAZ アップロードは行いません");
   expect(spec).toContain("座標変換」ではなく");
   expect(plan).toContain("EVLR header を先に読み");

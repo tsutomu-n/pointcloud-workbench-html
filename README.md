@@ -89,7 +89,7 @@
 - `three.js`、`laz-perf`、`simple-statistics`、`Flatbush`、`simpleheat`、`proj4js` は CDN から読み込むため、通常利用にはネットワーク接続が必要です。
 - サーバー経路は static-only です。Workers、Pages Functions、APIs、telemetry、DB 書き込み、サーバー側点群処理を追加しません。
 - 選択した点群ファイルはユーザーの端末内に留まります。ネットワークアクセスはアプリ資産、`proj4js`、ユーザーがクリックした外部地図リンクのためであり、LAS/LAZ upload ではありません。no LAS/LAZ upload。Selected LAS/LAZ files are processed locally in the browser and are not uploaded.
-- CRS diagnostics はローカル metadata の確認と、対応する JGD2011 平面直角座標系の bounds 中心変換だけを行います。geocoding、EPSG database lookup、map matching、サーバー側 CRS 処理は行いません。server-side CRS processing は行いません。
+- CRS diagnostics はローカル metadata の確認と、対応する JGD2011 平面直角座標系の bounds 中心変換だけを行います。coordinate conversion はこの限定範囲に限り、geocoding、EPSG database lookup、map matching、サーバー側 CRS 処理は行いません。server-side CRS processing は行いません。
 - 緯度経度は点群範囲の中心推定です。住所、現場境界、測量成果座標、納品用位置保証としては扱わないでください。Google Maps / 地理院地図リンクはクリック時だけ外部サイトへ緯度経度を渡します。
 - CRS diagnostics は LAS header / VLR / EVLR を上限付きで読み、LAS/LAZ ファイルやローカルファイル名をアップロードまたは問い合わせ文へコピーしません。
 - 取得品質はローカルの属性 coverage 補助です。アプリが使う LAS 1.4 R15 point-record layout に従い、PDRF 0-5 と PDRF 6+ の return / scan-angle interpretation を分け、GPS-time monotonicity は測量級証明ではなく warning signal として扱います。
