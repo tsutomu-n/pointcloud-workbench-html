@@ -6208,6 +6208,7 @@
         loadRiskLevel: "ok",
         pointCloudData: null,
         diagnosticsReport: null,
+        acquisitionMetrics: null,
         diagnosticCandidateMap: {},
         selectedDiagnosticCandidateKey: null,
         diagnosticCandidateFilterKind: "all",
@@ -6361,7 +6362,88 @@
         };
       }
 
-      function buildAcquisitionQualityReport(header = statsData.header) {
+      function isFiniteNumber(value) {
+        if (value === null || value === undefined || value === "") return false;
+        return Number.isFinite(Number(value));
+      }
+
+      function buildAcquisitionMetricsReport(points = [], options = {}) {
+        const safePoints = Array.isArray(points) ? points : [];
+        const sampleCap = Math.max(1, Math.floor(Number(options.sampleCap) || 500000));
+        const step = safePoints.length > sampleCap
+          ? Math.ceil(safePoints.length / sampleCap)
+          : 1;
+        const sampled = [];
+        for (let i = 0; i < safePoints.length && sampled.length < sampleCap; i += step) {
+          sampled.push(safePoints[i]);
+        }
+
+        const sampledPointCount = sampled.length;
+        if (!sampledPointCount) {
+          return {
+            sampleCap,
+            sampledPointCount: 0,
+            returnSignalCoverage: 0,
+            scanAngleCoverage: 0,
+            gpsTimeCoverage: 0,
+            gpsTimeMonotonicRatio: null,
+            warnings: [],
+          };
+        }
+
+        let returnCount = 0;
+        let scanAngleCount = 0;
+        let gpsTimeCount = 0;
+        let gpsPairs = 0;
+        let gpsMonotonicPairs = 0;
+        let previousGpsTime = null;
+
+        sampled.forEach((point) => {
+          if (isFiniteNumber(point?.returnNumber) && Number(point.returnNumber) > 0) {
+            returnCount += 1;
+          }
+          if (isFiniteNumber(point?.scanAngle)) {
+            scanAngleCount += 1;
+          }
+          if (isFiniteNumber(point?.gpsTime)) {
+            const gpsTime = Number(point.gpsTime);
+            gpsTimeCount += 1;
+            if (previousGpsTime !== null) {
+              gpsPairs += 1;
+              if (gpsTime >= previousGpsTime) gpsMonotonicPairs += 1;
+            }
+            previousGpsTime = gpsTime;
+          }
+        });
+
+        const roundCoverage = (count) =>
+          Number((count / sampledPointCount).toFixed(4));
+        const gpsTimeMonotonicRatio = gpsPairs
+          ? Number((gpsMonotonicPairs / gpsPairs).toFixed(4))
+          : null;
+        const warnings = [];
+        const returnSignalCoverage = roundCoverage(returnCount);
+        const scanAngleCoverage = roundCoverage(scanAngleCount);
+        const gpsTimeCoverage = roundCoverage(gpsTimeCount);
+        if (returnSignalCoverage < 0.7) warnings.push("ACQ_RETURN_SIGNAL_SPARSE");
+        if (scanAngleCoverage < 0.7) warnings.push("ACQ_SCAN_ANGLE_SPARSE");
+        if (gpsTimeCoverage < 0.7) warnings.push("ACQ_GPS_TIME_SPARSE");
+        if (gpsTimeMonotonicRatio !== null && gpsTimeMonotonicRatio < 0.8) {
+          warnings.push("ACQ_GPS_TIME_NON_MONOTONIC");
+        }
+
+        return {
+          sampleCap,
+          sampledPointCount,
+          returnSignalCoverage,
+          scanAngleCoverage,
+          gpsTimeCoverage,
+          gpsTimeMonotonicRatio,
+          warnings: uniqueStrings(warnings),
+        };
+      }
+
+      function buildAcquisitionQualityReport(header = statsData.header, metrics = null) {
         const attributes = buildAttributeAvailabilityReport(header);
         const availableSet = new Set(attributes.available || []);
         const requiredSignals = ["return", "scanAngle", "gpsTime"];
@@ -6377,6 +6459,34 @@
         if (availableSet.has("scanAngle")) score += 30;
         if (availableSet.has("gpsTime")) score += 30;
 
+        if (metrics && Number.isFinite(Number(metrics.sampledPointCount)) && Number(metrics.sampledPointCount) > 0) {
+          let measuredDeduction = 0;
+          const applyCoverageDeduction = (coverage, warningCode, softPenalty, hardPenalty) => {
+            const safeCoverage = Number(coverage);
+            if (!Number.isFinite(safeCoverage)) return;
+            if (safeCoverage < 0.7) {
+              warnings.push(warningCode);
+              measuredDeduction += softPenalty;
+            }
+            if (safeCoverage < 0.4) {
+              measuredDeduction += hardPenalty;
+            }
+          };
+          applyCoverageDeduction(metrics.returnSignalCoverage, "ACQ_RETURN_SIGNAL_SPARSE", 10, 10);
+          applyCoverageDeduction(metrics.scanAngleCoverage, "ACQ_SCAN_ANGLE_SPARSE", 8, 8);
+          applyCoverageDeduction(metrics.gpsTimeCoverage, "ACQ_GPS_TIME_SPARSE", 10, 10);
+          if (
+            Number.isFinite(Number(metrics.gpsTimeMonotonicRatio)) &&
+            Number(metrics.gpsTimeMonotonicRatio) < 0.8
+          ) {
+            warnings.push("ACQ_GPS_TIME_NON_MONOTONIC");
+          }
+          if (Array.isArray(metrics.warnings)) {
+            warnings.push(...metrics.warnings);
+          }
+          score = Math.max(0, score - Math.min(30, measuredDeduction));
+        }
+
         let status = "unknown";
         if (!attributes.available?.length) status = "unknown";
         else if (score >= 90) status = "high";
@@ -6384,10 +6494,13 @@
         else status = "low";
 
         return {
+          evaluationMode: "availability-plus-measured",
+          sampleCap: metrics?.sampleCap ?? 500000,
           status,
           score,
           availableSignals,
           missingSignals,
+          metrics: metrics || null,
           warnings: uniqueStrings(warnings),
         };
       }
@@ -6435,7 +6548,10 @@
           },
           lineage: buildLineageReport(statsData.header),
           attributes: buildAttributeAvailabilityReport(statsData.header),
-          acquisitionQuality: buildAcquisitionQualityReport(statsData.header),
+          acquisitionQuality: buildAcquisitionQualityReport(
+            statsData.header,
+            statsData.acquisitionMetrics,
+          ),
           diagnosticsCandidates: diagnosticCandidates,
           recentErrors,
         };
@@ -11737,13 +11853,40 @@
           );
         }
 
+        const pointFormat = Number(header.pointDataRecordFormat);
         let classification;
-        if (header.pointDataRecordFormat === 0) {
-          classification = 1;
-        } else if (header.pointDataRecordFormat >= 6) {
+        let returnNumber = null;
+        let numberOfReturns = null;
+        let scanAngle = null;
+        let gpsTime = null;
+        if (pointFormat >= 6) {
+          const returnByte = view.getUint8(pointOffset + 14);
+          returnNumber = returnByte & 0x0f;
+          numberOfReturns = (returnByte >> 4) & 0x0f;
           classification = view.getUint8(pointOffset + 16);
+          if (pointOffset + 20 <= view.byteLength) {
+            scanAngle = Number((view.getInt16(pointOffset + 18, true) * 0.006).toFixed(4));
+          }
+          if (
+            [6, 7, 8, 9, 10].includes(pointFormat) &&
+            pointOffset + 30 <= view.byteLength
+          ) {
+            gpsTime = view.getFloat64(pointOffset + 22, true);
+          }
         } else {
-          classification = view.getUint8(pointOffset + 15);
+          const returnByte = view.getUint8(pointOffset + 14);
+          returnNumber = returnByte & 0x07;
+          numberOfReturns = (returnByte >> 3) & 0x07;
+          classification = pointFormat === 0 ? 1 : view.getUint8(pointOffset + 15);
+          if (pointOffset + 17 <= view.byteLength) {
+            scanAngle = view.getInt8(pointOffset + 16);
+          }
+          if (
+            [1, 3, 4, 5].includes(pointFormat) &&
+            pointOffset + 28 <= view.byteLength
+          ) {
+            gpsTime = view.getFloat64(pointOffset + 20, true);
+          }
         }
 
         if (sampleIndex >= 0 && sampleIndex < 10) {
@@ -11768,7 +11911,17 @@
           return null;
         }
 
-        return { x, y, z, intensity, classification };
+        return {
+          x,
+          y,
+          z,
+          intensity,
+          classification,
+          returnNumber,
+          numberOfReturns,
+          scanAngle,
+          gpsTime,
+        };
       }
 
       async function parseLASHeaderFromFile(
@@ -12078,6 +12231,9 @@
           fileName: resolvedName,
           fileSize,
         });
+        const acquisitionMetrics = buildAcquisitionMetricsReport(points, {
+          sampleCap: 500000,
+        });
         const headerPointCount = pointCloudData.pointCounts.sourceCount;
         console.log(`ヘッダー解析成功: ${headerPointCount.toLocaleString()}点`);
 
@@ -12104,6 +12260,7 @@
           statsData.estimatedPeakMemoryMB = profile.estimatedPeakMemoryMB;
           statsData.loadRiskLevel = profile.riskLevel;
           statsData.pointCloudData = pointCloudData;
+          statsData.acquisitionMetrics = acquisitionMetrics;
         } catch (statsError) {
           console.warn("統計情報の更新に失敗（処理続行）:", statsError);
         }
@@ -13457,14 +13614,36 @@
           // PDRF 6-10 で classification の位置が異なる
           let classification;
           let classificationFlags = null;
+          let returnNumber = null;
+          let numberOfReturns = null;
+          let scanAngle = null;
+          let gpsTime = null;
 
           if (pointFormat >= 6) {
+            const returnByte = pointData.getUint8(14);
+            returnNumber = returnByte & 0x0f;
+            numberOfReturns = (returnByte >> 4) & 0x0f;
             // PDRF 6-10: Byte 16 が classification、Byte 15 は classification flags
             classificationFlags = pointData.getUint8(15);
             classification = pointData.getUint8(16);
+            if (pointData.byteLength >= 20) {
+              scanAngle = Number((pointData.getInt16(18, true) * 0.006).toFixed(4));
+            }
+            if (pointData.byteLength >= 30) {
+              gpsTime = pointData.getFloat64(22, true);
+            }
           } else {
+            const returnByte = pointData.getUint8(14);
+            returnNumber = returnByte & 0x07;
+            numberOfReturns = (returnByte >> 3) & 0x07;
             // PDRF 0-5: Byte 15 が classification
             classification = pointData.getUint8(15);
+            if (pointData.byteLength >= 17) {
+              scanAngle = pointData.getInt8(16);
+            }
+            if ([1, 3, 4, 5].includes(pointFormat) && pointData.byteLength >= 28) {
+              gpsTime = pointData.getFloat64(20, true);
+            }
           }
 
           let red = 0,
@@ -13478,7 +13657,21 @@
             }
           }
 
-          return { x, y, z, intensity, classification, red, green, blue };
+          return {
+            x,
+            y,
+            z,
+            intensity,
+            classification,
+            classificationFlags,
+            returnNumber,
+            numberOfReturns,
+            scanAngle,
+            gpsTime,
+            red,
+            green,
+            blue,
+          };
         } catch (error) {
           console.warn("LAZ点の解析に失敗:", error);
           return null;
@@ -18376,7 +18569,10 @@
           updateRuntimeStatusPanel,
           buildLineageReport,
           buildAttributeAvailabilityReport,
+          buildAcquisitionMetricsReport,
           buildAcquisitionQualityReport,
+          decodeLASPointRecord,
+          decodeLAZPoint,
           buildManualDiagnosticReport,
           copyManualDiagnosticReport,
           resolvePointCloudReader,

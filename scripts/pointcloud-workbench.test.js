@@ -1242,6 +1242,183 @@ test("buildAcquisitionQualityReport emits warnings when key acquisition signals 
   expect(report.warnings).toContain("ACQ_GPS_TIME_MISSING");
 });
 
+test("decodeLASPointRecord extracts legacy acquisition fields", () => {
+  const context = createContext();
+  context.__buffer = new ArrayBuffer(28);
+  vm.runInContext(
+    `
+      const view = new DataView(__buffer);
+      view.setInt32(0, 100, true);
+      view.setInt32(4, 200, true);
+      view.setInt32(8, 300, true);
+      view.setUint16(12, 42, true);
+      view.setUint8(14, 3 | (5 << 3));
+      view.setUint8(15, 2);
+      view.setInt8(16, -12);
+      view.setFloat64(20, 123.5, true);
+    `,
+    context,
+  );
+  context.__header = {
+    pointDataRecordFormat: 1,
+    xScaleFactor: 0.01,
+    yScaleFactor: 0.01,
+    zScaleFactor: 0.01,
+    xOffset: 0,
+    yOffset: 0,
+    zOffset: 0,
+  };
+
+  const point = vm.runInContext(
+    "window.__pcwTestApi.decodeLASPointRecord(new DataView(__buffer), 0, __header)",
+    context,
+  );
+
+  expect(point).toMatchObject({
+    x: 1,
+    y: 2,
+    z: 3,
+    intensity: 42,
+    classification: 2,
+    returnNumber: 3,
+    numberOfReturns: 5,
+    scanAngle: -12,
+    gpsTime: 123.5,
+  });
+});
+
+test("decodeLASPointRecord extracts extended acquisition fields", () => {
+  const context = createContext();
+  context.__buffer = new ArrayBuffer(30);
+  vm.runInContext(
+    `
+      const view = new DataView(__buffer);
+      view.setInt32(0, 100, true);
+      view.setInt32(4, 200, true);
+      view.setInt32(8, 300, true);
+      view.setUint16(12, 42, true);
+      view.setUint8(14, 4 | (6 << 4));
+      view.setUint8(16, 2);
+      view.setInt16(18, 1000, true);
+      view.setFloat64(22, 456.25, true);
+    `,
+    context,
+  );
+  context.__header = {
+    pointDataRecordFormat: 6,
+    xScaleFactor: 0.01,
+    yScaleFactor: 0.01,
+    zScaleFactor: 0.01,
+    xOffset: 0,
+    yOffset: 0,
+    zOffset: 0,
+  };
+
+  const point = vm.runInContext(
+    "window.__pcwTestApi.decodeLASPointRecord(new DataView(__buffer), 0, __header)",
+    context,
+  );
+
+  expect(point).toMatchObject({
+    returnNumber: 4,
+    numberOfReturns: 6,
+    scanAngle: 6,
+    gpsTime: 456.25,
+  });
+});
+
+test("decodeLAZPoint extracts extended acquisition fields", () => {
+  const context = createContext();
+  context.__buffer = new ArrayBuffer(38);
+  vm.runInContext(
+    `
+      const view = new DataView(__buffer);
+      view.setInt32(0, 100, true);
+      view.setInt32(4, 200, true);
+      view.setInt32(8, 300, true);
+      view.setUint16(12, 42, true);
+      view.setUint8(14, 2 | (3 << 4));
+      view.setUint8(16, 5);
+      view.setInt16(18, -500, true);
+      view.setFloat64(22, 789.75, true);
+    `,
+    context,
+  );
+  context.__header = {
+    xScaleFactor: 0.01,
+    yScaleFactor: 0.01,
+    zScaleFactor: 0.01,
+    xOffset: 0,
+    yOffset: 0,
+    zOffset: 0,
+  };
+
+  const point = vm.runInContext(
+    "window.__pcwTestApi.decodeLAZPoint(new DataView(__buffer), 8, __header)",
+    context,
+  );
+
+  expect(point).toMatchObject({
+    classification: 5,
+    returnNumber: 2,
+    numberOfReturns: 3,
+    scanAngle: -3,
+    gpsTime: 789.75,
+  });
+});
+
+test("buildAcquisitionMetricsReport computes coverage and GPS monotonic ratio", () => {
+  const context = createContext();
+  context.__points = [
+    { returnNumber: 1, numberOfReturns: 2, scanAngle: -2, gpsTime: 10 },
+    { returnNumber: 1, numberOfReturns: 1, scanAngle: 0, gpsTime: 11 },
+    { returnNumber: null, numberOfReturns: null, scanAngle: null, gpsTime: 9 },
+    { returnNumber: 2, numberOfReturns: 2, scanAngle: 3, gpsTime: null },
+  ];
+
+  const metrics = vm.runInContext(
+    "window.__pcwTestApi.buildAcquisitionMetricsReport(__points, { sampleCap: 500000 })",
+    context,
+  );
+
+  expect(metrics.sampledPointCount).toBe(4);
+  expect(metrics.returnSignalCoverage).toBe(0.75);
+  expect(metrics.scanAngleCoverage).toBe(0.75);
+  expect(metrics.gpsTimeCoverage).toBe(0.75);
+  expect(metrics.gpsTimeMonotonicRatio).toBe(0.5);
+  expect(metrics.warnings).toContain("ACQ_GPS_TIME_NON_MONOTONIC");
+});
+
+test("buildAcquisitionQualityReport applies measured coverage deductions", () => {
+  const context = createContext();
+  context.__header = {
+    pointDataRecordFormat: 7,
+    pointDataRecordLength: 36,
+  };
+  context.__metrics = {
+    sampledPointCount: 4,
+    returnSignalCoverage: 0.25,
+    scanAngleCoverage: 0.25,
+    gpsTimeCoverage: 0.25,
+    gpsTimeMonotonicRatio: 0.5,
+    warnings: ["ACQ_GPS_TIME_NON_MONOTONIC"],
+  };
+
+  const report = vm.runInContext(
+    "window.__pcwTestApi.buildAcquisitionQualityReport(__header, __metrics)",
+    context,
+  );
+
+  expect(report.evaluationMode).toBe("availability-plus-measured");
+  expect(report.score).toBe(70);
+  expect(report.status).toBe("medium");
+  expect(report.metrics).toEqual(context.__metrics);
+  expect(report.warnings).toContain("ACQ_RETURN_SIGNAL_SPARSE");
+  expect(report.warnings).toContain("ACQ_SCAN_ANGLE_SPARSE");
+  expect(report.warnings).toContain("ACQ_GPS_TIME_SPARSE");
+  expect(report.warnings).toContain("ACQ_GPS_TIME_NON_MONOTONIC");
+});
+
 test("ReaderRegistry exposes LAS and LAZ local readers", () => {
   const context = createContext();
 
@@ -2160,14 +2337,14 @@ test("parseLASPointsFromFile reads sampled LAS data via slices without full file
   );
 
   expect(points).toHaveLength(3);
-  expect(points[0]).toEqual({
+  expect(points[0]).toMatchObject({
     x: 1,
     y: 11,
     z: 21,
     intensity: 100,
     classification: 2,
   });
-  expect(points[2]).toEqual({
+  expect(points[2]).toMatchObject({
     x: 3,
     y: 13,
     z: 23,
