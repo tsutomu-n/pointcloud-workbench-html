@@ -6995,6 +6995,16 @@
         measurability: 10,
         anomalies: 10,
       };
+      const DIAGNOSTIC_DEDUCTION_BY_CODE = {
+        CRS_MISSING: 15,
+        CLASSIFICATION_POOR: 10,
+        CLASSIFICATION_LIMITED: 5,
+        DISPLAY_RATIO_LOW: 8,
+        DENSITY_HOLES: 12,
+        DENSITY_SPIKES: 8,
+        Z_OUTLIERS: 8,
+        ISOLATED_POINTS: 6,
+      };
 
       function normalizeDiagnosticsWarningCodes(rawCodes = []) {
         if (!Array.isArray(rawCodes) || !rawCodes.length) return [];
@@ -7074,10 +7084,16 @@
           displayRatio,
         });
         const reasons = warningCodes.map((code) => DIAGNOSTIC_WARNING_LABELS[code] || code);
+        const deductionByCode = {};
+        let totalDeduction = 0;
 
-        const deduct = (points, reason) => {
+        const deduct = (points, reason, code = "") => {
           if (points <= 0) return;
           score -= points;
+          totalDeduction += points;
+          if (code) {
+            deductionByCode[code] = (deductionByCode[code] || 0) + points;
+          }
           if (!reasons.includes(reason)) reasons.push(reason);
         };
 
@@ -7087,19 +7103,50 @@
             crsDiagnostics.status,
           )
         ) {
-          deduct(15, "CRS確認");
+          deduct(DIAGNOSTIC_DEDUCTION_BY_CODE.CRS_MISSING, "CRS確認", "CRS_MISSING");
         }
-        if (classificationStats?.quality === "poor") deduct(10, "分類品質");
-        else if (classificationStats?.quality === "limited") deduct(5, "分類限定");
+        if (classificationStats?.quality === "poor") {
+          deduct(
+            DIAGNOSTIC_DEDUCTION_BY_CODE.CLASSIFICATION_POOR,
+            "分類品質",
+            "CLASSIFICATION_POOR",
+          );
+        } else if (classificationStats?.quality === "limited") {
+          deduct(
+            DIAGNOSTIC_DEDUCTION_BY_CODE.CLASSIFICATION_LIMITED,
+            "分類限定",
+            "CLASSIFICATION_LIMITED",
+          );
+        }
 
         const safeDisplayRatio = Number(displayRatio);
         if (Number.isFinite(safeDisplayRatio) && safeDisplayRatio < 5) {
-          deduct(8, "表示率低");
+          deduct(
+            DIAGNOSTIC_DEDUCTION_BY_CODE.DISPLAY_RATIO_LOW,
+            "表示率低",
+            "DISPLAY_RATIO_LOW",
+          );
         }
-        if (densityGrid?.summary?.emptyInteriorCells) deduct(12, "欠測候補");
-        if (densityGrid?.summary?.densitySpikeCells) deduct(8, "密度スパイク");
-        if (zOutliers?.candidates?.length) deduct(8, "Z外れ値");
-        if (isolatedPoints?.candidates?.length) deduct(6, "孤立候補");
+        if (densityGrid?.summary?.emptyInteriorCells) {
+          deduct(DIAGNOSTIC_DEDUCTION_BY_CODE.DENSITY_HOLES, "欠測候補", "DENSITY_HOLES");
+        }
+        if (densityGrid?.summary?.densitySpikeCells) {
+          deduct(
+            DIAGNOSTIC_DEDUCTION_BY_CODE.DENSITY_SPIKES,
+            "密度スパイク",
+            "DENSITY_SPIKES",
+          );
+        }
+        if (zOutliers?.candidates?.length) {
+          deduct(DIAGNOSTIC_DEDUCTION_BY_CODE.Z_OUTLIERS, "Z外れ値", "Z_OUTLIERS");
+        }
+        if (isolatedPoints?.candidates?.length) {
+          deduct(
+            DIAGNOSTIC_DEDUCTION_BY_CODE.ISOLATED_POINTS,
+            "孤立候補",
+            "ISOLATED_POINTS",
+          );
+        }
 
         score = Math.max(0, Math.round(score));
         let status = "ok";
@@ -7112,6 +7159,8 @@
           status,
           reasons,
           warningCodes,
+          totalDeduction,
+          deductionByCode,
           sectionWeights: { ...DIAGNOSTICS_SCORE_WEIGHTS },
         };
       }
@@ -7238,8 +7287,23 @@
         const totalLimit = Math.max(1, Math.floor(Number(options.totalLimit) || 30));
         const kindFilter = options.kindFilter || "all";
         const items = [];
+        const sortPointsByIndex = (points = []) =>
+          [...points].sort((a, b) => {
+            const indexA = Number.isFinite(a?.index) ? Number(a.index) : Number.MAX_SAFE_INTEGER;
+            const indexB = Number.isFinite(b?.index) ? Number(b.index) : Number.MAX_SAFE_INTEGER;
+            return indexA - indexB;
+          });
+        const sortCellsByPosition = (cells = []) =>
+          [...cells].sort((a, b) => {
+            const rowA = Number.isFinite(a?.row) ? Number(a.row) : Number.MAX_SAFE_INTEGER;
+            const rowB = Number.isFinite(b?.row) ? Number(b.row) : Number.MAX_SAFE_INTEGER;
+            if (rowA !== rowB) return rowA - rowB;
+            const colA = Number.isFinite(a?.column) ? Number(a.column) : Number.MAX_SAFE_INTEGER;
+            const colB = Number.isFinite(b?.column) ? Number(b.column) : Number.MAX_SAFE_INTEGER;
+            return colA - colB;
+          });
         const addPointItems = (kind, points = [], detailFormatter = null) => {
-          points.slice(0, perCategoryLimit).forEach((point, localIndex) => {
+          sortPointsByIndex(points).slice(0, perCategoryLimit).forEach((point, localIndex) => {
             items.push({
               key: `${kind}-${point.index ?? localIndex}`,
               kind,
@@ -7250,7 +7314,7 @@
           });
         };
         const addCellItems = (kind, cells = [], detailFormatter = null) => {
-          cells.slice(0, perCategoryLimit).forEach((cell) => {
+          sortCellsByPosition(cells).slice(0, perCategoryLimit).forEach((cell) => {
             items.push({
               key: `${kind}-${cell.row}-${cell.column}`,
               kind,
@@ -7297,6 +7361,9 @@
       }
 
       function buildDiagnosticCandidateSummary(report) {
+        const warningCodes = normalizeDiagnosticsWarningCodes(
+          report?.score?.warningCodes || report?.warningCodes || [],
+        );
         const byKind = {
           "Z外れ値": report?.zOutliers?.candidates?.length || 0,
           "孤立候補": report?.isolatedPoints?.candidates?.length || 0,
@@ -7305,7 +7372,14 @@
         };
         const total = Object.values(byKind).reduce((sum, count) => sum + count, 0);
         const activeKind = statsData.diagnosticCandidateFilterKind || "all";
-        return { total, byKind, activeKind };
+        return {
+          total,
+          byKind,
+          activeKind,
+          warningCodes,
+          score: Number.isFinite(report?.score?.score) ? report.score.score : null,
+          scoreStatus: report?.score?.status || null,
+        };
       }
 
       function sourceToDisplayPoint(source, header = statsData.header) {
@@ -7408,6 +7482,15 @@
           index: candidate.point?.index ?? null,
           row: candidate.cell?.row ?? null,
           column: candidate.cell?.column ?? null,
+          warningCodes: normalizeDiagnosticsWarningCodes(
+            statsData.diagnosticsReport?.score?.warningCodes ||
+              statsData.diagnosticsReport?.warningCodes ||
+              [],
+          ),
+          score: Number.isFinite(statsData.diagnosticsReport?.score?.score)
+            ? statsData.diagnosticsReport.score.score
+            : null,
+          scoreStatus: statsData.diagnosticsReport?.score?.status || null,
         };
         const text = JSON.stringify(payload, null, 2);
         try {

@@ -1504,6 +1504,17 @@ test("buildDiagnosticsScore deducts for CRS, density, outlier, and isolation war
   expect(score.warningCodes).toContain("CRS_MISSING");
   expect(score.warningCodes).toContain("DENSITY_HOLES");
   expect(score.sectionWeights.reliability).toBe(30);
+  expect(score.totalDeduction).toBe(67);
+  expect(score.deductionByCode).toMatchObject({
+    CRS_MISSING: 15,
+    CLASSIFICATION_POOR: 10,
+    DISPLAY_RATIO_LOW: 8,
+    DENSITY_HOLES: 12,
+    DENSITY_SPIKES: 8,
+    Z_OUTLIERS: 8,
+    ISOLATED_POINTS: 6,
+  });
+  expect(Object.values(score.sectionWeights).reduce((sum, value) => sum + value, 0)).toBe(100);
 });
 
 test("buildDiagnosticsWarningCodes returns normalized warning codes", () => {
@@ -1606,6 +1617,87 @@ test("buildPointCloudDiagnostics falls back when optional OSS helpers are not lo
   expect(report.usesFlatbush).toBe(false);
   expect(report.densityGrid.summary.occupiedCells).toBeGreaterThan(0);
   expect(Number.isFinite(report.score.score)).toBe(true);
+});
+
+test("buildDiagnosticCandidateItems keeps deterministic order for same candidate set", () => {
+  const context = createContext();
+  context.__reportA = {
+    zOutliers: { candidates: [{ index: 10, z: 2 }, { index: 2, z: 3 }] },
+    isolatedPoints: { candidates: [{ index: 9, neighborCount: 0 }, { index: 3, neighborCount: 1 }] },
+    densityGrid: {
+      emptyInteriorCells: [{ row: 4, column: 2 }, { row: 1, column: 9 }],
+      densitySpikeCells: [{ row: 8, column: 1, count: 80 }, { row: 2, column: 2, count: 90 }],
+    },
+  };
+  context.__reportB = {
+    zOutliers: { candidates: [{ index: 2, z: 3 }, { index: 10, z: 2 }] },
+    isolatedPoints: { candidates: [{ index: 3, neighborCount: 1 }, { index: 9, neighborCount: 0 }] },
+    densityGrid: {
+      emptyInteriorCells: [{ row: 1, column: 9 }, { row: 4, column: 2 }],
+      densitySpikeCells: [{ row: 2, column: 2, count: 90 }, { row: 8, column: 1, count: 80 }],
+    },
+  };
+
+  const detailsA = vm.runInContext(
+    "window.__pcwTestApi.buildDiagnosticCandidateItems(__reportA).map((item) => item.detail)",
+    context,
+  );
+  const detailsB = vm.runInContext(
+    "window.__pcwTestApi.buildDiagnosticCandidateItems(__reportB).map((item) => item.detail)",
+    context,
+  );
+
+  expect(detailsA).toEqual(detailsB);
+});
+
+test("diagnostic candidate copy payloads include normalized warning codes and score metadata", async () => {
+  const context = createContext();
+  vm.runInContext(
+    `
+      navigator.clipboard = {
+        writeText: async (text) => {
+          globalThis.__clipboardText = text;
+        },
+      };
+      statsData.diagnosticsReport = {
+        score: {
+          score: 72,
+          status: "warn",
+          warningCodes: ["density_holes", "CRS_MISSING", "density_holes"],
+        },
+        zOutliers: { candidates: [{ index: 7, z: 12.34 }] },
+        isolatedPoints: { candidates: [] },
+        densityGrid: {
+          emptyInteriorCells: [{ row: 3, column: 5 }],
+          densitySpikeCells: [],
+        },
+      };
+      statsData.diagnosticCandidateMap = {
+        "Z外れ値:7": {
+          key: "Z外れ値:7",
+          kind: "Z外れ値",
+          detail: "#7 Z=12.34",
+          point: { index: 7 },
+        },
+      };
+      statsData.selectedDiagnosticCandidateKey = "Z外れ値:7";
+    `,
+    context,
+  );
+
+  const selectedCopy = await vm.runInContext("copySelectedDiagnosticCandidate()", context);
+  const selectedPayload = JSON.parse(selectedCopy.text);
+  expect(selectedCopy.ok).toBe(true);
+  expect(selectedPayload.warningCodes).toEqual(["CRS_MISSING", "DENSITY_HOLES"]);
+  expect(selectedPayload.score).toBe(72);
+  expect(selectedPayload.scoreStatus).toBe("warn");
+
+  const summaryCopy = await vm.runInContext("copyDiagnosticCandidateSummary()", context);
+  const summaryPayload = JSON.parse(summaryCopy.text);
+  expect(summaryCopy.ok).toBe(true);
+  expect(summaryPayload.warningCodes).toEqual(["CRS_MISSING", "DENSITY_HOLES"]);
+  expect(summaryPayload.score).toBe(72);
+  expect(summaryPayload.scoreStatus).toBe("warn");
 });
 
 test("startDataLoading restarts memory monitoring before load", async () => {
