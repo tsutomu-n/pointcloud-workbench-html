@@ -144,6 +144,16 @@
 - `buildDiagnosticCandidateItems()` は point/cell 候補を index / row-column でソートして、同一候補集合で順序を安定化する
 - `copySelectedDiagnosticCandidate()` と `copyDiagnosticCandidateSummary()` は `warningCodes`, `score`, `scoreStatus` を含む
 
+## 7.7 取得品質 / 属性 / 来歴 / 作業メモ
+- `buildLineageReport()` は LAS header の project id、system identifier、generating software、作成日、PDRF、VLR/EVLR 数を要約する
+- `buildAttributeAvailabilityReport()` は LAS 1.4 R15 の安定した point-record layout を基準に、`xyz`, `intensity`, `return`, `classification`, `scanAngle`, `gpsTime`, `rgb`, `nir`, `waveform`, `scannerChannel`, `classificationFlags` の利用可否を返す
+- PDRF 0-5 と PDRF 6+ は return / classification / scan-angle の byte layout が異なるため、decode 側で別分岐にする。PDRF 6+ の scan angle は raw int16 に `0.006 degree` を掛ける
+- `buildAcquisitionMetricsReport()` は表示用に読んだ sampled points から return / scan-angle / GPS-time coverage と GPS-time monotonic ratio を計算する。GPS-time monotonic ratio は警告用の補助指標であり、score の強い決定要因にしない
+- `buildAcquisitionQualityReport()` は属性利用可否と measured coverage を合成し、`status`, `score`, `availableSignals`, `missingSignals`, `warnings` を返す
+- `buildManualDiagnosticReport()` は `lineage`, `attributes`, `acquisitionQuality`, `diagnosticsCandidates` を含むが、ローカルファイル名、点群 payload、座標配列は含めない
+- `buildWorkAssistSnapshot()` は `schemaVersion: 1` の作業メモ JSON を作り、表示、断面、計測履歴、異常候補、取得品質を要約する。ファイル名、点群配列、元LAS座標配列、ROI geometry の永続化情報は含めない
+- `copyWorkAssistSnapshot()` は `copyTextToClipboard()` 経由で作業メモ JSON をコピーする。外部送信、ファイル書き込み、サーバー処理は行わない
+
 ## 8. 点群生成と描画
 
 ### 8.1 `createPointCloudFromData()`

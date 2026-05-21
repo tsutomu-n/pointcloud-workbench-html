@@ -1133,6 +1133,196 @@ test("manual diagnostic report omits point cloud payloads and file names", () =>
   expect(reportText).not.toContain("points\":[");
 });
 
+test("work assist snapshot summarizes current work without file names or point payloads", () => {
+  const context = createContext();
+  context.__selectedFile = {
+    name: "private-river-site.laz",
+    size: 7890,
+  };
+  vm.runInContext(
+    `
+      window.__pcwTestApi.setWorkflowState({
+        step: "complete",
+        selectedQuality: "medium",
+        selectedFile: __selectedFile,
+      });
+      statsData.fileName = "private-river-site.laz";
+      statsData.loadStrategy = "laz-chunked";
+      statsData.loadRiskLevel = "ok";
+      statsData.header = {
+        pointDataRecordFormat: 1,
+        pointDataRecordLength: 28,
+      };
+      statsData.acquisitionMetrics = {
+        sampleCap: 500000,
+        sampledPointCount: 3,
+        returnSignalCoverage: 1,
+        scanAngleCoverage: 1,
+        gpsTimeCoverage: 1,
+        gpsTimeMonotonicRatio: 1,
+        warnings: [],
+      };
+      statsData.sectionProfile = {
+        status: "ok",
+        count: 12,
+        groundCount: 9,
+        groundRatio: 75,
+        minZ: 1.23456,
+        maxZ: 5.98765,
+        zRange: 4.75309,
+        densityEstimate: 0.123456,
+        samples: [{ x: 1, z: 2, classification: 2 }],
+      };
+      statsData.diagnosticsReport = {
+        score: {
+          score: 88,
+          status: "info",
+          warningCodes: ["DENSITY_HOLES"],
+        },
+        zOutliers: { candidates: [] },
+        isolatedPoints: { candidates: [] },
+        densityGrid: {
+          emptyInteriorCells: [{ row: 2, column: 3 }],
+          densitySpikeCells: [],
+        },
+      };
+      statsData.diagnosticCandidateFilterKind = "欠測セル";
+      statsData.selectedDiagnosticCandidateKey = "欠測セル-2-3";
+      statsData.diagnosticCandidateMap = {
+        "欠測セル-2-3": {
+          key: "欠測セル-2-3",
+          kind: "欠測セル",
+          detail: "r2 c3",
+          cell: { row: 2, column: 3, centerX: 100, centerY: 200 },
+        },
+      };
+      measurementState.history = [
+        window.__pcwTestApi.createMeasurementRecord(
+          4,
+          { source: { x: 10, y: 20, z: 30 } },
+          { source: { x: 13, y: 24, z: 42 } }
+        ),
+      ];
+      measurementState.selectedRecordId = 4;
+      is2DMode = true;
+      current2DView = "top";
+      colorMode = "classification";
+      currentVisualizationMode = "classification";
+      camera = {
+        position: { x: 1.234567, y: 2.345678, z: 3.456789 },
+        up: { x: 0, y: 1, z: 0 },
+      };
+      controls = { target: { x: 4, y: 5, z: 6 } };
+      document.getElementById("sectionWidthRange").value = "6.5";
+      document.getElementById("sectionGroundOnly").checked = true;
+    `,
+    context,
+  );
+
+  const snapshot = vm.runInContext(
+    "window.__pcwTestApi.buildWorkAssistSnapshot()",
+    context,
+  );
+  const snapshotText = JSON.stringify(snapshot);
+
+  expect(snapshot.privacy).toMatchObject({
+    manualCopyOnly: true,
+    telemetry: false,
+    sendsPointCloudFile: false,
+    includesPointCloudData: false,
+    includesFileName: false,
+    includesSourceCoordinates: false,
+  });
+  expect(snapshot.workflow).toMatchObject({
+    step: "complete",
+    selectedQuality: "medium",
+    loadStrategy: "laz-chunked",
+  });
+  expect(snapshot.view).toMatchObject({
+    mode: "2d",
+    view2d: "top",
+    colorMode: "classification",
+    cameraPosition: { x: 1.2346, y: 2.3457, z: 3.4568 },
+  });
+  expect(snapshot.section).toMatchObject({
+    width: 6.5,
+    groundOnly: true,
+    profile: {
+      count: 12,
+      groundCount: 9,
+      groundRatio: 75,
+      zRange: 4.753,
+    },
+  });
+  expect(snapshot.measurement).toMatchObject({
+    historyCount: 1,
+    activeRecordId: 4,
+    lastResult: {
+      id: 4,
+      distance3d: 13,
+      horizontalDistance: 5,
+      heightDifference: 12,
+    },
+  });
+  expect(snapshot.diagnostics.selectedCandidate).toMatchObject({
+    key: "欠測セル-2-3",
+    kind: "欠測セル",
+    row: 2,
+    column: 3,
+  });
+  expect(snapshot.acquisitionQuality).toMatchObject({
+    status: "high",
+    score: 100,
+    availableSignals: ["return", "scanAngle", "gpsTime"],
+  });
+  expect(snapshotText).not.toContain("private-river-site");
+  expect(snapshotText).not.toContain("samples");
+  expect(snapshotText).not.toContain("sourcePositions");
+  expect(snapshotText).not.toContain('"samples"');
+  expect(snapshotText).not.toContain('"points"');
+  expect(snapshotText).not.toContain('"start"');
+  expect(snapshotText).not.toContain('"end"');
+});
+
+test("copyWorkAssistSnapshot writes privacy-safe JSON to clipboard", async () => {
+  const context = createContext();
+  vm.runInContext(
+    `
+      navigator.clipboard = {
+        writeText: async (text) => {
+          globalThis.__clipboardText = text;
+        },
+      };
+      window.__pcwTestApi.setWorkflowState({
+        step: "complete",
+        selectedQuality: "low",
+      });
+      statsData.header = {
+        pointDataRecordFormat: 0,
+        pointDataRecordLength: 20,
+      };
+    `,
+    context,
+  );
+
+  const copied = await vm.runInContext(
+    "window.__pcwTestApi.copyWorkAssistSnapshot()",
+    context,
+  );
+  const clipboardText = vm.runInContext("globalThis.__clipboardText", context);
+  const payload = JSON.parse(clipboardText);
+
+  expect(copied.ok).toBe(true);
+  expect(copied.text).toBe(clipboardText);
+  expect(payload.schemaVersion).toBe(1);
+  expect(payload.workflow).toMatchObject({
+    step: "complete",
+    selectedQuality: "low",
+  });
+  expect(payload.privacy.includesFileName).toBe(false);
+  expect(payload.acquisitionQuality.missingSignals).toContain("gpsTime");
+});
+
 test("buildLineageReport summarizes header provenance and warnings", () => {
   const context = createContext();
   context.__header = {

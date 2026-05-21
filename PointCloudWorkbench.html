@@ -5046,6 +5046,13 @@
                   断面:
                   <span class="stats-value" id="sectionProfileSummary">2D表示時に更新</span>
                 </div>
+                <button
+                  class="diagnostic-candidate-copy-btn"
+                  type="button"
+                  onclick="copyWorkAssistSnapshot()"
+                >
+                  作業メモコピー
+                </button>
               </div>
               <div class="stats-tile">
                 <div class="stats-tile-title">性能</div>
@@ -6575,6 +6582,165 @@
           };
         }
       }
+
+      function roundWorkAssistNumber(value, digits = 4) {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return null;
+        const factor = 10 ** digits;
+        return Math.round(numeric * factor) / factor;
+      }
+
+      function serializeWorkAssistVector(vector) {
+        if (!vector) return null;
+        const x = roundWorkAssistNumber(vector.x);
+        const y = roundWorkAssistNumber(vector.y);
+        const z = roundWorkAssistNumber(vector.z);
+        if (x === null || y === null || z === null) return null;
+        return { x, y, z };
+      }
+
+      function summarizeSectionProfileForWorkAssist(profile = statsData.sectionProfile) {
+        if (!profile || !Number.isFinite(Number(profile.count)) || Number(profile.count) <= 0) {
+          return {
+            status: profile?.status || "unknown",
+            count: 0,
+          };
+        }
+        return {
+          status: profile.status || "ok",
+          count: Number(profile.count),
+          groundCount: Number(profile.groundCount || 0),
+          groundRatio: roundWorkAssistNumber(profile.groundRatio, 2),
+          minZ: roundWorkAssistNumber(profile.minZ, 3),
+          maxZ: roundWorkAssistNumber(profile.maxZ, 3),
+          zRange: roundWorkAssistNumber(profile.zRange, 3),
+          densityEstimate: roundWorkAssistNumber(profile.densityEstimate, 4),
+        };
+      }
+
+      function summarizeMeasurementRecordForWorkAssist(record) {
+        if (!record?.metrics) return null;
+        const metrics = record.metrics;
+        return {
+          id: Number.isFinite(Number(record.id)) ? Number(record.id) : null,
+          distance3d: roundWorkAssistNumber(metrics.distance3d, 3),
+          horizontalDistance: roundWorkAssistNumber(metrics.horizontalDistance, 3),
+          heightDifference: roundWorkAssistNumber(metrics.heightDifference, 3),
+          dx: roundWorkAssistNumber(metrics.dx, 3),
+          dy: roundWorkAssistNumber(metrics.dy, 3),
+          dz: roundWorkAssistNumber(metrics.dz, 3),
+        };
+      }
+
+      function getWorkAssistSelectedCandidate() {
+        const key = statsData.selectedDiagnosticCandidateKey;
+        const candidate = key ? statsData.diagnosticCandidateMap?.[key] : null;
+        if (!candidate) return null;
+        return {
+          key: String(candidate.key || key),
+          kind: String(candidate.kind || ""),
+          detail: String(candidate.detail || ""),
+          index: Number.isFinite(Number(candidate.point?.index))
+            ? Number(candidate.point.index)
+            : null,
+          row: Number.isFinite(Number(candidate.cell?.row))
+            ? Number(candidate.cell.row)
+            : null,
+          column: Number.isFinite(Number(candidate.cell?.column))
+            ? Number(candidate.cell.column)
+            : null,
+        };
+      }
+
+      function buildWorkAssistSnapshot() {
+        const activeMeasurementId = getActiveMeasurementRecordId(measurementState);
+        const activeMeasurement =
+          findMeasurementRecordById(activeMeasurementId) ||
+          measurementState.history[measurementState.history.length - 1] ||
+          null;
+        const acquisitionQuality = buildAcquisitionQualityReport(
+          statsData.header,
+          statsData.acquisitionMetrics,
+        );
+        const diagnosticsCandidates = buildDiagnosticCandidateSummary(
+          statsData.diagnosticsReport,
+        );
+        const sectionWidth = Number(document.getElementById("sectionWidthRange")?.value);
+        const groundOnly = !!document.getElementById("sectionGroundOnly")?.checked;
+
+        return {
+          schemaVersion: 1,
+          generatedAt: new Date().toISOString(),
+          app: "PointCloudWorkbench",
+          privacy: {
+            manualCopyOnly: true,
+            telemetry: false,
+            sendsPointCloudFile: false,
+            includesPointCloudData: false,
+            includesFileName: false,
+            includesSourceCoordinates: false,
+          },
+          workflow: {
+            step: workflowState.step,
+            selectedQuality: workflowState.selectedQuality,
+            loadStrategy: statsData.loadStrategy,
+            loadRiskLevel: statsData.loadRiskLevel,
+          },
+          view: {
+            mode: is2DMode ? "2d" : "3d",
+            view2d: is2DMode ? current2DView : null,
+            colorMode,
+            visualizationMode: currentVisualizationMode,
+            cadMode: isCADMode,
+            cameraPosition: serializeWorkAssistVector(camera?.position),
+            cameraTarget: serializeWorkAssistVector(controls?.target),
+            cameraUp: serializeWorkAssistVector(camera?.up),
+          },
+          section: {
+            width: Number.isFinite(sectionWidth) ? sectionWidth : null,
+            groundOnly,
+            profile: summarizeSectionProfileForWorkAssist(statsData.sectionProfile),
+          },
+          measurement: {
+            historyCount: measurementState.history.length,
+            activeRecordId: activeMeasurementId ?? null,
+            lastResult: summarizeMeasurementRecordForWorkAssist(activeMeasurement),
+          },
+          diagnostics: {
+            filterKind: statsData.diagnosticCandidateFilterKind || "all",
+            selectedCandidate: getWorkAssistSelectedCandidate(),
+            summary: diagnosticsCandidates,
+          },
+          acquisitionQuality: {
+            status: acquisitionQuality.status,
+            score: acquisitionQuality.score,
+            availableSignals: acquisitionQuality.availableSignals,
+            missingSignals: acquisitionQuality.missingSignals,
+            warnings: acquisitionQuality.warnings,
+          },
+        };
+      }
+
+      async function copyWorkAssistSnapshot() {
+        const snapshot = buildWorkAssistSnapshot();
+        const text = JSON.stringify(snapshot, null, 2);
+        try {
+          await copyTextToClipboard(text);
+          showToast("作業メモをコピーしました。現場確認メモに貼り付けできます。", "success");
+          return { ok: true, text, snapshot };
+        } catch (error) {
+          console.warn("Work assist copy failed:", error);
+          showToast("作業メモコピーに失敗しました。ブラウザー設定を確認してください。", "warning");
+          return {
+            ok: false,
+            text,
+            snapshot,
+            reason: error?.message || "Clipboard copy failed",
+          };
+        }
+      }
+
+      window.copyWorkAssistSnapshot = copyWorkAssistSnapshot;
 
       async function copyTextToClipboard(text) {
         if (navigator.clipboard?.writeText) {
@@ -18597,6 +18763,8 @@
           decodeLAZPoint,
           buildManualDiagnosticReport,
           copyManualDiagnosticReport,
+          buildWorkAssistSnapshot,
+          copyWorkAssistSnapshot,
           resolvePointCloudReader,
           createPointCloudData,
           calculatePointBounds,
