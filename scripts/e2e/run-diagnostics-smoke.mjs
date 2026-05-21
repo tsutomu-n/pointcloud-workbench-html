@@ -83,29 +83,57 @@ async function runSingleScenario({ browser, baseUrl, inputPath, label, screensho
     viewport: { width: 1600, height: 1000 },
   });
   const page = await context.newPage();
+  const debug = {
+    step: "init",
+    consoleErrors: [],
+    pageErrors: [],
+    requestFailures: [],
+  };
+
+  page.on("console", (message) => {
+    if (message.type() === "error") {
+      debug.consoleErrors.push(message.text());
+    }
+  });
+  page.on("pageerror", (error) => {
+    debug.pageErrors.push(error?.message || String(error));
+  });
+  page.on("requestfailed", (request) => {
+    debug.requestFailures.push({
+      url: request.url(),
+      method: request.method(),
+      failure: request.failure()?.errorText || "unknown",
+    });
+  });
 
   try {
+    debug.step = "navigate";
     await page.goto(`${baseUrl}/PointCloudWorkbench.html`, { waitUntil: "domcontentloaded" });
+    debug.step = "wait-event-listeners";
     await page.waitForFunction(() => window.eventListenersSetupDone === true, null, { timeout: 30000 });
 
+    debug.step = "set-input";
     await page.setInputFiles("#fileInput", inputPath);
     await page.evaluate(() => {
       const input = document.getElementById("fileInput");
       if (input) input.dispatchEvent(new Event("change", { bubbles: true }));
     });
 
+    debug.step = "preflight";
     await page.waitForSelector("#proceedToQuality:not([disabled])", { timeout: 30000 });
     await page.click("#proceedToQuality");
     await page.waitForSelector("#quality-low", { timeout: 10000 });
     await page.click('label.quality-option[data-quality="low"]');
     await page.click('button:has-text("読み込み開始")');
 
+    debug.step = "load-complete";
     await page.waitForFunction(
       () => typeof workflowState !== "undefined" && workflowState.step === "complete",
       null,
       { timeout: 540000 },
     );
 
+    debug.step = "stats-open";
     await page.click("#statsToggle");
     await page.waitForSelector("#diagnosticCandidateList", { timeout: 10000 });
     await page.waitForTimeout(1200);
@@ -117,18 +145,21 @@ async function runSingleScenario({ browser, baseUrl, inputPath, label, screensho
     const markerExists = await page.evaluate(() => typeof diagnosticCandidateMarker !== "undefined" && !!diagnosticCandidateMarker);
     assertTrue(markerExists, `${label}: marker was not created after candidate click`);
 
+    debug.step = "candidate-copy";
     const selectedCopy = await page.evaluate(async () => {
       if (typeof copySelectedDiagnosticCandidate !== "function") return { ok: false, reason: "copy function missing" };
       return await copySelectedDiagnosticCandidate();
     });
     assertTrue(selectedCopy?.ok && String(selectedCopy?.text || "").includes('"kind"'), `${label}: selected copy failed`);
 
+    debug.step = "summary-copy";
     const summaryCopy = await page.evaluate(async () => {
       if (typeof copyDiagnosticCandidateSummary !== "function") return { ok: false, reason: "summary copy function missing" };
       return await copyDiagnosticCandidateSummary();
     });
     assertTrue(summaryCopy?.ok && String(summaryCopy?.text || "").includes('"total"'), `${label}: summary copy failed`);
 
+    debug.step = "screenshot";
     fs.mkdirSync(OUT_DIR, { recursive: true });
     await page.screenshot({
       path: path.resolve(OUT_DIR, screenshotName),
@@ -140,6 +171,26 @@ async function runSingleScenario({ browser, baseUrl, inputPath, label, screensho
       candidateCount,
       screenshot: path.resolve(OUT_DIR, screenshotName),
     };
+  } catch (error) {
+    let workflowStep = "unknown";
+    try {
+      workflowStep = await page.evaluate(
+        () => (typeof workflowState !== "undefined" ? workflowState.step : "missing"),
+      );
+    } catch {}
+    console.error(
+      `[${label}] scenario failed at step=${debug.step} workflowStep=${workflowStep}: ${error.message}`,
+    );
+    if (debug.pageErrors.length) {
+      console.error(`[${label}] pageErrors: ${JSON.stringify(debug.pageErrors.slice(-5))}`);
+    }
+    if (debug.consoleErrors.length) {
+      console.error(`[${label}] consoleErrors: ${JSON.stringify(debug.consoleErrors.slice(-5))}`);
+    }
+    if (debug.requestFailures.length) {
+      console.error(`[${label}] requestFailures: ${JSON.stringify(debug.requestFailures.slice(-5))}`);
+    }
+    throw error;
   } finally {
     await context.close();
   }

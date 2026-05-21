@@ -33,6 +33,12 @@
 - 実装変更時は、該当するガイドを同時更新してください。
 - 操作仕様を変更した場合は運用ガイド、内部処理を変更した場合は実装リファレンスを更新対象にしてください。
 
+## 再開時の最小検証順
+1. `bun test scripts/pointcloud-workbench.test.js`
+2. `bun scripts/check-readme.js`
+3. `bunx --package playwright node scripts/e2e/run-diagnostics-smoke.mjs --las samples/test.las --laz samples/test.laz`
+4. 必要なら `workflow_dispatch` の `Diagnostics Smoke` を手動実行してスクリーンショット成果物を確認
+
 ## 主要関数クイックリンク（PointCloudWorkbench.html）
 
 | 関数 | 行番号リンク | 用途 |

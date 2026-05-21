@@ -66,6 +66,8 @@
 - `FILE_IO_POLICY` は header 先読込と chunked 読込サイズを定義
 - `CRS_DIAGNOSTIC_POLICY` は CRS 診断用の record 数、VLR byte 数、EVLR payload byte 数、WKT text 長の上限を定義
 - `SUPPORTED_LANGUAGES = ["ja", "en", "zh"]`
+- `DIAGNOSTIC_WARNING_LABELS` / `DIAGNOSTIC_WARNING_CODE_ORDER` は warning code の表示名と正規順序を定義
+- `DIAGNOSTIC_DEDUCTION_BY_CODE` は score 減点値を warning code 単位で固定する
 
 ## 5. 初期化フロー
 1. `DOMContentLoaded`
@@ -134,6 +136,13 @@
 - `buildCoordinateReferenceDiagnostics()` は主 status と warnings を分け、水平 CRS が検出できている場合に parse warning だけで主判定を失わない
 - CRS 診断は座標変換、EPSG DB 参照、ジオイド補正、地図照合、外部 API 呼び出し、サーバー処理を行わない
 - `formatCrsInquiryText()` / `copyCrsInquiryText()` は問い合わせ用の確認項目だけを出し、ローカルファイル名、点群 payload、座標配列を含めない
+
+## 7.6 診断 score / warning code 契約
+- `normalizeDiagnosticsWarningCodes()` は warning code を大文字・アンダースコア正規化し、既知コードのみ採用、重複排除、既定順序で返す
+- `buildDiagnosticsWarningCodes()` は `CRS_MISSING` / `CLASSIFICATION_*` / `DISPLAY_RATIO_LOW` / `DENSITY_*` / `Z_OUTLIERS` / `ISOLATED_POINTS` を返す
+- `buildDiagnosticsScore()` は `score`, `status`, `warningCodes` に加えて `totalDeduction`, `deductionByCode`, `sectionWeights` を返す
+- `buildDiagnosticCandidateItems()` は point/cell 候補を index / row-column でソートして、同一候補集合で順序を安定化する
+- `copySelectedDiagnosticCandidate()` と `copyDiagnosticCandidateSummary()` は `warningCodes`, `score`, `scoreStatus` を含む
 
 ## 8. 点群生成と描画
 

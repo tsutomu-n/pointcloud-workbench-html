@@ -66,6 +66,8 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 - Slice view and 2D cross-section inspection
 - Automatic classification assistance and classification quality review
 - Statistics panel for point counts, class breakdowns, and processing time
+- Diagnostics warning codes are normalized, deduplicated, and emitted in a stable order (`CRS_MISSING`, `CLASSIFICATION_*`, `DISPLAY_RATIO_LOW`, `DENSITY_*`, `Z_OUTLIERS`, `ISOLATED_POINTS`)
+- Diagnostic candidate summary/selected copy payloads include normalized warning codes and score metadata (`score`, `scoreStatus`)
 
 ## Browser / Runtime Requirements
 
@@ -116,12 +118,17 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 
 ## Testing
 
+- Restart-time minimum verification order:
+  - `bun test scripts/pointcloud-workbench.test.js`
+  - `bun scripts/check-readme.js`
+  - `bunx --package playwright node scripts/e2e/run-diagnostics-smoke.mjs --las samples/test.las --laz samples/test.laz`
 - `bun test scripts/pointcloud-workbench.test.js scripts/documentation-consistency.test.js scripts/gitignore.test.js scripts/repository-metadata.test.js scripts/public-repo-readiness.test.js scripts/landing-page-i18n.test.js`
 - `bun scripts/check-readme.js`
 - Browser smoke for local LAS/LAZ diagnostics (headless Playwright, no repo dependency install):
   - `bunx --package playwright playwright install chromium`
   - `bunx --package playwright node scripts/e2e/run-diagnostics-smoke.mjs --las samples/test.las --laz samples/test.laz`
   - Output screenshots: `.tmp/e2e/las-diagnostics.png`, `.tmp/e2e/laz-diagnostics.png`
+  - On failure, the smoke runner logs scenario step, `workflowState.step`, and recent page/console/request failures.
 - Optional manual CI job: GitHub Actions `Diagnostics Smoke` (`workflow_dispatch`) runs the same LAS/LAZ smoke and uploads screenshots as artifacts.
 - CI also runs pinned `actionlint` for `.github/workflows/*.yml`; local `actionlint .github/workflows/*.yml` is optional.
 
