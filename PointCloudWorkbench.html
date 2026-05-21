@@ -11832,6 +11832,9 @@
       }
 
       function decodeLASPointRecord(view, pointOffset, header, sampleIndex = -1) {
+        if (!view || pointOffset < 0 || pointOffset + 15 > view.byteLength) {
+          return null;
+        }
         const rawX = view.getInt32(pointOffset, true);
         const rawY = view.getInt32(pointOffset + 4, true);
         const rawZ = view.getInt32(pointOffset + 8, true);
@@ -11860,10 +11863,14 @@
         let scanAngle = null;
         let gpsTime = null;
         if (pointFormat >= 6) {
-          const returnByte = view.getUint8(pointOffset + 14);
-          returnNumber = returnByte & 0x0f;
-          numberOfReturns = (returnByte >> 4) & 0x0f;
-          classification = view.getUint8(pointOffset + 16);
+          if (pointOffset + 15 <= view.byteLength) {
+            const returnByte = view.getUint8(pointOffset + 14);
+            returnNumber = returnByte & 0x0f;
+            numberOfReturns = (returnByte >> 4) & 0x0f;
+          }
+          classification = pointOffset + 17 <= view.byteLength
+            ? view.getUint8(pointOffset + 16)
+            : 1;
           if (pointOffset + 20 <= view.byteLength) {
             scanAngle = Number((view.getInt16(pointOffset + 18, true) * 0.006).toFixed(4));
           }
@@ -11874,10 +11881,14 @@
             gpsTime = view.getFloat64(pointOffset + 22, true);
           }
         } else {
-          const returnByte = view.getUint8(pointOffset + 14);
-          returnNumber = returnByte & 0x07;
-          numberOfReturns = (returnByte >> 3) & 0x07;
-          classification = pointFormat === 0 ? 1 : view.getUint8(pointOffset + 15);
+          if (pointOffset + 15 <= view.byteLength) {
+            const returnByte = view.getUint8(pointOffset + 14);
+            returnNumber = returnByte & 0x07;
+            numberOfReturns = (returnByte >> 3) & 0x07;
+          }
+          classification = pointFormat === 0 || pointOffset + 16 > view.byteLength
+            ? 1
+            : view.getUint8(pointOffset + 15);
           if (pointOffset + 17 <= view.byteLength) {
             scanAngle = view.getInt8(pointOffset + 16);
           }
@@ -13603,6 +13614,7 @@
 
       function decodeLAZPoint(pointData, pointFormat, header) {
         try {
+          if (!pointData || pointData.byteLength < 15) return null;
           const x =
             pointData.getInt32(0, true) * header.xScaleFactor + header.xOffset;
           const y =
@@ -13620,12 +13632,18 @@
           let gpsTime = null;
 
           if (pointFormat >= 6) {
-            const returnByte = pointData.getUint8(14);
-            returnNumber = returnByte & 0x0f;
-            numberOfReturns = (returnByte >> 4) & 0x0f;
+            if (pointData.byteLength >= 15) {
+              const returnByte = pointData.getUint8(14);
+              returnNumber = returnByte & 0x0f;
+              numberOfReturns = (returnByte >> 4) & 0x0f;
+            }
             // PDRF 6-10: Byte 16 が classification、Byte 15 は classification flags
-            classificationFlags = pointData.getUint8(15);
-            classification = pointData.getUint8(16);
+            classificationFlags = pointData.byteLength >= 16
+              ? pointData.getUint8(15)
+              : null;
+            classification = pointData.byteLength >= 17
+              ? pointData.getUint8(16)
+              : 1;
             if (pointData.byteLength >= 20) {
               scanAngle = Number((pointData.getInt16(18, true) * 0.006).toFixed(4));
             }
@@ -13633,11 +13651,15 @@
               gpsTime = pointData.getFloat64(22, true);
             }
           } else {
-            const returnByte = pointData.getUint8(14);
-            returnNumber = returnByte & 0x07;
-            numberOfReturns = (returnByte >> 3) & 0x07;
+            if (pointData.byteLength >= 15) {
+              const returnByte = pointData.getUint8(14);
+              returnNumber = returnByte & 0x07;
+              numberOfReturns = (returnByte >> 3) & 0x07;
+            }
             // PDRF 0-5: Byte 15 が classification
-            classification = pointData.getUint8(15);
+            classification = pointData.byteLength >= 16
+              ? pointData.getUint8(15)
+              : 1;
             if (pointData.byteLength >= 17) {
               scanAngle = pointData.getInt8(16);
             }

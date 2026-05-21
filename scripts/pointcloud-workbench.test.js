@@ -1327,6 +1327,65 @@ test("decodeLASPointRecord extracts extended acquisition fields", () => {
   });
 });
 
+test("decodeLASPointRecord returns null for truncated mandatory point bytes", () => {
+  const context = createContext();
+  context.__buffer = new ArrayBuffer(14);
+  context.__header = {
+    pointDataRecordFormat: 6,
+    xScaleFactor: 0.01,
+    yScaleFactor: 0.01,
+    zScaleFactor: 0.01,
+    xOffset: 0,
+    yOffset: 0,
+    zOffset: 0,
+  };
+
+  const point = vm.runInContext(
+    "window.__pcwTestApi.decodeLASPointRecord(new DataView(__buffer), 0, __header)",
+    context,
+  );
+
+  expect(point).toBeNull();
+});
+
+test("decodeLASPointRecord keeps optional acquisition fields null when truncated", () => {
+  const context = createContext();
+  context.__buffer = new ArrayBuffer(15);
+  vm.runInContext(
+    `
+      const view = new DataView(__buffer);
+      view.setInt32(0, 100, true);
+      view.setInt32(4, 200, true);
+      view.setInt32(8, 300, true);
+      view.setUint16(12, 42, true);
+      view.setUint8(14, 1 | (1 << 4));
+    `,
+    context,
+  );
+  context.__header = {
+    pointDataRecordFormat: 6,
+    xScaleFactor: 0.01,
+    yScaleFactor: 0.01,
+    zScaleFactor: 0.01,
+    xOffset: 0,
+    yOffset: 0,
+    zOffset: 0,
+  };
+
+  const point = vm.runInContext(
+    "window.__pcwTestApi.decodeLASPointRecord(new DataView(__buffer), 0, __header)",
+    context,
+  );
+
+  expect(point).toMatchObject({
+    returnNumber: 1,
+    numberOfReturns: 1,
+    classification: 1,
+    scanAngle: null,
+    gpsTime: null,
+  });
+});
+
 test("decodeLAZPoint extracts extended acquisition fields", () => {
   const context = createContext();
   context.__buffer = new ArrayBuffer(38);
@@ -1364,6 +1423,64 @@ test("decodeLAZPoint extracts extended acquisition fields", () => {
     numberOfReturns: 3,
     scanAngle: -3,
     gpsTime: 789.75,
+  });
+});
+
+test("decodeLAZPoint returns null for truncated mandatory point bytes", () => {
+  const context = createContext();
+  context.__buffer = new ArrayBuffer(14);
+  context.__header = {
+    xScaleFactor: 0.01,
+    yScaleFactor: 0.01,
+    zScaleFactor: 0.01,
+    xOffset: 0,
+    yOffset: 0,
+    zOffset: 0,
+  };
+
+  const point = vm.runInContext(
+    "window.__pcwTestApi.decodeLAZPoint(new DataView(__buffer), 8, __header)",
+    context,
+  );
+
+  expect(point).toBeNull();
+});
+
+test("decodeLAZPoint keeps optional extended fields null when truncated", () => {
+  const context = createContext();
+  context.__buffer = new ArrayBuffer(15);
+  vm.runInContext(
+    `
+      const view = new DataView(__buffer);
+      view.setInt32(0, 100, true);
+      view.setInt32(4, 200, true);
+      view.setInt32(8, 300, true);
+      view.setUint16(12, 42, true);
+      view.setUint8(14, 2 | (3 << 4));
+    `,
+    context,
+  );
+  context.__header = {
+    xScaleFactor: 0.01,
+    yScaleFactor: 0.01,
+    zScaleFactor: 0.01,
+    xOffset: 0,
+    yOffset: 0,
+    zOffset: 0,
+  };
+
+  const point = vm.runInContext(
+    "window.__pcwTestApi.decodeLAZPoint(new DataView(__buffer), 8, __header)",
+    context,
+  );
+
+  expect(point).toMatchObject({
+    returnNumber: 2,
+    numberOfReturns: 3,
+    classification: 1,
+    classificationFlags: null,
+    scanAngle: null,
+    gpsTime: null,
   });
 });
 
