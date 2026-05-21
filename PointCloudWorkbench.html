@@ -13,6 +13,7 @@
     <script src="https://cdn.jsdelivr.net/npm/simple-statistics@7.8.9/dist/simple-statistics.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatbush@4.5.0/flatbush.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/simpleheat@0.4.0/simpleheat.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/proj4@2.12.1/dist/proj4.js"></script>
     <script>
       // OrbitControls のインライン実装
       THREE.OrbitControls = function (object, domElement) {
@@ -4871,6 +4872,28 @@
                 <div class="stats-item">
                   注意: <span class="stats-value" id="crsWarnings">不明</span>
                 </div>
+                <div class="stats-item">
+                  中心緯度経度:
+                  <span class="stats-value" id="crsCenterLatLon">未変換</span>
+                </div>
+                <div class="stats-item" id="crsMapLinksRow">
+                  地図:
+                  <a
+                    class="stats-value"
+                    id="crsGoogleMapsLink"
+                    href="#"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >Google Maps</a>
+                  /
+                  <a
+                    class="stats-value"
+                    id="crsGsiMapsLink"
+                    href="#"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >地理院地図</a>
+                </div>
                 <button
                   class="control-btn"
                   id="crsInquiryCopyBtn"
@@ -6604,9 +6627,16 @@
       }
 
       function roundDiagnosticCoordinate(value) {
+        if (value === null || value === undefined) return null;
         const numeric = Number(value);
         if (!Number.isFinite(numeric)) return null;
         return Math.round(numeric * 1000) / 1000;
+      }
+
+      function roundLatLonCoordinate(value) {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return null;
+        return Math.round(numeric * 1000000) / 1000000;
       }
 
       function buildDiagnosticBoundsReport() {
@@ -6638,46 +6668,179 @@
         };
       }
 
+      const JGD2011_PLANE_RECTANGULAR_CRS = {
+        6669: { zone: "I", lat0: 33, lon0: 129.5 },
+        6670: { zone: "II", lat0: 33, lon0: 131 },
+        6671: { zone: "III", lat0: 36, lon0: 132.166666666667 },
+        6672: { zone: "IV", lat0: 33, lon0: 133.5 },
+        6673: { zone: "V", lat0: 36, lon0: 134.333333333333 },
+        6674: { zone: "VI", lat0: 36, lon0: 136 },
+        6675: { zone: "VII", lat0: 36, lon0: 137.166666666667 },
+        6676: { zone: "VIII", lat0: 36, lon0: 138.5 },
+        6677: { zone: "IX", lat0: 36, lon0: 139.833333333333 },
+        6678: { zone: "X", lat0: 40, lon0: 140.833333333333 },
+        6679: { zone: "XI", lat0: 44, lon0: 140.25 },
+        6680: { zone: "XII", lat0: 44, lon0: 142.25 },
+        6681: { zone: "XIII", lat0: 44, lon0: 144.25 },
+        6682: { zone: "XIV", lat0: 26, lon0: 142 },
+        6683: { zone: "XV", lat0: 26, lon0: 127.5 },
+        6684: { zone: "XVI", lat0: 26, lon0: 124 },
+        6685: { zone: "XVII", lat0: 26, lon0: 131 },
+        6686: { zone: "XVIII", lat0: 20, lon0: 136 },
+        6687: { zone: "XIX", lat0: 26, lon0: 154 },
+      };
+
+      Object.entries(JGD2011_PLANE_RECTANGULAR_CRS).forEach(([epsg, entry]) => {
+        entry.epsg = epsg;
+        entry.name = `JGD2011 / Japan Plane Rectangular CS ${entry.zone}`;
+        entry.axisOrder = "northing-easting";
+        entry.proj4 = `+proj=tmerc +lat_0=${entry.lat0} +lon_0=${entry.lon0} +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs`;
+      });
+
+      function getProj4Transformer() {
+        if (typeof window !== "undefined" && typeof window.proj4 === "function") {
+          return window.proj4;
+        }
+        if (typeof proj4 === "function") {
+          return proj4;
+        }
+        return null;
+      }
+
+      function getHorizontalEpsgCandidates(crsDiagnostics) {
+        return uniqueStrings([
+          ...(crsDiagnostics?.epsgCandidates?.horizontal || []),
+          ...(crsDiagnostics?.horizontal?.epsg || []),
+        ].map((code) => String(code).replace(/^EPSG:/i, "")));
+      }
+
+      function buildLatLonUnavailable(reason, warning) {
+        return {
+          status: "unavailable",
+          reason,
+          source: "bounds-center",
+          latitude: null,
+          longitude: null,
+          confidence: "low",
+          warnings: uniqueStrings([warning]),
+        };
+      }
+
+      function buildMapLinks(latLon) {
+        if (latLon?.status !== "converted") {
+          return {
+            googleMaps: null,
+            gsiMaps: null,
+          };
+        }
+        const latitude = encodeURIComponent(String(latLon.latitude));
+        const longitude = encodeURIComponent(String(latLon.longitude));
+        return {
+          googleMaps: `https://www.google.com/maps/search/?api=1&query=${latitude}%2C${longitude}`,
+          gsiMaps: `https://maps.gsi.go.jp/#16/${latitude}/${longitude}/&base=std&ls=std&disp=1&vs=c1j0h0k0l0u0t0z0r0s0m0f1`,
+        };
+      }
+
+      function buildDiagnosticLatLonReport(crsDiagnostics, bounds) {
+        if (!bounds) {
+          return buildLatLonUnavailable("bounds-missing", "LATLON_BOUNDS_MISSING");
+        }
+        const horizontalCandidates = getHorizontalEpsgCandidates(crsDiagnostics);
+        if (!horizontalCandidates.length) {
+          return buildLatLonUnavailable("horizontal-epsg-missing", "LATLON_HORIZONTAL_EPSG_MISSING");
+        }
+        if (horizontalCandidates.length > 1) {
+          return buildLatLonUnavailable("ambiguous-horizontal-epsg", "LATLON_AMBIGUOUS_HORIZONTAL_EPSG");
+        }
+
+        const epsg = horizontalCandidates[0];
+        const definition = JGD2011_PLANE_RECTANGULAR_CRS[epsg];
+        if (!definition) {
+          return buildLatLonUnavailable("unsupported-horizontal-epsg", "LATLON_UNSUPPORTED_HORIZONTAL_EPSG");
+        }
+
+        const transformer = getProj4Transformer();
+        if (!transformer) {
+          return buildLatLonUnavailable("proj4-unavailable", "LATLON_PROJ4_UNAVAILABLE");
+        }
+
+        const sourceCrs = `EPSG:${epsg}`;
+        if (typeof transformer.defs === "function") {
+          transformer.defs(sourceCrs, definition.proj4);
+        }
+
+        try {
+          const eastingNorthing = [bounds.centerY, bounds.centerX];
+          const converted = transformer(sourceCrs, "EPSG:4326", eastingNorthing);
+          const longitude = roundLatLonCoordinate(converted?.[0]);
+          const latitude = roundLatLonCoordinate(converted?.[1]);
+          if (latitude === null || longitude === null) {
+            return buildLatLonUnavailable("invalid-transform-result", "LATLON_INVALID_TRANSFORM_RESULT");
+          }
+          return {
+            status: "converted",
+            source: "bounds-center",
+            epsg,
+            crsName: crsDiagnostics?.horizontal?.name || definition.name,
+            axisOrder: definition.axisOrder,
+            input: {
+              x: bounds.centerX,
+              y: bounds.centerY,
+            },
+            latitude,
+            longitude,
+            confidence: crsDiagnostics?.confidence || "medium",
+            warnings: ["LATLON_AXIS_ORDER_APPLIED"],
+          };
+        } catch (error) {
+          return buildLatLonUnavailable("transform-failed", "LATLON_TRANSFORM_FAILED");
+        }
+      }
+
       function buildDiagnosticLocationReport() {
         const crsDiagnostics =
           statsData.crsDiagnostics || statsData.header?.crsDiagnostics || null;
         const bounds = buildDiagnosticBoundsReport();
+        const coordinateReference = crsDiagnostics
+          ? {
+              status: crsDiagnostics.status || "unknown",
+              label: formatCrsDiagnosticsStatus(crsDiagnostics),
+              confidence: crsDiagnostics.confidence || "low",
+              horizontal: crsDiagnostics.horizontal || null,
+              vertical: crsDiagnostics.vertical || null,
+              units: crsDiagnostics.units || null,
+              epsgCandidates: crsDiagnostics.epsgCandidates || {
+                horizontal: [],
+                vertical: [],
+                unit: [],
+                other: [],
+              },
+              warningCodes: crsDiagnostics.warningCodes || [],
+            }
+          : {
+              status: "unknown",
+              label: "不明",
+              confidence: "low",
+              horizontal: null,
+              vertical: null,
+              units: null,
+              epsgCandidates: {
+                horizontal: [],
+                vertical: [],
+                unit: [],
+                other: [],
+              },
+              warningCodes: [],
+            };
+        const latLon = buildDiagnosticLatLonReport(coordinateReference, bounds);
 
         return {
-          coordinateReference: crsDiagnostics
-            ? {
-                status: crsDiagnostics.status || "unknown",
-                label: formatCrsDiagnosticsStatus(crsDiagnostics),
-                confidence: crsDiagnostics.confidence || "low",
-                horizontal: crsDiagnostics.horizontal || null,
-                vertical: crsDiagnostics.vertical || null,
-                units: crsDiagnostics.units || null,
-                epsgCandidates: crsDiagnostics.epsgCandidates || {
-                  horizontal: [],
-                  vertical: [],
-                  unit: [],
-                  other: [],
-                },
-                warningCodes: crsDiagnostics.warningCodes || [],
-              }
-            : {
-                status: "unknown",
-                label: "不明",
-                confidence: "low",
-                horizontal: null,
-                vertical: null,
-                units: null,
-                epsgCandidates: {
-                  horizontal: [],
-                  vertical: [],
-                  unit: [],
-                  other: [],
-                },
-                warningCodes: [],
-              },
+          coordinateReference,
           bounds,
+          latLon,
+          mapLinks: buildMapLinks(latLon),
           note:
-            "CRSが不明な場合、boundsは元座標系内の範囲であり、地図上の住所や緯度経度ではありません。",
+            "緯度経度は対応CRSのbounds中心から推定した確認用の値です。CRSが不明な場合、boundsは元座標系内の範囲であり、地図上の住所や緯度経度ではありません。",
         };
       }
 
@@ -13475,6 +13638,42 @@
         };
       }
 
+      function formatLatLonDisplay(latLon) {
+        if (latLon?.status === "converted") {
+          return `${latLon.latitude.toFixed(6)}, ${latLon.longitude.toFixed(6)}`;
+        }
+        const reasonLabels = {
+          "bounds-missing": "座標範囲なし",
+          "horizontal-epsg-missing": "水平EPSGなし",
+          "ambiguous-horizontal-epsg": "EPSG候補が複数",
+          "unsupported-horizontal-epsg": "未対応EPSG",
+          "proj4-unavailable": "変換ライブラリ未読込",
+          "invalid-transform-result": "変換結果不正",
+          "transform-failed": "変換失敗",
+        };
+        return `未変換（${reasonLabels[latLon?.reason] || "理由不明"}）`;
+      }
+
+      function setMapLinkState(id, href) {
+        const link = document.getElementById(id);
+        if (!link) return;
+        if (href) {
+          link.href = href;
+          if (typeof link.removeAttribute === "function") {
+            link.removeAttribute("aria-disabled");
+          } else {
+            link.setAttribute("aria-disabled", "false");
+          }
+          link.style.pointerEvents = "";
+          link.style.opacity = "";
+        } else {
+          link.href = "#";
+          link.setAttribute("aria-disabled", "true");
+          link.style.pointerEvents = "none";
+          link.style.opacity = "0.55";
+        }
+      }
+
       function formatCrsInquiryText() {
         return [
           "LAS/LAZ ファイルの座標系をご教示ください。",
@@ -18517,6 +18716,7 @@
 
       function updateCrsDiagnosticsDisplay(diagnostics) {
         const rows = formatCrsDiagnosticsRows(diagnostics);
+        const location = buildDiagnosticLocationReport();
         const mappings = {
           crsStatus: rows.status,
           crsHorizontal: rows.horizontal,
@@ -18525,11 +18725,14 @@
           crsSources: rows.sources,
           crsUnits: rows.units,
           crsWarnings: rows.warnings,
+          crsCenterLatLon: formatLatLonDisplay(location.latLon),
         };
         Object.entries(mappings).forEach(([id, value]) => {
           const el = document.getElementById(id);
           if (el) el.textContent = value || "不明";
         });
+        setMapLinkState("crsGoogleMapsLink", location.mapLinks?.googleMaps);
+        setMapLinkState("crsGsiMapsLink", location.mapLinks?.gsiMaps);
       }
 
       function updateDiagnosticsSummaryDisplay(report) {
@@ -19021,6 +19224,11 @@
           buildCoordinateReferenceDiagnostics,
           formatCrsDiagnosticsStatus,
           formatCrsDiagnosticsRows,
+          formatLatLonDisplay,
+          buildDiagnosticLocationReport,
+          buildDiagnosticLatLonReport,
+          buildMapLinks,
+          updateCrsDiagnosticsDisplay,
           formatCrsInquiryText,
           analyzeSelectedFilePreview,
           checkFileSizeLimits,

@@ -59,6 +59,7 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 - Runtime mode summary for Hosted / Portable / renderer / isolation capabilities
 - Manual diagnostic report copy with no telemetry, no LAS/LAZ upload, and no file name included
 - CRS diagnostics from local LAS/LAZ header, VLR, and EVLR metadata, including WKT / GeoTIFF / EPSG candidates and cautious height-basis warnings
+- Center latitude/longitude display and Google Maps / GSI Maps links when the CRS is a supported JGD2011 Japan Plane Rectangular CRS
 - Acquisition quality summary in the manual report, based on LAS point format signal availability and sampled return / scan-angle / GPS-time coverage
 - Ground candidate assist for displayed points, choosing class 2 ground when available and falling back to low-percentile grid estimates when ground classes are sparse
 - Work-assist memo copy for the current view, section, measurement, diagnostics, and acquisition-quality state without file names or point payloads
@@ -82,10 +83,11 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 
 ## Constraints
 
-- `three.js`, `laz-perf`, `simple-statistics`, `Flatbush`, and `simpleheat` are loaded from CDNs, so normal operation requires network access.
+- `three.js`, `laz-perf`, `simple-statistics`, `Flatbush`, `simpleheat`, and `proj4js` are loaded from CDNs, so normal operation requires network access.
 - The server path is static-only. It must not add Workers, Pages Functions, APIs, telemetry, DB writes, or server-side point cloud processing.
-- Selected point cloud files stay on the user's device. Network access is for application assets and optional map tiles, not LAS/LAZ upload.
-- CRS diagnostics are local metadata inspection only. They do not perform coordinate conversion, geocoding, EPSG database lookup, map matching, or server-side CRS processing.
+- Selected point cloud files stay on the user's device. Network access is for application assets, `proj4js`, and user-clicked external map links, not LAS/LAZ upload.
+- CRS diagnostics perform local metadata inspection and bounds-center conversion only for supported JGD2011 Japan Plane Rectangular CRS codes. They do not perform geocoding, EPSG database lookup, map matching, or server-side CRS processing.
+- Latitude/longitude is an estimated point-cloud bounds center. Do not treat it as an address, site boundary, survey-grade coordinate, or deliverable position guarantee. Google Maps / GSI Maps links pass latitude/longitude to the external site only after the user clicks them.
 - CRS diagnostics read bounded LAS header / VLR / EVLR slices and do not upload LAS/LAZ files or copy local file names into CRS inquiry text.
 - Acquisition quality is a local dimension-coverage aid. It follows the stable LAS 1.4 R15 point-record layout used by the app, keeps PDRF 0-5 and PDRF 6+ return / scan-angle interpretation separate, and treats GPS-time monotonicity as a warning signal rather than survey-grade proof.
 - Ground candidate assist is approximate and displayed-point based. It is not a survey-grade DTM, design surface, cut/fill basis, or deliverable terrain model.
@@ -148,6 +150,6 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 
 ## CDN / Network Notes
 
-- Runtime depends on `three.js`, `laz-perf`, `simple-statistics`, `Flatbush`, and `simpleheat` served from CDNs.
+- Runtime depends on `three.js`, `laz-perf`, `simple-statistics`, `Flatbush`, `simpleheat`, and `proj4js` served from CDNs.
 - Normal usage requires network access. If the CDN is unreachable, the app may fail to initialize.
 - The GitHub Pages demo has the same CDN dependency.

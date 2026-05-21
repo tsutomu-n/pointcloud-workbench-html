@@ -134,7 +134,7 @@
 - `summarizeGeoTiffKeys()` は GeoTIFF key の `3072` / `2048` / `4096` / `3076` / `4099` を候補として扱う
 - `summarizeProjectionRecords()` は表示用には WKT を優先し、EVLR WKT を VLR WKT より優先する。WKT と GeoTIFF の水平 CRS 候補が異なる場合は warning を残す
 - `buildCoordinateReferenceDiagnostics()` は主 status と warnings を分け、水平 CRS が検出できている場合に parse warning だけで主判定を失わない
-- CRS 診断は座標変換、EPSG DB 参照、ジオイド補正、地図照合、外部 API 呼び出し、サーバー処理を行わない
+- CRS 診断は JGD2011 平面直角座標系 `EPSG:6669`-`EPSG:6687` の bounds 中心変換だけを `proj4js` で行う。EPSG DB 参照、ジオイド補正、地図照合、外部 API 呼び出し、サーバー処理は行わない
 - `formatCrsInquiryText()` / `copyCrsInquiryText()` は問い合わせ用の確認項目だけを出し、ローカルファイル名、点群 payload、座標配列を含めない
 
 ## 7.6 診断 score / warning code 契約
@@ -151,7 +151,11 @@
 - `buildAcquisitionMetricsReport()` は表示用に読んだ sampled points から return / scan-angle / GPS-time coverage と GPS-time monotonic ratio を計算する。GPS-time monotonic ratio は警告用の補助指標であり、score の強い決定要因にしない
 - `buildAcquisitionQualityReport()` は属性利用可否と measured coverage を合成し、`status`, `score`, `availableSignals`, `missingSignals`, `warnings` を返す
 - `buildManualDiagnosticReport()` は `lineage`, `attributes`, `acquisitionQuality`, `location`, `diagnosticsCandidates` を含むが、ローカルファイル名、点群 payload、座標配列は含めない
-- `location.coordinateReference` は CRS 診断結果を要約し、`location.bounds` は header または表示点 bounds から座標範囲と中心を丸めて出す。CRS 不明時は地図上の住所や緯度経度として扱わない
+- `location.coordinateReference` は CRS 診断結果を要約し、`location.bounds` は header または表示点 bounds から座標範囲と中心を丸めて出す
+- `location.latLon` は対応 EPSG が 1 つだけあり、bounds と `proj4js` が利用できる場合に `status: converted` を返す。変換対象は bounds 中心だけで、全点変換や住所逆引きは行わない
+- JGD2011 平面直角座標系は EPSG 側の軸が northing/easting のため、LAS の `centerX/centerY` を `northing/easting` とみなし、`proj4js` へ渡す時は `[centerY, centerX]` に入れ替える
+- `location.mapLinks` は `latLon.status === "converted"` の場合だけ Google Maps と地理院地図の外部リンクを返す。リンクは自動取得せず、ユーザークリック時だけ外部サイトへ緯度経度を渡す
+- CRS 不明、EPSG 複数候補、未対応 EPSG、bounds 不足、`proj4js` 未読込、変換結果不正では `location.latLon.status: unavailable` とし、住所や緯度経度として扱わない
 - `buildWorkAssistSnapshot()` は `schemaVersion: 1` の作業メモ JSON を作り、表示、断面、計測履歴、異常候補、取得品質を要約する。ファイル名、点群配列、元LAS座標配列、ROI geometry の永続化情報は含めない
 - `copyWorkAssistSnapshot()` は `copyTextToClipboard()` 経由で作業メモ JSON をコピーする。外部送信、ファイル書き込み、サーバー処理は行わない
 

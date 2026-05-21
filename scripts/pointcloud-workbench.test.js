@@ -1244,6 +1244,196 @@ test("manual diagnostic report includes CRS and coordinate bounds for location r
   expect(report.location.note).toContain("CRSが不明な場合");
 });
 
+test("manual diagnostic report converts supported JGD2011 bounds center to map links", () => {
+  const context = createContext();
+  context.__proj4Calls = [];
+  context.window.proj4 = (from, to, coordinate) => {
+    context.__proj4Calls.push({ from, to, coordinate });
+    return [139.767125, 35.681236];
+  };
+  context.proj4 = context.window.proj4;
+
+  vm.runInContext(
+    `
+      statsData.header = {
+        minX: 1000,
+        maxX: 1500,
+        minY: 2000,
+        maxY: 2600,
+        minZ: 5,
+        maxZ: 25,
+        crsDiagnostics: {
+          status: "usable-horizontal-crs",
+          confidence: "medium",
+          horizontal: {
+            detected: true,
+            name: "JGD2011 / Japan Plane Rectangular CS IX",
+            epsg: ["6677"],
+            source: "wkt",
+          },
+          vertical: {
+            detected: false,
+            name: null,
+            epsg: [],
+            heightBasis: null,
+            source: null,
+          },
+          units: {
+            horizontal: "metre",
+            vertical: null,
+          },
+          epsgCandidates: {
+            horizontal: ["6677"],
+            vertical: [],
+            unit: ["9001"],
+            other: [],
+          },
+          warningCodes: [],
+        },
+      };
+      statsData.crsDiagnostics = statsData.header.crsDiagnostics;
+    `,
+    context,
+  );
+
+  const report = JSON.parse(
+    vm.runInContext("window.__pcwTestApi.buildManualDiagnosticReport()", context),
+  );
+
+  expect(context.__proj4Calls).toEqual([
+    {
+      from: "EPSG:6677",
+      to: "EPSG:4326",
+      coordinate: [2300, 1250],
+    },
+  ]);
+  expect(report.location.latLon).toMatchObject({
+    status: "converted",
+    source: "bounds-center",
+    epsg: "6677",
+    crsName: "JGD2011 / Japan Plane Rectangular CS IX",
+    axisOrder: "northing-easting",
+    latitude: 35.681236,
+    longitude: 139.767125,
+    confidence: "medium",
+    warnings: ["LATLON_AXIS_ORDER_APPLIED"],
+  });
+  expect(report.location.mapLinks.googleMaps).toBe(
+    "https://www.google.com/maps/search/?api=1&query=35.681236%2C139.767125",
+  );
+  expect(report.location.mapLinks.gsiMaps).toContain(
+    "https://maps.gsi.go.jp/#16/35.681236/139.767125/",
+  );
+});
+
+test("manual diagnostic report does not convert ambiguous or unavailable locations", () => {
+  const context = createContext();
+  context.window.proj4 = () => [139, 35];
+  context.proj4 = context.window.proj4;
+
+  vm.runInContext(
+    `
+      statsData.header = {
+        minX: 1000,
+        maxX: 1500,
+        minY: 2000,
+        maxY: 2600,
+        minZ: 5,
+        maxZ: 25,
+        crsDiagnostics: {
+          status: "usable-horizontal-crs",
+          confidence: "medium",
+          horizontal: {
+            detected: true,
+            name: "ambiguous",
+            epsg: ["6677", "6678"],
+            source: "wkt",
+          },
+          vertical: { detected: false, epsg: [] },
+          units: { horizontal: "metre", vertical: null },
+          epsgCandidates: {
+            horizontal: ["6677", "6678"],
+            vertical: [],
+            unit: ["9001"],
+            other: [],
+          },
+          warningCodes: [],
+        },
+      };
+      statsData.crsDiagnostics = statsData.header.crsDiagnostics;
+    `,
+    context,
+  );
+
+  let report = JSON.parse(
+    vm.runInContext("window.__pcwTestApi.buildManualDiagnosticReport()", context),
+  );
+  expect(report.location.latLon).toMatchObject({
+    status: "unavailable",
+    reason: "ambiguous-horizontal-epsg",
+  });
+  expect(report.location.mapLinks).toEqual({
+    googleMaps: null,
+    gsiMaps: null,
+  });
+
+  vm.runInContext(
+    `
+      statsData.crsDiagnostics.epsgCandidates.horizontal = ["6677"];
+      statsData.crsDiagnostics.horizontal.epsg = ["6677"];
+      statsData.header.minX = null;
+    `,
+    context,
+  );
+  report = JSON.parse(
+    vm.runInContext("window.__pcwTestApi.buildManualDiagnosticReport()", context),
+  );
+  expect(report.location.latLon).toMatchObject({
+    status: "unavailable",
+    reason: "bounds-missing",
+  });
+});
+
+test("CRS diagnostics display shows converted lat lon and map links", () => {
+  const context = createContext();
+  context.window.proj4 = () => [139.767125, 35.681236];
+  context.proj4 = context.window.proj4;
+  vm.runInContext(
+    `
+      statsData.header = {
+        minX: 1000,
+        maxX: 1500,
+        minY: 2000,
+        maxY: 2600,
+        minZ: 5,
+        maxZ: 25,
+        crsDiagnostics: {
+          status: "usable-horizontal-crs",
+          confidence: "medium",
+          horizontal: { detected: true, name: "JGD2011 / Japan Plane Rectangular CS IX", epsg: ["6677"], source: "wkt" },
+          vertical: { detected: false, epsg: [] },
+          units: { horizontal: "metre", vertical: null },
+          epsgCandidates: { horizontal: ["6677"], vertical: [], unit: ["9001"], other: [] },
+          warningCodes: [],
+        },
+      };
+      statsData.crsDiagnostics = statsData.header.crsDiagnostics;
+      window.__pcwTestApi.updateCrsDiagnosticsDisplay(statsData.crsDiagnostics);
+    `,
+    context,
+  );
+
+  expect(context.document.getElementById("crsCenterLatLon").textContent).toBe(
+    "35.681236, 139.767125",
+  );
+  expect(context.document.getElementById("crsGoogleMapsLink").href).toBe(
+    "https://www.google.com/maps/search/?api=1&query=35.681236%2C139.767125",
+  );
+  expect(context.document.getElementById("crsGsiMapsLink").href).toContain(
+    "https://maps.gsi.go.jp/#16/35.681236/139.767125/",
+  );
+});
+
 test("work assist snapshot summarizes current work without file names or point payloads", () => {
   const context = createContext();
   context.__selectedFile = {

@@ -57,9 +57,13 @@
 2. `return`, `scanAngle`, `gpsTime` の利用可否と sampled coverage を、取得状態の参考情報として扱う
 3. `gpsTimeMonotonicRatio` は警告用の補助指標であり、測量成果の時系列品質を保証するものではない
 4. 診断情報の `location.coordinateReference` で CRS 診断、`location.bounds` で元座標系内の範囲と中心を確認する
-5. CRS が不明な場合、`location.bounds` は住所や緯度経度ではなく、元座標系内の数値範囲として扱う
-6. 統計パネルの「作業メモコピー」を押すと、現在の表示、断面、計測履歴、異常候補、取得品質の要約を JSON でコピーできる
-7. 作業メモにはローカルファイル名、点群 payload、元LAS座標配列は含まれない
+5. `location.latLon.status` が `converted` の場合だけ、bounds 中心の推定緯度経度として扱う
+6. 統計パネルの Google Maps / 地理院地図リンクは、クリック時だけ外部地図へ緯度経度を渡す。LAS/LAZ ファイル本体、ファイル名、点群 payload は送らない
+7. CRS が不明、EPSG 候補が複数、未対応 EPSG、bounds 不足、`proj4js` 未読込の場合、`location.latLon.status` は `unavailable` になる
+8. 緯度経度は住所、河川現場の正確な境界、測量成果座標、納品用位置保証として扱わない
+9. CRS が不明な場合、`location.bounds` は住所や緯度経度ではなく、元座標系内の数値範囲として扱う
+10. 統計パネルの「作業メモコピー」を押すと、現在の表示、断面、計測履歴、異常候補、取得品質の要約を JSON でコピーできる
+11. 作業メモにはローカルファイル名、点群 payload、元LAS座標配列は含まれない
 
 ### 4.7 地表候補アシストの確認
 1. 読み込み完了後、統計パネルの「地表候補」と「地表方式」を確認する
