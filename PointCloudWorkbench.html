@@ -6552,6 +6552,7 @@
         const selectedFileName = selectedFile?.name || statsData.fileName || "";
         const fileSize = Number(selectedFile?.size || statsData.fileSize || 0);
         const pointCloudSummary = statsData.pointCloudData?.pointCounts || null;
+        const location = buildDiagnosticLocationReport();
         const recentErrors = (errorTracker.errors || [])
           .slice(-5)
           .map(summarizeDiagnosticError);
@@ -6587,6 +6588,7 @@
             displayRatio: Number(statsData.displayRatio || 0),
             pointCloudSummary,
           },
+          location,
           lineage: buildLineageReport(statsData.header),
           attributes: buildAttributeAvailabilityReport(statsData.header),
           acquisitionQuality: buildAcquisitionQualityReport(
@@ -6599,6 +6601,84 @@
         };
 
         return JSON.stringify(report, null, 2);
+      }
+
+      function roundDiagnosticCoordinate(value) {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return null;
+        return Math.round(numeric * 1000) / 1000;
+      }
+
+      function buildDiagnosticBoundsReport() {
+        const bounds = statsData.pointCloudData?.bounds || statsData.header;
+        const minX = roundDiagnosticCoordinate(bounds?.minX);
+        const maxX = roundDiagnosticCoordinate(bounds?.maxX);
+        const minY = roundDiagnosticCoordinate(bounds?.minY);
+        const maxY = roundDiagnosticCoordinate(bounds?.maxY);
+        const minZ = roundDiagnosticCoordinate(bounds?.minZ);
+        const maxZ = roundDiagnosticCoordinate(bounds?.maxZ);
+
+        if (
+          [minX, maxX, minY, maxY, minZ, maxZ].some((value) => value === null)
+        ) {
+          return null;
+        }
+
+        return {
+          source: statsData.pointCloudData?.bounds ? "displayed-points" : "header",
+          minX,
+          maxX,
+          minY,
+          maxY,
+          minZ,
+          maxZ,
+          centerX: roundDiagnosticCoordinate((minX + maxX) / 2),
+          centerY: roundDiagnosticCoordinate((minY + maxY) / 2),
+          centerZ: roundDiagnosticCoordinate((minZ + maxZ) / 2),
+        };
+      }
+
+      function buildDiagnosticLocationReport() {
+        const crsDiagnostics =
+          statsData.crsDiagnostics || statsData.header?.crsDiagnostics || null;
+        const bounds = buildDiagnosticBoundsReport();
+
+        return {
+          coordinateReference: crsDiagnostics
+            ? {
+                status: crsDiagnostics.status || "unknown",
+                label: formatCrsDiagnosticsStatus(crsDiagnostics),
+                confidence: crsDiagnostics.confidence || "low",
+                horizontal: crsDiagnostics.horizontal || null,
+                vertical: crsDiagnostics.vertical || null,
+                units: crsDiagnostics.units || null,
+                epsgCandidates: crsDiagnostics.epsgCandidates || {
+                  horizontal: [],
+                  vertical: [],
+                  unit: [],
+                  other: [],
+                },
+                warningCodes: crsDiagnostics.warningCodes || [],
+              }
+            : {
+                status: "unknown",
+                label: "不明",
+                confidence: "low",
+                horizontal: null,
+                vertical: null,
+                units: null,
+                epsgCandidates: {
+                  horizontal: [],
+                  vertical: [],
+                  unit: [],
+                  other: [],
+                },
+                warningCodes: [],
+              },
+          bounds,
+          note:
+            "CRSが不明な場合、boundsは元座標系内の範囲であり、地図上の住所や緯度経度ではありません。",
+        };
       }
 
       async function copyManualDiagnosticReport() {

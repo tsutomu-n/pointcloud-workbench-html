@@ -150,7 +150,8 @@
 - PDRF 0-5 と PDRF 6+ は return / classification / scan-angle の byte layout が異なるため、decode 側で別分岐にする。PDRF 6+ の scan angle は raw int16 に `0.006 degree` を掛ける
 - `buildAcquisitionMetricsReport()` は表示用に読んだ sampled points から return / scan-angle / GPS-time coverage と GPS-time monotonic ratio を計算する。GPS-time monotonic ratio は警告用の補助指標であり、score の強い決定要因にしない
 - `buildAcquisitionQualityReport()` は属性利用可否と measured coverage を合成し、`status`, `score`, `availableSignals`, `missingSignals`, `warnings` を返す
-- `buildManualDiagnosticReport()` は `lineage`, `attributes`, `acquisitionQuality`, `diagnosticsCandidates` を含むが、ローカルファイル名、点群 payload、座標配列は含めない
+- `buildManualDiagnosticReport()` は `lineage`, `attributes`, `acquisitionQuality`, `location`, `diagnosticsCandidates` を含むが、ローカルファイル名、点群 payload、座標配列は含めない
+- `location.coordinateReference` は CRS 診断結果を要約し、`location.bounds` は header または表示点 bounds から座標範囲と中心を丸めて出す。CRS 不明時は地図上の住所や緯度経度として扱わない
 - `buildWorkAssistSnapshot()` は `schemaVersion: 1` の作業メモ JSON を作り、表示、断面、計測履歴、異常候補、取得品質を要約する。ファイル名、点群配列、元LAS座標配列、ROI geometry の永続化情報は含めない
 - `copyWorkAssistSnapshot()` は `copyTextToClipboard()` 経由で作業メモ JSON をコピーする。外部送信、ファイル書き込み、サーバー処理は行わない
 

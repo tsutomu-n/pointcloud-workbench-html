@@ -1105,6 +1105,15 @@ test("manual diagnostic report omits point cloud payloads and file names", () =>
       "密度スパイク": 0,
     },
   });
+  expect(report.location).toMatchObject({
+    coordinateReference: {
+      status: "unknown",
+      label: "不明",
+      confidence: "low",
+      warningCodes: [],
+    },
+    bounds: null,
+  });
   expect(report.lineage).toMatchObject({
     projectId: "unknown",
     systemIdentifier: "unknown",
@@ -1137,6 +1146,102 @@ test("manual diagnostic report omits point cloud payloads and file names", () =>
   });
   expect(reportText).not.toContain("private-site-survey");
   expect(reportText).not.toContain("points\":[");
+});
+
+test("manual diagnostic report includes CRS and coordinate bounds for location review", () => {
+  const context = createContext();
+  vm.runInContext(
+    `
+      statsData.header = {
+        minX: 1000,
+        maxX: 1500,
+        minY: 2000,
+        maxY: 2600,
+        minZ: 5,
+        maxZ: 25,
+        crsDiagnostics: {
+          status: "usable-horizontal-crs",
+          confidence: "medium",
+          horizontal: {
+            detected: true,
+            name: "JGD2011 / Japan Plane Rectangular CS IX",
+            epsg: ["6677"],
+            source: "wkt",
+          },
+          vertical: {
+            detected: false,
+            name: null,
+            epsg: [],
+            heightBasis: null,
+            source: null,
+          },
+          units: {
+            horizontal: "metre",
+            vertical: null,
+          },
+          epsgCandidates: {
+            horizontal: ["6677"],
+            vertical: [],
+            unit: ["9001"],
+            other: [],
+          },
+          warningCodes: ["vertical-crs-missing"],
+        },
+      };
+      statsData.crsDiagnostics = statsData.header.crsDiagnostics;
+      statsData.pointCloudData = {
+        bounds: {
+          minX: 1001.12345,
+          maxX: 1499.98765,
+          minY: 2002.22222,
+          maxY: 2598.88888,
+          minZ: 6.11111,
+          maxZ: 24.99999,
+        },
+        pointCounts: {
+          sourceCount: 100,
+          decodedCount: 10,
+          displayCount: 10,
+          displayRatio: 10,
+          samplingRate: 10,
+        },
+      };
+    `,
+    context,
+  );
+
+  const report = JSON.parse(
+    vm.runInContext("window.__pcwTestApi.buildManualDiagnosticReport()", context),
+  );
+
+  expect(report.location.coordinateReference).toMatchObject({
+    status: "usable-horizontal-crs",
+    label: "位置特定に使える可能性があります",
+    confidence: "medium",
+    horizontal: {
+      detected: true,
+      name: "JGD2011 / Japan Plane Rectangular CS IX",
+      epsg: ["6677"],
+    },
+    epsgCandidates: {
+      horizontal: ["6677"],
+      unit: ["9001"],
+    },
+    warningCodes: ["vertical-crs-missing"],
+  });
+  expect(report.location.bounds).toMatchObject({
+    source: "displayed-points",
+    minX: 1001.123,
+    maxX: 1499.988,
+    minY: 2002.222,
+    maxY: 2598.889,
+    minZ: 6.111,
+    maxZ: 25,
+    centerX: 1250.556,
+    centerY: 2300.556,
+    centerZ: 15.556,
+  });
+  expect(report.location.note).toContain("CRSが不明な場合");
 });
 
 test("work assist snapshot summarizes current work without file names or point payloads", () => {
