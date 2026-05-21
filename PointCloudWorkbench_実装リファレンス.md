@@ -1,6 +1,6 @@
 # PointCloudWorkbench 実装リファレンス
 
-更新日時: 2026-05-19 00:00:00 JST
+更新日時: 2026-05-21 00:00:00 JST
 
 ## 1. スコープ
 - 対象: `PointCloudWorkbench.html`（単一ファイル構成）
@@ -143,6 +143,25 @@
 - `buildDiagnosticsScore()` は `score`, `status`, `warningCodes` に加えて `totalDeduction`, `deductionByCode`, `sectionWeights` を返す
 - `buildDiagnosticCandidateItems()` は point/cell 候補を index / row-column でソートして、同一候補集合で順序を安定化する
 - `copySelectedDiagnosticCandidate()` と `copyDiagnosticCandidateSummary()` は `warningCodes`, `score`, `scoreStatus` を含む
+
+## 7.7 取得品質 / 属性 / 来歴 / 作業メモ
+- `buildLineageReport()` は LAS header の project id、system identifier、generating software、作成日、PDRF、VLR/EVLR 数を要約する
+- `buildAttributeAvailabilityReport()` は LAS 1.4 R15 の安定した point-record layout を基準に、`xyz`, `intensity`, `return`, `classification`, `scanAngle`, `gpsTime`, `rgb`, `nir`, `waveform`, `scannerChannel`, `classificationFlags` の利用可否を返す
+- PDRF 0-5 と PDRF 6+ は return / classification / scan-angle の byte layout が異なるため、decode 側で別分岐にする。PDRF 6+ の scan angle は raw int16 に `0.006 degree` を掛ける
+- `buildAcquisitionMetricsReport()` は表示用に読んだ sampled points から return / scan-angle / GPS-time coverage と GPS-time monotonic ratio を計算する。GPS-time monotonic ratio は警告用の補助指標であり、score の強い決定要因にしない
+- `buildAcquisitionQualityReport()` は属性利用可否と measured coverage を合成し、`status`, `score`, `availableSignals`, `missingSignals`, `warnings` を返す
+- `buildManualDiagnosticReport()` は `lineage`, `attributes`, `acquisitionQuality`, `diagnosticsCandidates` を含むが、ローカルファイル名、点群 payload、座標配列は含めない
+- `buildWorkAssistSnapshot()` は `schemaVersion: 1` の作業メモ JSON を作り、表示、断面、計測履歴、異常候補、取得品質を要約する。ファイル名、点群配列、元LAS座標配列、ROI geometry の永続化情報は含めない
+- `copyWorkAssistSnapshot()` は `copyTextToClipboard()` 経由で作業メモ JSON をコピーする。外部送信、ファイル書き込み、サーバー処理は行わない
+
+## 7.8 地表候補アシスト
+- `buildGroundCandidateGrid(points, bounds, options)` は表示点ベースの参考地表候補を作る。測量成果DTM、設計面、土量根拠は作らない
+- `classification_ground` は class 2 ground が一定比率以上ある場合に使い、セル内 ground 点の median Z を `groundCandidateZ` にする
+- `low_percentile_grid` は ground 分類がない、または薄い場合に使い、セル内全点の p05 Z を `groundCandidateZ` にする
+- `GroundCandidateReport` 相当の object は `method`, `grid`, `cells`, `summary`, `warnings` を持つ。`summary` は `validCellRatio`, `groundPointCount`, `nonGroundPointCount`, `confidence` を返す
+- warning は `GROUND_CLASS_MISSING`, `GROUND_CLASS_SPARSE`, `GROUND_GRID_HOLES`, `GROUND_ESTIMATE_LOW_CONFIDENCE` を返す
+- `buildPointCloudDiagnostics()` は `groundCandidate` を含め、`buildManualDiagnosticReport()` と `buildWorkAssistSnapshot()` は要約のみを出す
+- HAG点属性付与、DTMメッシュ表示、地表/非地表表示切替、勾配、土量、差分は未実装の後続拡張
 
 ## 8. 点群生成と描画
 
@@ -291,85 +310,85 @@
 
 | 関数/クラス | 行番号リンク | 役割 |
 |---|---|---|
-| `ErrorTracker` | [PointCloudWorkbench.html#L4482](PointCloudWorkbench.html#L4482) | グローバル例外収集と表示 |
-| `MemoryMonitor` | [PointCloudWorkbench.html#L4753](PointCloudWorkbench.html#L4753) | メモリ圧監視と自動最適化 |
-| `PerformanceMonitor` | [PointCloudWorkbench.html#L4929](PointCloudWorkbench.html#L4929) | FPS監視と性能劣化対応 |
-| `CompatibilityChecker` | [PointCloudWorkbench.html#L5157](PointCloudWorkbench.html#L5157) | ブラウザ機能互換チェック |
-| `init` | [PointCloudWorkbench.html#L5728](PointCloudWorkbench.html#L5728) | 全体初期化エントリ |
-| `safeInitializeComponents` | [PointCloudWorkbench.html#L5749](PointCloudWorkbench.html#L5749) | 初期化タスクの順次実行 |
-| `setupEventListeners` | [PointCloudWorkbench.html#L5986](PointCloudWorkbench.html#L5986) | UI/キー/離脱イベント登録 |
-| `cleanupEventListeners` | [PointCloudWorkbench.html#L6265](PointCloudWorkbench.html#L6265) | 登録済みイベント一括解除 |
-| `setAppLanguage` | [PointCloudWorkbench.html#L5668](PointCloudWorkbench.html#L5668) | 表示言語反映と保存 |
-| `initializeLanguagePreference` | [PointCloudWorkbench.html#L5686](PointCloudWorkbench.html#L5686) | 言語設定の復元 |
+| `ErrorTracker` | [PointCloudWorkbench.html#L5115](PointCloudWorkbench.html#L5115) | グローバル例外収集と表示 |
+| `MemoryMonitor` | [PointCloudWorkbench.html#L5444](PointCloudWorkbench.html#L5444) | メモリ圧監視と自動最適化 |
+| `PerformanceMonitor` | [PointCloudWorkbench.html#L5620](PointCloudWorkbench.html#L5620) | FPS監視と性能劣化対応 |
+| `CompatibilityChecker` | [PointCloudWorkbench.html#L5848](PointCloudWorkbench.html#L5848) | ブラウザ機能互換チェック |
+| `init` | [PointCloudWorkbench.html#L8966](PointCloudWorkbench.html#L8966) | 全体初期化エントリ |
+| `safeInitializeComponents` | [PointCloudWorkbench.html#L8987](PointCloudWorkbench.html#L8987) | 初期化タスクの順次実行 |
+| `setupEventListeners` | [PointCloudWorkbench.html#L9224](PointCloudWorkbench.html#L9224) | UI/キー/離脱イベント登録 |
+| `cleanupEventListeners` | [PointCloudWorkbench.html#L9503](PointCloudWorkbench.html#L9503) | 登録済みイベント一括解除 |
+| `setAppLanguage` | [PointCloudWorkbench.html#L8906](PointCloudWorkbench.html#L8906) | 表示言語反映と保存 |
+| `initializeLanguagePreference` | [PointCloudWorkbench.html#L8924](PointCloudWorkbench.html#L8924) | 言語設定の復元 |
 
 ### 18.2 ワークフロー・入力
 
 | 関数 | 行番号リンク | 役割 |
 |---|---|---|
-| `handleFileSelect` | [PointCloudWorkbench.html#L6295](PointCloudWorkbench.html#L6295) | ファイル選択ハンドラ |
-| `checkFileSizeLimits` | [PointCloudWorkbench.html#L6513](PointCloudWorkbench.html#L6513) | サイズ判定の共通関数 |
-| `updateFileInfo` | [PointCloudWorkbench.html#L6698](PointCloudWorkbench.html#L6698) | ファイル情報UI更新 |
-| `proceedToQualitySelection` | [PointCloudWorkbench.html#L6787](PointCloudWorkbench.html#L6787) | 品質設定画面遷移 |
-| `applyQualitySelection` | [PointCloudWorkbench.html#L6857](PointCloudWorkbench.html#L6857) | 品質状態の正規化反映 |
-| `startDataLoading` | [PointCloudWorkbench.html#L7157](PointCloudWorkbench.html#L7157) | 読み込み開始制御 |
-| `updateLoadingInfo` | [PointCloudWorkbench.html#L7318](PointCloudWorkbench.html#L7318) | 読み込み情報表示更新 |
-| `updateProgress` | [PointCloudWorkbench.html#L7507](PointCloudWorkbench.html#L7507) | 進捗バー・文言更新 |
-| `loadLASFileActual` | [PointCloudWorkbench.html#L7560](PointCloudWorkbench.html#L7560) | 実データ読み込み本体 |
-| `completeLoading` | [PointCloudWorkbench.html#L9688](PointCloudWorkbench.html#L9688) | 完了状態へ遷移 |
+| `handleFileSelect` | [PointCloudWorkbench.html#L9533](PointCloudWorkbench.html#L9533) | ファイル選択ハンドラ |
+| `checkFileSizeLimits` | [PointCloudWorkbench.html#L9753](PointCloudWorkbench.html#L9753) | サイズ判定の共通関数 |
+| `updateFileInfo` | [PointCloudWorkbench.html#L9950](PointCloudWorkbench.html#L9950) | ファイル情報UI更新 |
+| `proceedToQualitySelection` | [PointCloudWorkbench.html#L10075](PointCloudWorkbench.html#L10075) | 品質設定画面遷移 |
+| `applyQualitySelection` | [PointCloudWorkbench.html#L10145](PointCloudWorkbench.html#L10145) | 品質状態の正規化反映 |
+| `startDataLoading` | [PointCloudWorkbench.html#L11356](PointCloudWorkbench.html#L11356) | 読み込み開始制御 |
+| `updateLoadingInfo` | [PointCloudWorkbench.html#L11517](PointCloudWorkbench.html#L11517) | 読み込み情報表示更新 |
+| `updateProgress` | [PointCloudWorkbench.html#L11823](PointCloudWorkbench.html#L11823) | 進捗バー・文言更新 |
+| `loadLASFileActual` | [PointCloudWorkbench.html#L11876](PointCloudWorkbench.html#L11876) | 実データ読み込み本体 |
+| `completeLoading` | [PointCloudWorkbench.html#L14991](PointCloudWorkbench.html#L14991) | 完了状態へ遷移 |
 
 ### 18.3 データ処理・描画
 
 | 関数 | 行番号リンク | 役割 |
 |---|---|---|
-| `setupPointCloudVisualization` | [PointCloudWorkbench.html#L7865](PointCloudWorkbench.html#L7865) | 点群表示セットアップ |
-| `parseLASHeaderFromFile` | [PointCloudWorkbench.html#L7958](PointCloudWorkbench.html#L7958) | LASヘッダー先読み |
-| `parseLASPointsFromFile` | [PointCloudWorkbench.html#L7973](PointCloudWorkbench.html#L7973) | LAS chunked 点抽出 |
-| `readFileIntoWasmHeap` | [PointCloudWorkbench.html#L8112](PointCloudWorkbench.html#L8112) | LAZ chunked 転送 |
-| `buildPointCloudFromLASFile` | [PointCloudWorkbench.html#L8204](PointCloudWorkbench.html#L8204) | LAS ローカル読込入口 |
-| `buildPointCloudFromLAZFile` | [PointCloudWorkbench.html#L8238](PointCloudWorkbench.html#L8238) | LAZ ローカル読込入口 |
-| `buildPointCloudFromArrayBuffer` | [PointCloudWorkbench.html#L8264](PointCloudWorkbench.html#L8264) | 読み込み共通処理入口 |
-| `parsePointsFromArrayBuffer` | [PointCloudWorkbench.html#L8283](PointCloudWorkbench.html#L8283) | LAS/LAZ 分岐パーサ |
-| `parseLASHeader` | [PointCloudWorkbench.html#L8363](PointCloudWorkbench.html#L8363) | LASヘッダー解析 |
-| `parseLASPoints` | [PointCloudWorkbench.html#L8489](PointCloudWorkbench.html#L8489) | LAS点群抽出 |
-| `decompressLAZFile` | [PointCloudWorkbench.html#L8565](PointCloudWorkbench.html#L8565) | LAZ解凍処理 |
-| `decodeLAZPoint` | [PointCloudWorkbench.html#L8891](PointCloudWorkbench.html#L8891) | LAZ 1点デコード |
-| `createPointCloudFromData` | [PointCloudWorkbench.html#L8933](PointCloudWorkbench.html#L8933) | BufferGeometry生成 |
-| `downsamplePointCloud` | [PointCloudWorkbench.html#L9307](PointCloudWorkbench.html#L9307) | 点群間引き最適化 |
-| `adjustCameraToData` | [PointCloudWorkbench.html#L9465](PointCloudWorkbench.html#L9465) | データ範囲フィット |
-| `animate` | [PointCloudWorkbench.html#L12108](PointCloudWorkbench.html#L12108) | メインレンダーループ |
-| `updateStatsDisplay` | [PointCloudWorkbench.html#L13190](PointCloudWorkbench.html#L13190) | 統計UI再計算 |
+| `setupPointCloudVisualization` | [PointCloudWorkbench.html#L12179](PointCloudWorkbench.html#L12179) | 点群表示セットアップ |
+| `parseLASHeaderFromFile` | [PointCloudWorkbench.html#L12320](PointCloudWorkbench.html#L12320) | LASヘッダー先読み |
+| `parseLASPointsFromFile` | [PointCloudWorkbench.html#L12430](PointCloudWorkbench.html#L12430) | LAS chunked 点抽出 |
+| `readFileIntoWasmHeap` | [PointCloudWorkbench.html#L12569](PointCloudWorkbench.html#L12569) | LAZ chunked 転送 |
+| `buildPointCloudFromLASFile` | [PointCloudWorkbench.html#L12693](PointCloudWorkbench.html#L12693) | LAS ローカル読込入口 |
+| `buildPointCloudFromLAZFile` | [PointCloudWorkbench.html#L12728](PointCloudWorkbench.html#L12728) | LAZ ローカル読込入口 |
+| `buildPointCloudFromArrayBuffer` | [PointCloudWorkbench.html#L12757](PointCloudWorkbench.html#L12757) | 読み込み共通処理入口 |
+| `parsePointsFromArrayBuffer` | [PointCloudWorkbench.html#L12776](PointCloudWorkbench.html#L12776) | LAS/LAZ 分岐パーサ |
+| `parseLASHeader` | [PointCloudWorkbench.html#L13417](PointCloudWorkbench.html#L13417) | LASヘッダー解析 |
+| `parseLASPoints` | [PointCloudWorkbench.html#L13594](PointCloudWorkbench.html#L13594) | LAS点群抽出 |
+| `decompressLAZFile` | [PointCloudWorkbench.html#L13670](PointCloudWorkbench.html#L13670) | LAZ解凍処理 |
+| `decodeLAZPoint` | [PointCloudWorkbench.html#L13997](PointCloudWorkbench.html#L13997) | LAZ 1点デコード |
+| `createPointCloudFromData` | [PointCloudWorkbench.html#L14086](PointCloudWorkbench.html#L14086) | BufferGeometry生成 |
+| `downsamplePointCloud` | [PointCloudWorkbench.html#L14486](PointCloudWorkbench.html#L14486) | 点群間引き最適化 |
+| `adjustCameraToData` | [PointCloudWorkbench.html#L14689](PointCloudWorkbench.html#L14689) | データ範囲フィット |
+| `animate` | [PointCloudWorkbench.html#L17350](PointCloudWorkbench.html#L17350) | メインレンダーループ |
+| `updateStatsDisplay` | [PointCloudWorkbench.html#L18557](PointCloudWorkbench.html#L18557) | 統計UI再計算 |
 
 ### 18.4 表示モード・UI補助
 
 | 関数 | 行番号リンク | 役割 |
 |---|---|---|
-| `set2DView` | [PointCloudWorkbench.html#L9644](PointCloudWorkbench.html#L9644) | 2Dビュー切替 |
-| `exit2DView` | [PointCloudWorkbench.html#L9653](PointCloudWorkbench.html#L9653) | 3Dビュー復帰 |
-| `setColorMode` | [PointCloudWorkbench.html#L9907](PointCloudWorkbench.html#L9907) | 色分けモード切替入口 |
-| `executeColorModeChange` | [PointCloudWorkbench.html#L9928](PointCloudWorkbench.html#L9928) | 色バッファ再計算 |
-| `updateLegendPanel` | [PointCloudWorkbench.html#L10321](PointCloudWorkbench.html#L10321) | 分類凡例の描画 |
-| `determineBestVisualizationMode` | [PointCloudWorkbench.html#L10426](PointCloudWorkbench.html#L10426) | 推奨表示モード判定 |
-| `toggleSlicing` | [PointCloudWorkbench.html#L10639](PointCloudWorkbench.html#L10639) | スライスUI切替 |
-| `updateSlicing` | [PointCloudWorkbench.html#L10721](PointCloudWorkbench.html#L10721) | スライス面更新 |
-| `autoClassify` | [PointCloudWorkbench.html#L12091](PointCloudWorkbench.html#L12091) | 自動分類起動 |
-| `detectSystemPerformanceBackground` | [PointCloudWorkbench.html#L12162](PointCloudWorkbench.html#L12162) | バックグラウンド性能検出 |
-| `getRecommendationAnalysis` | [PointCloudWorkbench.html#L12346](PointCloudWorkbench.html#L12346) | 品質推奨計算 |
-| `updatePerformanceDisplay` | [PointCloudWorkbench.html#L12433](PointCloudWorkbench.html#L12433) | 性能情報UI反映 |
-| `showConfirmDialog` | [PointCloudWorkbench.html#L12511](PointCloudWorkbench.html#L12511) | 確認ダイアログ |
-| `showToast` | [PointCloudWorkbench.html#L12622](PointCloudWorkbench.html#L12622) | 通知表示 |
-| `handleKeyDown` | [PointCloudWorkbench.html#L12714](PointCloudWorkbench.html#L12714) | キー入力処理 |
-| `handleKeyUp` | [PointCloudWorkbench.html#L12836](PointCloudWorkbench.html#L12836) | キー入力解放処理 |
-| `performFinalCleanup` | [PointCloudWorkbench.html#L13513](PointCloudWorkbench.html#L13513) | 終了時クリーンアップ |
+| `set2DView` | [PointCloudWorkbench.html#L14868](PointCloudWorkbench.html#L14868) | 2Dビュー切替 |
+| `exit2DView` | [PointCloudWorkbench.html#L14878](PointCloudWorkbench.html#L14878) | 3Dビュー復帰 |
+| `setColorMode` | [PointCloudWorkbench.html#L15222](PointCloudWorkbench.html#L15222) | 色分けモード切替入口 |
+| `executeColorModeChange` | [PointCloudWorkbench.html#L15240](PointCloudWorkbench.html#L15240) | 色バッファ再計算 |
+| `updateLegendPanel` | [PointCloudWorkbench.html#L15568](PointCloudWorkbench.html#L15568) | 分類凡例の描画 |
+| `determineBestVisualizationMode` | [PointCloudWorkbench.html#L15673](PointCloudWorkbench.html#L15673) | 推奨表示モード判定 |
+| `toggleSlicing` | [PointCloudWorkbench.html#L15886](PointCloudWorkbench.html#L15886) | スライスUI切替 |
+| `updateSlicing` | [PointCloudWorkbench.html#L15968](PointCloudWorkbench.html#L15968) | スライス面更新 |
+| `autoClassify` | [PointCloudWorkbench.html#L17333](PointCloudWorkbench.html#L17333) | 自動分類起動 |
+| `detectSystemPerformanceBackground` | [PointCloudWorkbench.html#L17404](PointCloudWorkbench.html#L17404) | バックグラウンド性能検出 |
+| `getRecommendationAnalysis` | [PointCloudWorkbench.html#L17588](PointCloudWorkbench.html#L17588) | 品質推奨計算 |
+| `updatePerformanceDisplay` | [PointCloudWorkbench.html#L17675](PointCloudWorkbench.html#L17675) | 性能情報UI反映 |
+| `showConfirmDialog` | [PointCloudWorkbench.html#L17753](PointCloudWorkbench.html#L17753) | 確認ダイアログ |
+| `showToast` | [PointCloudWorkbench.html#L17864](PointCloudWorkbench.html#L17864) | 通知表示 |
+| `handleKeyDown` | [PointCloudWorkbench.html#L17956](PointCloudWorkbench.html#L17956) | キー入力処理 |
+| `handleKeyUp` | [PointCloudWorkbench.html#L18085](PointCloudWorkbench.html#L18085) | キー入力解放処理 |
+| `performFinalCleanup` | [PointCloudWorkbench.html#L18891](PointCloudWorkbench.html#L18891) | 終了時クリーンアップ |
 
 ## 19. ユースケース別トレース（事実ベース）
 
 ### 19.1 大容量ファイル（500MB超）を選択したとき
 
 処理経路:
-1. `handleFileSelect` → [PointCloudWorkbench.html#L6295](PointCloudWorkbench.html#L6295)
-2. `checkFileSizeLimits` → [PointCloudWorkbench.html#L6513](PointCloudWorkbench.html#L6513)
-3. `showFileSizeWarning`（必要時）→ [PointCloudWorkbench.html#L6617](PointCloudWorkbench.html#L6617)
-4. `updateFileInfo` → [PointCloudWorkbench.html#L6698](PointCloudWorkbench.html#L6698)
+1. `handleFileSelect` → [PointCloudWorkbench.html#L9533](PointCloudWorkbench.html#L9533)
+2. `checkFileSizeLimits` → [PointCloudWorkbench.html#L9753](PointCloudWorkbench.html#L9753)
+3. `showFileSizeWarning`（必要時）→ [PointCloudWorkbench.html#L9868](PointCloudWorkbench.html#L9868)
+4. `updateFileInfo` → [PointCloudWorkbench.html#L9950](PointCloudWorkbench.html#L9950)
 
 ポイント:
 - 閾値帯は `FILE_SIZE_THRESHOLDS`、形式別上限は `FILE_SIZE_LIMITS` で管理
@@ -378,9 +397,9 @@
 ### 19.2 形式別上限を読み込み開始時に防ぐ
 
 処理経路:
-1. `startDataLoading` → [PointCloudWorkbench.html#L7157](PointCloudWorkbench.html#L7157)
-2. `loadLASFileActual` → [PointCloudWorkbench.html#L7560](PointCloudWorkbench.html#L7560)
-3. `checkFileSizeLimits` 再評価 → [PointCloudWorkbench.html#L6513](PointCloudWorkbench.html#L6513)
+1. `startDataLoading` → [PointCloudWorkbench.html#L11356](PointCloudWorkbench.html#L11356)
+2. `loadLASFileActual` → [PointCloudWorkbench.html#L11876](PointCloudWorkbench.html#L11876)
+3. `checkFileSizeLimits` 再評価 → [PointCloudWorkbench.html#L9753](PointCloudWorkbench.html#L9753)
 4. `canProceed=false` なら警告表示して例外終了
 
 ポイント:
@@ -390,13 +409,13 @@
 ### 19.3 通常読み込み（LAS/LAZ）から表示完了まで
 
 処理経路:
-1. `startDataLoading` → [PointCloudWorkbench.html#L7157](PointCloudWorkbench.html#L7157)
-2. `loadLASFileActual` → [PointCloudWorkbench.html#L7560](PointCloudWorkbench.html#L7560)
-3. `buildPointCloudFromLASFile` / `buildPointCloudFromLAZFile` / `buildPointCloudFromArrayBuffer` → [PointCloudWorkbench.html#L8204](PointCloudWorkbench.html#L8204) / [PointCloudWorkbench.html#L8238](PointCloudWorkbench.html#L8238) / [PointCloudWorkbench.html#L8264](PointCloudWorkbench.html#L8264)
-4. `parseLASPointsFromFile` / `readFileIntoWasmHeap` / `parsePointsFromArrayBuffer` → [PointCloudWorkbench.html#L7973](PointCloudWorkbench.html#L7973) / [PointCloudWorkbench.html#L8112](PointCloudWorkbench.html#L8112) / [PointCloudWorkbench.html#L8283](PointCloudWorkbench.html#L8283)
-5. `parseLASPoints` or `decompressLAZFile` → [PointCloudWorkbench.html#L8489](PointCloudWorkbench.html#L8489) / [PointCloudWorkbench.html#L8565](PointCloudWorkbench.html#L8565)
-6. `createPointCloudFromData` → [PointCloudWorkbench.html#L8933](PointCloudWorkbench.html#L8933)
-7. `completeLoading` → [PointCloudWorkbench.html#L9688](PointCloudWorkbench.html#L9688)
+1. `startDataLoading` → [PointCloudWorkbench.html#L11356](PointCloudWorkbench.html#L11356)
+2. `loadLASFileActual` → [PointCloudWorkbench.html#L11876](PointCloudWorkbench.html#L11876)
+3. `buildPointCloudFromLASFile` / `buildPointCloudFromLAZFile` / `buildPointCloudFromArrayBuffer` → [PointCloudWorkbench.html#L12693](PointCloudWorkbench.html#L12693) / [PointCloudWorkbench.html#L12728](PointCloudWorkbench.html#L12728) / [PointCloudWorkbench.html#L12757](PointCloudWorkbench.html#L12757)
+4. `parseLASPointsFromFile` / `readFileIntoWasmHeap` / `parsePointsFromArrayBuffer` → [PointCloudWorkbench.html#L12430](PointCloudWorkbench.html#L12430) / [PointCloudWorkbench.html#L12569](PointCloudWorkbench.html#L12569) / [PointCloudWorkbench.html#L12776](PointCloudWorkbench.html#L12776)
+5. `parseLASPoints` or `decompressLAZFile` → [PointCloudWorkbench.html#L13594](PointCloudWorkbench.html#L13594) / [PointCloudWorkbench.html#L13670](PointCloudWorkbench.html#L13670)
+6. `createPointCloudFromData` → [PointCloudWorkbench.html#L14086](PointCloudWorkbench.html#L14086)
+7. `completeLoading` → [PointCloudWorkbench.html#L14991](PointCloudWorkbench.html#L14991)
 
 ポイント:
 - 点群生成後に `statsData` と分類統計が更新される
@@ -406,9 +425,9 @@
 ### 19.4 分類表示の品質が低いデータ
 
 処理経路:
-1. `setColorMode('classification')` → [PointCloudWorkbench.html#L9907](PointCloudWorkbench.html#L9907)
-2. `executeColorModeChange` → [PointCloudWorkbench.html#L9928](PointCloudWorkbench.html#L9928)
-3. `getClassificationStats` / `updateLegendPanel` → [PointCloudWorkbench.html#L10115](PointCloudWorkbench.html#L10115) / [PointCloudWorkbench.html#L10321](PointCloudWorkbench.html#L10321)
+1. `setColorMode('classification')` → [PointCloudWorkbench.html#L15222](PointCloudWorkbench.html#L15222)
+2. `executeColorModeChange` → [PointCloudWorkbench.html#L15240](PointCloudWorkbench.html#L15240)
+3. `getClassificationStats` / `updateLegendPanel` → [PointCloudWorkbench.html#L15398](PointCloudWorkbench.html#L15398) / [PointCloudWorkbench.html#L15568](PointCloudWorkbench.html#L15568)
 
 ポイント:
 - 未分類率や分類種類数に基づいて警告ログとUI指標が更新される
@@ -418,9 +437,9 @@
 ### 19.5 メモリ圧・性能低下時の自動劣化
 
 処理経路:
-1. `MemoryMonitor.checkMemoryUsage`（定期）→ [PointCloudWorkbench.html#L4753](PointCloudWorkbench.html#L4753)
-2. `PerformanceMonitor.checkPerformance`（FPS監視）→ [PointCloudWorkbench.html#L4929](PointCloudWorkbench.html#L4929)
-3. `downsamplePointCloud` → [PointCloudWorkbench.html#L9307](PointCloudWorkbench.html#L9307)
+1. `MemoryMonitor.checkMemoryUsage`（定期）→ [PointCloudWorkbench.html#L5444](PointCloudWorkbench.html#L5444)
+2. `PerformanceMonitor.checkPerformance`（FPS監視）→ [PointCloudWorkbench.html#L5620](PointCloudWorkbench.html#L5620)
+3. `downsamplePointCloud` → [PointCloudWorkbench.html#L14486](PointCloudWorkbench.html#L14486)
 
 ポイント:
 - 条件を満たすと点数間引き・点サイズ調整が行われる

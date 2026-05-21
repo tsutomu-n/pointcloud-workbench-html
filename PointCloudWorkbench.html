@@ -4967,6 +4967,14 @@
                   <span class="stats-value" id="densitySpikeCandidates">-</span>
                 </div>
                 <div class="stats-item">
+                  地表候補:
+                  <span class="stats-value" id="groundCandidateStatus">参考 / 未計算</span>
+                </div>
+                <div class="stats-item">
+                  地表方式:
+                  <span class="stats-value" id="groundCandidateMethod">-</span>
+                </div>
+                <div class="stats-item">
                   注意:
                   <span class="stats-value" id="diagnosticsWarnings">表示点ベース</span>
                 </div>
@@ -5046,6 +5054,13 @@
                   断面:
                   <span class="stats-value" id="sectionProfileSummary">2D表示時に更新</span>
                 </div>
+                <button
+                  class="diagnostic-candidate-copy-btn"
+                  type="button"
+                  onclick="copyWorkAssistSnapshot()"
+                >
+                  作業メモコピー
+                </button>
               </div>
               <div class="stats-tile">
                 <div class="stats-tile-title">性能</div>
@@ -6208,6 +6223,8 @@
         loadRiskLevel: "ok",
         pointCloudData: null,
         diagnosticsReport: null,
+        acquisitionMetrics: null,
+        groundCandidateReport: null,
         diagnosticCandidateMap: {},
         selectedDiagnosticCandidateKey: null,
         diagnosticCandidateFilterKind: "all",
@@ -6247,6 +6264,285 @@
           timestamp: errorEntry?.timestamp || "",
           type: errorEntry?.type || "Unknown",
           message,
+        };
+      }
+
+      function buildLineageReport(header = statsData.header) {
+        const safeHeader = header && typeof header === "object" ? header : {};
+        const systemIdentifier = String(safeHeader.systemIdentifier || "").trim();
+        const generatingSoftware = String(safeHeader.generatingSoftware || "").trim();
+        const warnings = [];
+        if (!systemIdentifier) warnings.push("LINEAGE_SYSTEM_IDENTIFIER_MISSING");
+        if (!generatingSoftware) warnings.push("LINEAGE_GENERATOR_MISSING");
+        if ((safeHeader.numberOfExtendedVariableLengthRecords || 0) > 0) {
+          warnings.push("LINEAGE_EVRL_OR_VLR_WARNING");
+        } else if (Array.isArray(safeHeader.crsDiagnosticsWarnings) && safeHeader.crsDiagnosticsWarnings.length) {
+          warnings.push("LINEAGE_EVRL_OR_VLR_WARNING");
+        }
+
+        return {
+          source: "header",
+          projectId: String(safeHeader.projectId || "").trim() || "unknown",
+          systemIdentifier: systemIdentifier || "unknown",
+          generatingSoftware: generatingSoftware || "unknown",
+          fileCreationDayOfYear: Number.isFinite(Number(safeHeader.fileCreationDayOfYear))
+            && Number(safeHeader.fileCreationDayOfYear) > 0
+            ? Number(safeHeader.fileCreationDayOfYear)
+            : null,
+          fileCreationYear: Number.isFinite(Number(safeHeader.fileCreationYear))
+            && Number(safeHeader.fileCreationYear) > 0
+            ? Number(safeHeader.fileCreationYear)
+            : null,
+          pointDataRecordFormat: Number.isFinite(Number(safeHeader.pointDataRecordFormat))
+            ? Number(safeHeader.pointDataRecordFormat)
+            : null,
+          pointDataRecordLength: Number.isFinite(Number(safeHeader.pointDataRecordLength))
+            ? Number(safeHeader.pointDataRecordLength)
+            : null,
+          vlrCount: Number.isFinite(Number(safeHeader.numberOfVariableLengthRecords))
+            ? Number(safeHeader.numberOfVariableLengthRecords)
+            : 0,
+          evlrCount: Number.isFinite(Number(safeHeader.numberOfExtendedVariableLengthRecords))
+            ? Number(safeHeader.numberOfExtendedVariableLengthRecords)
+            : 0,
+          isCompressedPointFormat: Boolean(safeHeader.isCompressedPointFormat),
+          warnings: uniqueStrings(warnings),
+        };
+      }
+
+      function buildAttributeAvailabilityReport(header = statsData.header) {
+        const safeHeader = header && typeof header === "object" ? header : {};
+        const pointDataRecordFormat = Number.isFinite(Number(safeHeader.pointDataRecordFormat))
+          ? Number(safeHeader.pointDataRecordFormat)
+          : null;
+        const pointDataRecordLength = Number.isFinite(Number(safeHeader.pointDataRecordLength))
+          ? Number(safeHeader.pointDataRecordLength)
+          : null;
+        const warnings = [];
+        if (pointDataRecordFormat === null || pointDataRecordLength === null) {
+          return {
+            pointDataRecordFormat,
+            pointDataRecordLength,
+            available: [],
+            extraBytesLength: 0,
+            warnings,
+          };
+        }
+
+        const available = ["xyz", "intensity", "return", "classification", "scanAngle"];
+        if ([1, 3, 4, 5, 6, 7, 8, 9, 10].includes(pointDataRecordFormat)) {
+          available.push("gpsTime");
+        }
+        if ([2, 3, 5, 7, 8, 10].includes(pointDataRecordFormat)) {
+          available.push("rgb");
+        }
+        if ([8, 10].includes(pointDataRecordFormat)) {
+          available.push("nir");
+        }
+        if ([4, 5, 9, 10].includes(pointDataRecordFormat)) {
+          available.push("waveform");
+        }
+        if ([6, 7, 8, 9, 10].includes(pointDataRecordFormat)) {
+          available.push("scannerChannel", "classificationFlags");
+        }
+
+        const baseRecordLength = {
+          0: 20,
+          1: 28,
+          2: 26,
+          3: 34,
+          4: 57,
+          5: 63,
+          6: 30,
+          7: 36,
+          8: 38,
+          9: 59,
+          10: 67,
+        };
+        const baseline = baseRecordLength[pointDataRecordFormat];
+        let extraBytesLength = 0;
+        if (!Number.isFinite(baseline)) {
+          warnings.push("ATTRIBUTES_POINT_FORMAT_UNKNOWN");
+        } else {
+          extraBytesLength = Math.max(0, pointDataRecordLength - baseline);
+          if (extraBytesLength > 0) warnings.push("ATTRIBUTES_EXTRA_BYTES_PRESENT");
+          if (pointDataRecordLength < baseline) warnings.push("ATTRIBUTES_RECORD_LENGTH_SHORT");
+        }
+
+        return {
+          pointDataRecordFormat,
+          pointDataRecordLength,
+          available: uniqueStrings(available),
+          extraBytesLength,
+          warnings: uniqueStrings(warnings),
+        };
+      }
+
+      function isFiniteNumber(value) {
+        if (value === null || value === undefined || value === "") return false;
+        return Number.isFinite(Number(value));
+      }
+
+      function buildAcquisitionMetricsReport(points = [], options = {}) {
+        const safePoints = Array.isArray(points) ? points : [];
+        const sampleCap = Math.max(1, Math.floor(Number(options.sampleCap) || 500000));
+        const step = safePoints.length > sampleCap
+          ? Math.ceil(safePoints.length / sampleCap)
+          : 1;
+        const sampled = [];
+        for (let i = 0; i < safePoints.length && sampled.length < sampleCap; i += step) {
+          sampled.push(safePoints[i]);
+        }
+
+        const sampledPointCount = sampled.length;
+        if (!sampledPointCount) {
+          return {
+            sampleCap,
+            sampledPointCount: 0,
+            returnSignalCoverage: 0,
+            scanAngleCoverage: 0,
+            gpsTimeCoverage: 0,
+            gpsTimeMonotonicRatio: null,
+            warnings: [],
+          };
+        }
+
+        let returnCount = 0;
+        let scanAngleCount = 0;
+        let gpsTimeCount = 0;
+        let gpsPairs = 0;
+        let gpsMonotonicPairs = 0;
+        let previousGpsTime = null;
+
+        sampled.forEach((point) => {
+          if (isFiniteNumber(point?.returnNumber) && Number(point.returnNumber) > 0) {
+            returnCount += 1;
+          }
+          if (isFiniteNumber(point?.scanAngle)) {
+            scanAngleCount += 1;
+          }
+          if (isFiniteNumber(point?.gpsTime)) {
+            const gpsTime = Number(point.gpsTime);
+            gpsTimeCount += 1;
+            if (previousGpsTime !== null) {
+              gpsPairs += 1;
+              if (gpsTime >= previousGpsTime) gpsMonotonicPairs += 1;
+            }
+            previousGpsTime = gpsTime;
+          }
+        });
+
+        const roundCoverage = (count) =>
+          Number((count / sampledPointCount).toFixed(4));
+        const gpsTimeMonotonicRatio = gpsPairs
+          ? Number((gpsMonotonicPairs / gpsPairs).toFixed(4))
+          : null;
+        const warnings = [];
+        const returnSignalCoverage = roundCoverage(returnCount);
+        const scanAngleCoverage = roundCoverage(scanAngleCount);
+        const gpsTimeCoverage = roundCoverage(gpsTimeCount);
+        if (returnSignalCoverage < 0.7) warnings.push("ACQ_RETURN_SIGNAL_SPARSE");
+        if (scanAngleCoverage < 0.7) warnings.push("ACQ_SCAN_ANGLE_SPARSE");
+        if (gpsTimeCoverage < 0.7) warnings.push("ACQ_GPS_TIME_SPARSE");
+        if (gpsTimeMonotonicRatio !== null && gpsTimeMonotonicRatio < 0.8) {
+          warnings.push("ACQ_GPS_TIME_NON_MONOTONIC");
+        }
+
+        return {
+          sampleCap,
+          sampledPointCount,
+          returnSignalCoverage,
+          scanAngleCoverage,
+          gpsTimeCoverage,
+          gpsTimeMonotonicRatio,
+          warnings: uniqueStrings(warnings),
+        };
+      }
+
+      function buildAcquisitionQualityReport(header = statsData.header, metrics = null) {
+        const attributes = buildAttributeAvailabilityReport(header);
+        const availableSet = new Set(attributes.available || []);
+        const requiredSignals = ["return", "scanAngle", "gpsTime"];
+        const availableSignals = requiredSignals.filter((signal) => availableSet.has(signal));
+        const missingSignals = requiredSignals.filter((signal) => !availableSet.has(signal));
+        const warnings = [];
+        if (!availableSet.has("return")) warnings.push("ACQ_RETURN_MISSING");
+        if (!availableSet.has("scanAngle")) warnings.push("ACQ_SCAN_ANGLE_MISSING");
+        if (!availableSet.has("gpsTime")) warnings.push("ACQ_GPS_TIME_MISSING");
+
+        let score = 0;
+        if (availableSet.has("return")) score += 40;
+        if (availableSet.has("scanAngle")) score += 30;
+        if (availableSet.has("gpsTime")) score += 30;
+
+        if (metrics && Number.isFinite(Number(metrics.sampledPointCount)) && Number(metrics.sampledPointCount) > 0) {
+          let measuredDeduction = 0;
+          const applyCoverageDeduction = (coverage, warningCode, softPenalty, hardPenalty) => {
+            const safeCoverage = Number(coverage);
+            if (!Number.isFinite(safeCoverage)) return;
+            if (safeCoverage < 0.7) {
+              warnings.push(warningCode);
+              measuredDeduction += softPenalty;
+            }
+            if (safeCoverage < 0.4) {
+              measuredDeduction += hardPenalty;
+            }
+          };
+          applyCoverageDeduction(metrics.returnSignalCoverage, "ACQ_RETURN_SIGNAL_SPARSE", 10, 10);
+          applyCoverageDeduction(metrics.scanAngleCoverage, "ACQ_SCAN_ANGLE_SPARSE", 8, 8);
+          applyCoverageDeduction(metrics.gpsTimeCoverage, "ACQ_GPS_TIME_SPARSE", 10, 10);
+          if (
+            Number.isFinite(Number(metrics.gpsTimeMonotonicRatio)) &&
+            Number(metrics.gpsTimeMonotonicRatio) < 0.8
+          ) {
+            warnings.push("ACQ_GPS_TIME_NON_MONOTONIC");
+          }
+          if (Array.isArray(metrics.warnings)) {
+            warnings.push(...metrics.warnings);
+          }
+          score = Math.max(0, score - Math.min(30, measuredDeduction));
+        }
+
+        let status = "unknown";
+        if (!attributes.available?.length) status = "unknown";
+        else if (score >= 90) status = "high";
+        else if (score >= 60) status = "medium";
+        else status = "low";
+
+        return {
+          evaluationMode: "availability-plus-measured",
+          sampleCap: metrics?.sampleCap ?? 500000,
+          status,
+          score,
+          availableSignals,
+          missingSignals,
+          metrics: metrics || null,
+          warnings: uniqueStrings(warnings),
+        };
+      }
+
+      function summarizeGroundCandidateReport(report = statsData.groundCandidateReport) {
+        if (!report) {
+          return {
+            status: "unknown",
+            method: "unknown",
+            validCellRatio: 0,
+            confidence: "low",
+            groundPointCount: 0,
+            nonGroundPointCount: 0,
+            warnings: [],
+          };
+        }
+        return {
+          status: report.status || "unknown",
+          method: report.method || "unknown",
+          validCellRatio: Number.isFinite(Number(report.summary?.validCellRatio))
+            ? Number(report.summary.validCellRatio)
+            : 0,
+          confidence: report.summary?.confidence || "low",
+          groundPointCount: Number(report.summary?.groundPointCount || 0),
+          nonGroundPointCount: Number(report.summary?.nonGroundPointCount || 0),
+          warnings: uniqueStrings(report.warnings || []),
         };
       }
 
@@ -6291,6 +6587,13 @@
             displayRatio: Number(statsData.displayRatio || 0),
             pointCloudSummary,
           },
+          lineage: buildLineageReport(statsData.header),
+          attributes: buildAttributeAvailabilityReport(statsData.header),
+          acquisitionQuality: buildAcquisitionQualityReport(
+            statsData.header,
+            statsData.acquisitionMetrics,
+          ),
+          groundCandidate: summarizeGroundCandidateReport(statsData.groundCandidateReport),
           diagnosticsCandidates: diagnosticCandidates,
           recentErrors,
         };
@@ -6314,6 +6617,171 @@
           };
         }
       }
+
+      function roundWorkAssistNumber(value, digits = 4) {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return null;
+        const factor = 10 ** digits;
+        return Math.round(numeric * factor) / factor;
+      }
+
+      function serializeWorkAssistVector(vector) {
+        if (!vector) return null;
+        const x = roundWorkAssistNumber(vector.x);
+        const y = roundWorkAssistNumber(vector.y);
+        const z = roundWorkAssistNumber(vector.z);
+        if (x === null || y === null || z === null) return null;
+        return { x, y, z };
+      }
+
+      function summarizeSectionProfileForWorkAssist(profile = statsData.sectionProfile) {
+        if (!profile || !Number.isFinite(Number(profile.count)) || Number(profile.count) <= 0) {
+          return {
+            status: profile?.status || "unknown",
+            count: 0,
+          };
+        }
+        return {
+          status: profile.status || "ok",
+          count: Number(profile.count),
+          groundCount: Number(profile.groundCount || 0),
+          groundRatio: roundWorkAssistNumber(profile.groundRatio, 2),
+          minZ: roundWorkAssistNumber(profile.minZ, 3),
+          maxZ: roundWorkAssistNumber(profile.maxZ, 3),
+          zRange: roundWorkAssistNumber(profile.zRange, 3),
+          densityEstimate: roundWorkAssistNumber(profile.densityEstimate, 4),
+        };
+      }
+
+      function summarizeMeasurementRecordForWorkAssist(record) {
+        if (!record?.metrics) return null;
+        const metrics = record.metrics;
+        return {
+          id: Number.isFinite(Number(record.id)) ? Number(record.id) : null,
+          distance3d: roundWorkAssistNumber(metrics.distance3d, 3),
+          horizontalDistance: roundWorkAssistNumber(metrics.horizontalDistance, 3),
+          heightDifference: roundWorkAssistNumber(metrics.heightDifference, 3),
+          dx: roundWorkAssistNumber(metrics.dx, 3),
+          dy: roundWorkAssistNumber(metrics.dy, 3),
+          dz: roundWorkAssistNumber(metrics.dz, 3),
+        };
+      }
+
+      function getWorkAssistSelectedCandidate() {
+        const key = statsData.selectedDiagnosticCandidateKey;
+        const candidate = key ? statsData.diagnosticCandidateMap?.[key] : null;
+        if (!candidate) return null;
+        return {
+          key: String(candidate.key || key),
+          kind: String(candidate.kind || ""),
+          detail: String(candidate.detail || ""),
+          index: Number.isFinite(Number(candidate.point?.index))
+            ? Number(candidate.point.index)
+            : null,
+          row: Number.isFinite(Number(candidate.cell?.row))
+            ? Number(candidate.cell.row)
+            : null,
+          column: Number.isFinite(Number(candidate.cell?.column))
+            ? Number(candidate.cell.column)
+            : null,
+        };
+      }
+
+      function buildWorkAssistSnapshot() {
+        const activeMeasurementId = getActiveMeasurementRecordId(measurementState);
+        const activeMeasurement =
+          findMeasurementRecordById(activeMeasurementId) ||
+          measurementState.history[measurementState.history.length - 1] ||
+          null;
+        const acquisitionQuality = buildAcquisitionQualityReport(
+          statsData.header,
+          statsData.acquisitionMetrics,
+        );
+        const diagnosticsCandidates = buildDiagnosticCandidateSummary(
+          statsData.diagnosticsReport,
+        );
+        const groundCandidate = summarizeGroundCandidateReport(
+          statsData.groundCandidateReport ||
+            statsData.diagnosticsReport?.groundCandidate ||
+            null,
+        );
+        const sectionWidth = Number(document.getElementById("sectionWidthRange")?.value);
+        const groundOnly = !!document.getElementById("sectionGroundOnly")?.checked;
+
+        return {
+          schemaVersion: 1,
+          generatedAt: new Date().toISOString(),
+          app: "PointCloudWorkbench",
+          privacy: {
+            manualCopyOnly: true,
+            telemetry: false,
+            sendsPointCloudFile: false,
+            includesPointCloudData: false,
+            includesFileName: false,
+            includesSourceCoordinates: false,
+          },
+          workflow: {
+            step: workflowState.step,
+            selectedQuality: workflowState.selectedQuality,
+            loadStrategy: statsData.loadStrategy,
+            loadRiskLevel: statsData.loadRiskLevel,
+          },
+          view: {
+            mode: is2DMode ? "2d" : "3d",
+            view2d: is2DMode ? current2DView : null,
+            colorMode,
+            visualizationMode: currentVisualizationMode,
+            cadMode: isCADMode,
+            cameraPosition: serializeWorkAssistVector(camera?.position),
+            cameraTarget: serializeWorkAssistVector(controls?.target),
+            cameraUp: serializeWorkAssistVector(camera?.up),
+          },
+          section: {
+            width: Number.isFinite(sectionWidth) ? sectionWidth : null,
+            groundOnly,
+            profile: summarizeSectionProfileForWorkAssist(statsData.sectionProfile),
+          },
+          measurement: {
+            historyCount: measurementState.history.length,
+            activeRecordId: activeMeasurementId ?? null,
+            lastResult: summarizeMeasurementRecordForWorkAssist(activeMeasurement),
+          },
+          diagnostics: {
+            filterKind: statsData.diagnosticCandidateFilterKind || "all",
+            selectedCandidate: getWorkAssistSelectedCandidate(),
+            summary: diagnosticsCandidates,
+          },
+          groundCandidate,
+          acquisitionQuality: {
+            status: acquisitionQuality.status,
+            score: acquisitionQuality.score,
+            availableSignals: acquisitionQuality.availableSignals,
+            missingSignals: acquisitionQuality.missingSignals,
+            warnings: acquisitionQuality.warnings,
+          },
+        };
+      }
+
+      async function copyWorkAssistSnapshot() {
+        const snapshot = buildWorkAssistSnapshot();
+        const text = JSON.stringify(snapshot, null, 2);
+        try {
+          await copyTextToClipboard(text);
+          showToast("作業メモをコピーしました。現場確認メモに貼り付けできます。", "success");
+          return { ok: true, text, snapshot };
+        } catch (error) {
+          console.warn("Work assist copy failed:", error);
+          showToast("作業メモコピーに失敗しました。ブラウザー設定を確認してください。", "warning");
+          return {
+            ok: false,
+            text,
+            snapshot,
+            reason: error?.message || "Clipboard copy failed",
+          };
+        }
+      }
+
+      window.copyWorkAssistSnapshot = copyWorkAssistSnapshot;
 
       async function copyTextToClipboard(text) {
         if (navigator.clipboard?.writeText) {
@@ -6899,6 +7367,179 @@
         };
       }
 
+      function buildGroundCandidateGrid(points = [], bounds = null, options = {}) {
+        const safePoints = normalizeDiagnosticsPoints(points);
+        const safeBounds = bounds || calculatePointBounds(safePoints);
+        const emptyReport = (warnings = []) => ({
+          status: "unknown",
+          method: "unknown",
+          grid: {
+            cellSize: null,
+            cols: 0,
+            rows: 0,
+            originX: null,
+            originY: null,
+            sampleRatio: 1,
+          },
+          cells: [],
+          summary: {
+            validCellRatio: 0,
+            groundPointCount: 0,
+            nonGroundPointCount: 0,
+            averageHeightAboveGround: null,
+            confidence: "low",
+          },
+          warnings: uniqueStrings(warnings),
+        });
+
+        if (!safePoints.length || !safeBounds) {
+          return emptyReport(["GROUND_ESTIMATE_LOW_CONFIDENCE"]);
+        }
+
+        const xRange = Math.max(0, safeBounds.maxX - safeBounds.minX);
+        const yRange = Math.max(0, safeBounds.maxY - safeBounds.minY);
+        if (xRange <= 0 || yRange <= 0) {
+          return emptyReport(["GROUND_ESTIMATE_LOW_CONFIDENCE"]);
+        }
+
+        const maxCells = Math.max(16, Math.floor(Number(options.maxCells) || 120 * 120));
+        const requestedCellSize = Number(options.cellSize);
+        const defaultCellSize = Math.max(xRange, yRange) / 80;
+        let cellSize = Number.isFinite(requestedCellSize) && requestedCellSize > 0
+          ? requestedCellSize
+          : defaultCellSize;
+        if (!Number.isFinite(cellSize) || cellSize <= 0) {
+          return emptyReport(["GROUND_ESTIMATE_LOW_CONFIDENCE"]);
+        }
+
+        let cols = Math.max(1, Math.ceil(xRange / cellSize));
+        let rows = Math.max(1, Math.ceil(yRange / cellSize));
+        if (cols * rows > maxCells) {
+          const scale = Math.sqrt((cols * rows) / maxCells);
+          cellSize *= scale;
+          cols = Math.max(1, Math.ceil(xRange / cellSize));
+          rows = Math.max(1, Math.ceil(yRange / cellSize));
+        }
+
+        const totalCells = cols * rows;
+        const buckets = Array.from({ length: totalCells }, () => ({
+          points: [],
+          groundPoints: [],
+        }));
+        let groundPointCount = 0;
+        let nonGroundPointCount = 0;
+
+        safePoints.forEach((point) => {
+          const ix = Math.min(
+            cols - 1,
+            Math.max(0, Math.floor((point.x - safeBounds.minX) / cellSize)),
+          );
+          const iy = Math.min(
+            rows - 1,
+            Math.max(0, Math.floor((point.y - safeBounds.minY) / cellSize)),
+          );
+          const bucket = buckets[iy * cols + ix];
+          bucket.points.push(point);
+          if (point.classification === 2) {
+            groundPointCount += 1;
+            bucket.groundPoints.push(point);
+          } else {
+            nonGroundPointCount += 1;
+          }
+        });
+
+        const groundRatio = groundPointCount / safePoints.length;
+        const minGroundRatio = Number.isFinite(Number(options.minGroundRatio))
+          ? Number(options.minGroundRatio)
+          : 0.08;
+        const method = groundPointCount > 0 && groundRatio >= minGroundRatio
+          ? "classification_ground"
+          : "low_percentile_grid";
+        const stats = getStatisticsToolkit();
+        const warnings = [];
+        if (groundPointCount === 0) warnings.push("GROUND_CLASS_MISSING");
+        else if (method !== "classification_ground") warnings.push("GROUND_CLASS_SPARSE");
+
+        const cells = buckets.map((bucket, index) => {
+          const ix = index % cols;
+          const iy = Math.floor(index / cols);
+          const pointsForSurface =
+            method === "classification_ground" && bucket.groundPoints.length
+              ? bucket.groundPoints
+              : bucket.points;
+          const zValues = bucket.points.map((point) => point.z);
+          const surfaceZValues = pointsForSurface.map((point) => point.z);
+          const zMin = zValues.length
+            ? zValues.reduce((min, value) => Math.min(min, value), Number.POSITIVE_INFINITY)
+            : null;
+          const zMedian = zValues.length ? stats.quantileSorted(zValues, 0.5) : null;
+          const zP05 = zValues.length ? stats.quantileSorted(zValues, 0.05) : null;
+          const groundCandidateZ = surfaceZValues.length
+            ? (method === "classification_ground"
+                ? stats.quantileSorted(surfaceZValues, 0.5)
+                : stats.quantileSorted(surfaceZValues, 0.05))
+            : null;
+          let confidence = "empty";
+          if (groundCandidateZ !== null) {
+            if (method === "classification_ground" && bucket.groundPoints.length >= 2) {
+              confidence = "high";
+            } else if (method === "classification_ground") {
+              confidence = "medium";
+            } else {
+              confidence = bucket.points.length >= 3 ? "medium" : "low";
+            }
+          }
+          return {
+            ix,
+            iy,
+            pointCount: bucket.points.length,
+            groundPointCount: bucket.groundPoints.length,
+            groundCandidateZ,
+            zMin,
+            zMedian,
+            zP05,
+            zP95: zValues.length ? stats.quantileSorted(zValues, 0.95) : null,
+            confidence,
+          };
+        });
+
+        const validCells = cells.filter((cell) => cell.groundCandidateZ !== null);
+        const validCellRatio = totalCells > 0 ? validCells.length / totalCells : 0;
+        if (validCellRatio < 0.5) warnings.push("GROUND_GRID_HOLES");
+        if (method !== "classification_ground") warnings.push("GROUND_ESTIMATE_LOW_CONFIDENCE");
+
+        let confidence = "low";
+        if (method === "classification_ground" && validCellRatio >= 0.7 && groundRatio >= 0.2) {
+          confidence = "high";
+        } else if (validCellRatio >= 0.5 && (groundPointCount > 0 || safePoints.length >= 10)) {
+          confidence = "medium";
+        }
+
+        return {
+          status: confidence === "low" || warnings.length ? "warn" : "ok",
+          method,
+          grid: {
+            cellSize,
+            cols,
+            rows,
+            originX: safeBounds.minX,
+            originY: safeBounds.minY,
+            sampleRatio: Number.isFinite(Number(options.sampleRatio))
+              ? Number(options.sampleRatio)
+              : 1,
+          },
+          cells,
+          summary: {
+            validCellRatio,
+            groundPointCount,
+            nonGroundPointCount,
+            averageHeightAboveGround: null,
+            confidence,
+          },
+          warnings: uniqueStrings(warnings),
+        };
+      }
+
       function detectZOutliers(points = [], options = {}) {
         const safePoints = normalizeDiagnosticsPoints(points);
         const zValues = safePoints.map((point) => point.z);
@@ -7174,6 +7815,7 @@
         const bounds = pointCloudData?.bounds || calculatePointBounds(points);
         const spatialIndex = buildSpatialDiagnosticsIndex(points);
         const densityGrid = buildDensityGrid(points, bounds);
+        const groundCandidate = buildGroundCandidateGrid(points, bounds);
         const zOutliers = detectZOutliers(points);
         const isolatedPoints = detectIsolatedPoints(points, spatialIndex);
         const classificationStats = buildClassificationStats(
@@ -7193,6 +7835,7 @@
           basis: "displayed-points",
           usesFlatbush: spatialIndex.usesFlatbush,
           densityGrid,
+          groundCandidate,
           zOutliers,
           isolatedPoints,
           classificationStats,
@@ -11571,6 +12214,9 @@
       }
 
       function decodeLASPointRecord(view, pointOffset, header, sampleIndex = -1) {
+        if (!view || pointOffset < 0 || pointOffset + 15 > view.byteLength) {
+          return null;
+        }
         const rawX = view.getInt32(pointOffset, true);
         const rawY = view.getInt32(pointOffset + 4, true);
         const rawZ = view.getInt32(pointOffset + 8, true);
@@ -11592,13 +12238,48 @@
           );
         }
 
+        const pointFormat = Number(header.pointDataRecordFormat);
         let classification;
-        if (header.pointDataRecordFormat === 0) {
-          classification = 1;
-        } else if (header.pointDataRecordFormat >= 6) {
-          classification = view.getUint8(pointOffset + 16);
+        let returnNumber = null;
+        let numberOfReturns = null;
+        let scanAngle = null;
+        let gpsTime = null;
+        if (pointFormat >= 6) {
+          if (pointOffset + 15 <= view.byteLength) {
+            const returnByte = view.getUint8(pointOffset + 14);
+            returnNumber = returnByte & 0x0f;
+            numberOfReturns = (returnByte >> 4) & 0x0f;
+          }
+          classification = pointOffset + 17 <= view.byteLength
+            ? view.getUint8(pointOffset + 16)
+            : 1;
+          if (pointOffset + 20 <= view.byteLength) {
+            scanAngle = Number((view.getInt16(pointOffset + 18, true) * 0.006).toFixed(4));
+          }
+          if (
+            [6, 7, 8, 9, 10].includes(pointFormat) &&
+            pointOffset + 30 <= view.byteLength
+          ) {
+            gpsTime = view.getFloat64(pointOffset + 22, true);
+          }
         } else {
-          classification = view.getUint8(pointOffset + 15);
+          if (pointOffset + 15 <= view.byteLength) {
+            const returnByte = view.getUint8(pointOffset + 14);
+            returnNumber = returnByte & 0x07;
+            numberOfReturns = (returnByte >> 3) & 0x07;
+          }
+          classification = pointFormat === 0 || pointOffset + 16 > view.byteLength
+            ? 1
+            : view.getUint8(pointOffset + 15);
+          if (pointOffset + 17 <= view.byteLength) {
+            scanAngle = view.getInt8(pointOffset + 16);
+          }
+          if (
+            [1, 3, 4, 5].includes(pointFormat) &&
+            pointOffset + 28 <= view.byteLength
+          ) {
+            gpsTime = view.getFloat64(pointOffset + 20, true);
+          }
         }
 
         if (sampleIndex >= 0 && sampleIndex < 10) {
@@ -11623,7 +12304,17 @@
           return null;
         }
 
-        return { x, y, z, intensity, classification };
+        return {
+          x,
+          y,
+          z,
+          intensity,
+          classification,
+          returnNumber,
+          numberOfReturns,
+          scanAngle,
+          gpsTime,
+        };
       }
 
       async function parseLASHeaderFromFile(
@@ -11933,6 +12624,9 @@
           fileName: resolvedName,
           fileSize,
         });
+        const acquisitionMetrics = buildAcquisitionMetricsReport(points, {
+          sampleCap: 500000,
+        });
         const headerPointCount = pointCloudData.pointCounts.sourceCount;
         console.log(`ヘッダー解析成功: ${headerPointCount.toLocaleString()}点`);
 
@@ -11959,6 +12653,7 @@
           statsData.estimatedPeakMemoryMB = profile.estimatedPeakMemoryMB;
           statsData.loadRiskLevel = profile.riskLevel;
           statsData.pointCloudData = pointCloudData;
+          statsData.acquisitionMetrics = acquisitionMetrics;
         } catch (statsError) {
           console.warn("統計情報の更新に失敗（処理続行）:", statsError);
         }
@@ -12178,6 +12873,21 @@
         let end = array.indexOf(0);
         if (end < 0) end = array.length;
         return new TextDecoder().decode(array.slice(0, end)).trim();
+      }
+
+      function decodeFixedAsciiFromView(view, offset, length) {
+        if (!view || offset < 0 || length <= 0 || offset + length > view.byteLength) return "";
+        return decodeLasString(new Uint8Array(view.buffer, offset, length));
+      }
+
+      function formatLasProjectId(view) {
+        if (!view || view.byteLength < 24) return "";
+        const data1 = view.getUint32(8, true).toString(16).padStart(8, "0");
+        const data2 = view.getUint16(12, true).toString(16).padStart(4, "0");
+        const data3 = view.getUint16(14, true).toString(16).padStart(4, "0");
+        const bytes = new Uint8Array(view.buffer, 16, 8);
+        const tail = Array.from(bytes).map((byte) => byte.toString(16).padStart(2, "0"));
+        return `${data1}-${data2}-${data3}-${tail.slice(0, 2).join("")}-${tail.slice(2).join("")}`;
       }
 
       function getLasProjectionRecordType(record) {
@@ -12726,10 +13436,15 @@
           : 0;
         const header = {
           signature: signature,
+          projectId: formatLasProjectId(view),
           globalEncoding: view.getUint16(6, true),
           wktGlobalEncodingBit: Boolean(view.getUint16(6, true) & 0x10),
           versionMajor,
           versionMinor,
+          systemIdentifier: decodeFixedAsciiFromView(view, 26, 32),
+          generatingSoftware: decodeFixedAsciiFromView(view, 58, 32),
+          fileCreationDayOfYear: view.getUint16(90, true),
+          fileCreationYear: view.getUint16(92, true),
           headerSize: view.getUint16(94, true),
           pointDataOffset: view.getUint32(96, true),
           numberOfVariableLengthRecords: view.getUint32(100, true),
@@ -13281,6 +13996,7 @@
 
       function decodeLAZPoint(pointData, pointFormat, header) {
         try {
+          if (!pointData || pointData.byteLength < 15) return null;
           const x =
             pointData.getInt32(0, true) * header.xScaleFactor + header.xOffset;
           const y =
@@ -13292,14 +14008,46 @@
           // PDRF 6-10 で classification の位置が異なる
           let classification;
           let classificationFlags = null;
+          let returnNumber = null;
+          let numberOfReturns = null;
+          let scanAngle = null;
+          let gpsTime = null;
 
           if (pointFormat >= 6) {
+            if (pointData.byteLength >= 15) {
+              const returnByte = pointData.getUint8(14);
+              returnNumber = returnByte & 0x0f;
+              numberOfReturns = (returnByte >> 4) & 0x0f;
+            }
             // PDRF 6-10: Byte 16 が classification、Byte 15 は classification flags
-            classificationFlags = pointData.getUint8(15);
-            classification = pointData.getUint8(16);
+            classificationFlags = pointData.byteLength >= 16
+              ? pointData.getUint8(15)
+              : null;
+            classification = pointData.byteLength >= 17
+              ? pointData.getUint8(16)
+              : 1;
+            if (pointData.byteLength >= 20) {
+              scanAngle = Number((pointData.getInt16(18, true) * 0.006).toFixed(4));
+            }
+            if (pointData.byteLength >= 30) {
+              gpsTime = pointData.getFloat64(22, true);
+            }
           } else {
+            if (pointData.byteLength >= 15) {
+              const returnByte = pointData.getUint8(14);
+              returnNumber = returnByte & 0x07;
+              numberOfReturns = (returnByte >> 3) & 0x07;
+            }
             // PDRF 0-5: Byte 15 が classification
-            classification = pointData.getUint8(15);
+            classification = pointData.byteLength >= 16
+              ? pointData.getUint8(15)
+              : 1;
+            if (pointData.byteLength >= 17) {
+              scanAngle = pointData.getInt8(16);
+            }
+            if ([1, 3, 4, 5].includes(pointFormat) && pointData.byteLength >= 28) {
+              gpsTime = pointData.getFloat64(20, true);
+            }
           }
 
           let red = 0,
@@ -13313,7 +14061,21 @@
             }
           }
 
-          return { x, y, z, intensity, classification, red, green, blue };
+          return {
+            x,
+            y,
+            z,
+            intensity,
+            classification,
+            classificationFlags,
+            returnNumber,
+            numberOfReturns,
+            scanAngle,
+            gpsTime,
+            red,
+            green,
+            blue,
+          };
         } catch (error) {
           console.warn("LAZ点の解析に失敗:", error);
           return null;
@@ -13593,9 +14355,12 @@
             classificationCounts: statsData.classificationCounts,
             crsDiagnostics: statsData.crsDiagnostics || header.crsDiagnostics,
           });
+          statsData.groundCandidateReport =
+            statsData.diagnosticsReport?.groundCandidate || null;
         } catch (diagnosticsError) {
           console.warn("点群診断の更新に失敗（処理続行）:", diagnosticsError);
           statsData.diagnosticsReport = null;
+          statsData.groundCandidateReport = null;
         }
         const classificationTypes = qualityAnalysis.types;
         const unclassifiedPercent = qualityAnalysis.unclassifiedPercent;
@@ -13881,6 +14646,8 @@
               classificationCounts: statsData.classificationCounts,
               crsDiagnostics: statsData.crsDiagnostics,
             });
+            statsData.groundCandidateReport =
+              statsData.diagnosticsReport?.groundCandidate || null;
           }
 
           const loadedPointsEl = document.getElementById("loadedPoints");
@@ -17693,6 +18460,8 @@
           zOutlierCandidates: "-",
           isolatedPointCandidates: "-",
           densitySpikeCandidates: "-",
+          groundCandidateStatus: "参考 / 未計算",
+          groundCandidateMethod: "-",
           diagnosticsWarnings: "表示点ベース",
           diagnosticsWarningCodes: "-",
           diagnosticsScoreWeights: "-",
@@ -17701,6 +18470,9 @@
         if (report) {
           const score = report.score || {};
           const densitySummary = report.densityGrid?.summary || {};
+          const groundSummary = summarizeGroundCandidateReport(
+            statsData.groundCandidateReport || report.groundCandidate,
+          );
           const zCount = report.zOutliers?.candidates?.length || 0;
           const isolatedCount = report.isolatedPoints?.candidates?.length || 0;
           const reasons = Array.isArray(score.reasons) ? score.reasons : [];
@@ -17723,6 +18495,14 @@
           mappings.isolatedPointCandidates = `${isolatedCount.toLocaleString()}点`;
           mappings.densitySpikeCandidates =
             `${densitySummary.densitySpikeCells || 0}セル`;
+          mappings.groundCandidateStatus =
+            `参考 / ${groundSummary.confidence} / 有効${(groundSummary.validCellRatio * 100).toFixed(1)}%`;
+          mappings.groundCandidateMethod =
+            groundSummary.method === "classification_ground"
+              ? "class 2 ground"
+              : groundSummary.method === "low_percentile_grid"
+                ? "p05推定"
+                : "-";
           mappings.diagnosticsWarnings = reasons.length
             ? `表示点ベース / ${reasons.join(", ")}`
             : "表示点ベース / 大きな注意なし";
@@ -18168,6 +18948,7 @@
           getFileReadTimeoutMs,
           buildSpatialDiagnosticsIndex,
           buildDensityGrid,
+          buildGroundCandidateGrid,
           detectZOutliers,
           detectIsolatedPoints,
           buildDiagnosticsWarningCodes,
@@ -18209,8 +18990,16 @@
           selectRuntimeMode,
           buildRuntimeStatus,
           updateRuntimeStatusPanel,
+          buildLineageReport,
+          buildAttributeAvailabilityReport,
+          buildAcquisitionMetricsReport,
+          buildAcquisitionQualityReport,
+          decodeLASPointRecord,
+          decodeLAZPoint,
           buildManualDiagnosticReport,
           copyManualDiagnosticReport,
+          buildWorkAssistSnapshot,
+          copyWorkAssistSnapshot,
           resolvePointCloudReader,
           createPointCloudData,
           calculatePointBounds,

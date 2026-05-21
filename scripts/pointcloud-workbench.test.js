@@ -394,6 +394,10 @@ function createLasHeaderBuffer({
   startOfFirstExtendedVariableLengthRecord = 0n,
   numberOfExtendedVariableLengthRecords = 0,
   pointCount64 = 0n,
+  systemIdentifier = "",
+  generatingSoftware = "",
+  fileCreationDayOfYear = 0,
+  fileCreationYear = 0,
 } = {}) {
   const buffer = new ArrayBuffer(512);
   const view = new DataView(buffer);
@@ -402,6 +406,10 @@ function createLasHeaderBuffer({
   view.setUint16(6, globalEncoding, true);
   view.setUint8(24, versionMajor);
   view.setUint8(25, versionMinor);
+  encodeFixedAscii(view, 26, 32, systemIdentifier);
+  encodeFixedAscii(view, 58, 32, generatingSoftware);
+  view.setUint16(90, fileCreationDayOfYear, true);
+  view.setUint16(92, fileCreationYear, true);
   view.setUint16(94, headerSize, true);
   view.setUint32(96, pointDataOffset, true);
   view.setUint32(100, numberOfVariableLengthRecords, true);
@@ -537,6 +545,40 @@ test("parseLASHeader keeps EVLR fields empty for legacy headers", () => {
 
   expect(header.startOfFirstExtendedVariableLengthRecord).toBe(0);
   expect(header.numberOfExtendedVariableLengthRecords).toBe(0);
+});
+
+test("parseLASHeader extracts lineage metadata fields from header", () => {
+  const context = createContext();
+  context.__buffer = createLasHeaderBuffer({
+    versionMajor: 1,
+    versionMinor: 4,
+    systemIdentifier: "RIEGL VQ-1560",
+    generatingSoftware: "TerraScan 023.001",
+    fileCreationDayOfYear: 145,
+    fileCreationYear: 2026,
+  });
+  vm.runInContext(
+    `
+      const view = new DataView(__buffer);
+      view.setUint32(8, 0x12345678, true);
+      view.setUint16(12, 0x9abc, true);
+      view.setUint16(14, 0xdef0, true);
+      const projectTail = new Uint8Array(__buffer, 16, 8);
+      projectTail.set([0x11, 0x22, 0x33, 0x44, 0xaa, 0xbb, 0xcc, 0xdd]);
+    `,
+    context,
+  );
+
+  const header = vm.runInContext(
+    "window.__pcwTestApi.parseLASHeader(__buffer)",
+    context,
+  );
+
+  expect(header.systemIdentifier).toBe("RIEGL VQ-1560");
+  expect(header.generatingSoftware).toBe("TerraScan 023.001");
+  expect(header.fileCreationDayOfYear).toBe(145);
+  expect(header.fileCreationYear).toBe(2026);
+  expect(header.projectId).toBe("12345678-9abc-def0-1122-3344aabbccdd");
 });
 
 test("readLASProjectionRecords reads bounded VLR projection records without point data", async () => {
@@ -1063,8 +1105,649 @@ test("manual diagnostic report omits point cloud payloads and file names", () =>
       "密度スパイク": 0,
     },
   });
+  expect(report.lineage).toMatchObject({
+    projectId: "unknown",
+    systemIdentifier: "unknown",
+    generatingSoftware: "unknown",
+    fileCreationYear: null,
+    fileCreationDayOfYear: null,
+    source: "header",
+    warnings: [
+      "LINEAGE_SYSTEM_IDENTIFIER_MISSING",
+      "LINEAGE_GENERATOR_MISSING",
+    ],
+  });
+  expect(report.attributes).toMatchObject({
+    pointDataRecordFormat: null,
+    pointDataRecordLength: null,
+    available: [],
+    warnings: [],
+  });
+  expect(report.acquisitionQuality).toMatchObject({
+    status: "unknown",
+    score: 0,
+    availableSignals: [],
+    missingSignals: ["return", "scanAngle", "gpsTime"],
+  });
+  expect(report.groundCandidate).toMatchObject({
+    status: "unknown",
+    method: "unknown",
+    validCellRatio: 0,
+    confidence: "low",
+  });
   expect(reportText).not.toContain("private-site-survey");
   expect(reportText).not.toContain("points\":[");
+});
+
+test("work assist snapshot summarizes current work without file names or point payloads", () => {
+  const context = createContext();
+  context.__selectedFile = {
+    name: "private-river-site.laz",
+    size: 7890,
+  };
+  vm.runInContext(
+    `
+      window.__pcwTestApi.setWorkflowState({
+        step: "complete",
+        selectedQuality: "medium",
+        selectedFile: __selectedFile,
+      });
+      statsData.fileName = "private-river-site.laz";
+      statsData.loadStrategy = "laz-chunked";
+      statsData.loadRiskLevel = "ok";
+      statsData.header = {
+        pointDataRecordFormat: 1,
+        pointDataRecordLength: 28,
+      };
+      statsData.acquisitionMetrics = {
+        sampleCap: 500000,
+        sampledPointCount: 3,
+        returnSignalCoverage: 1,
+        scanAngleCoverage: 1,
+        gpsTimeCoverage: 1,
+        gpsTimeMonotonicRatio: 1,
+        warnings: [],
+      };
+      statsData.sectionProfile = {
+        status: "ok",
+        count: 12,
+        groundCount: 9,
+        groundRatio: 75,
+        minZ: 1.23456,
+        maxZ: 5.98765,
+        zRange: 4.75309,
+        densityEstimate: 0.123456,
+        samples: [{ x: 1, z: 2, classification: 2 }],
+      };
+      statsData.groundCandidateReport = {
+        status: "ok",
+        method: "classification_ground",
+        summary: {
+          validCellRatio: 0.75,
+          groundPointCount: 9,
+          nonGroundPointCount: 3,
+          confidence: "high",
+        },
+        warnings: [],
+      };
+      statsData.diagnosticsReport = {
+        score: {
+          score: 88,
+          status: "info",
+          warningCodes: ["DENSITY_HOLES"],
+        },
+        zOutliers: { candidates: [] },
+        isolatedPoints: { candidates: [] },
+        densityGrid: {
+          emptyInteriorCells: [{ row: 2, column: 3 }],
+          densitySpikeCells: [],
+        },
+      };
+      statsData.diagnosticCandidateFilterKind = "欠測セル";
+      statsData.selectedDiagnosticCandidateKey = "欠測セル-2-3";
+      statsData.diagnosticCandidateMap = {
+        "欠測セル-2-3": {
+          key: "欠測セル-2-3",
+          kind: "欠測セル",
+          detail: "r2 c3",
+          cell: { row: 2, column: 3, centerX: 100, centerY: 200 },
+        },
+      };
+      measurementState.history = [
+        window.__pcwTestApi.createMeasurementRecord(
+          4,
+          { source: { x: 10, y: 20, z: 30 } },
+          { source: { x: 13, y: 24, z: 42 } }
+        ),
+      ];
+      measurementState.selectedRecordId = 4;
+      is2DMode = true;
+      current2DView = "top";
+      colorMode = "classification";
+      currentVisualizationMode = "classification";
+      camera = {
+        position: { x: 1.234567, y: 2.345678, z: 3.456789 },
+        up: { x: 0, y: 1, z: 0 },
+      };
+      controls = { target: { x: 4, y: 5, z: 6 } };
+      document.getElementById("sectionWidthRange").value = "6.5";
+      document.getElementById("sectionGroundOnly").checked = true;
+    `,
+    context,
+  );
+
+  const snapshot = vm.runInContext(
+    "window.__pcwTestApi.buildWorkAssistSnapshot()",
+    context,
+  );
+  const snapshotText = JSON.stringify(snapshot);
+
+  expect(snapshot.privacy).toMatchObject({
+    manualCopyOnly: true,
+    telemetry: false,
+    sendsPointCloudFile: false,
+    includesPointCloudData: false,
+    includesFileName: false,
+    includesSourceCoordinates: false,
+  });
+  expect(snapshot.workflow).toMatchObject({
+    step: "complete",
+    selectedQuality: "medium",
+    loadStrategy: "laz-chunked",
+  });
+  expect(snapshot.view).toMatchObject({
+    mode: "2d",
+    view2d: "top",
+    colorMode: "classification",
+    cameraPosition: { x: 1.2346, y: 2.3457, z: 3.4568 },
+  });
+  expect(snapshot.section).toMatchObject({
+    width: 6.5,
+    groundOnly: true,
+    profile: {
+      count: 12,
+      groundCount: 9,
+      groundRatio: 75,
+      zRange: 4.753,
+    },
+  });
+  expect(snapshot.measurement).toMatchObject({
+    historyCount: 1,
+    activeRecordId: 4,
+    lastResult: {
+      id: 4,
+      distance3d: 13,
+      horizontalDistance: 5,
+      heightDifference: 12,
+    },
+  });
+  expect(snapshot.diagnostics.selectedCandidate).toMatchObject({
+    key: "欠測セル-2-3",
+    kind: "欠測セル",
+    row: 2,
+    column: 3,
+  });
+  expect(snapshot.groundCandidate).toMatchObject({
+    status: "ok",
+    method: "classification_ground",
+    validCellRatio: 0.75,
+    confidence: "high",
+    groundPointCount: 9,
+  });
+  expect(snapshot.acquisitionQuality).toMatchObject({
+    status: "high",
+    score: 100,
+    availableSignals: ["return", "scanAngle", "gpsTime"],
+  });
+  expect(snapshotText).not.toContain("private-river-site");
+  expect(snapshotText).not.toContain("samples");
+  expect(snapshotText).not.toContain("sourcePositions");
+  expect(snapshotText).not.toContain('"samples"');
+  expect(snapshotText).not.toContain('"points"');
+  expect(snapshotText).not.toContain('"start"');
+  expect(snapshotText).not.toContain('"end"');
+});
+
+test("copyWorkAssistSnapshot writes privacy-safe JSON to clipboard", async () => {
+  const context = createContext();
+  vm.runInContext(
+    `
+      navigator.clipboard = {
+        writeText: async (text) => {
+          globalThis.__clipboardText = text;
+        },
+      };
+      window.__pcwTestApi.setWorkflowState({
+        step: "complete",
+        selectedQuality: "low",
+      });
+      statsData.header = {
+        pointDataRecordFormat: 0,
+        pointDataRecordLength: 20,
+      };
+    `,
+    context,
+  );
+
+  const copied = await vm.runInContext(
+    "window.__pcwTestApi.copyWorkAssistSnapshot()",
+    context,
+  );
+  const clipboardText = vm.runInContext("globalThis.__clipboardText", context);
+  const payload = JSON.parse(clipboardText);
+
+  expect(copied.ok).toBe(true);
+  expect(copied.text).toBe(clipboardText);
+  expect(payload.schemaVersion).toBe(1);
+  expect(payload.workflow).toMatchObject({
+    step: "complete",
+    selectedQuality: "low",
+  });
+  expect(payload.privacy.includesFileName).toBe(false);
+  expect(payload.acquisitionQuality.missingSignals).toContain("gpsTime");
+});
+
+test("buildLineageReport summarizes header provenance and warnings", () => {
+  const context = createContext();
+  context.__header = {
+    projectId: "12345678-9abc-def0-1122-3344aabbccdd",
+    systemIdentifier: "RIEGL",
+    generatingSoftware: "TerraScan",
+    fileCreationDayOfYear: 145,
+    fileCreationYear: 2026,
+    pointDataRecordFormat: 8,
+    pointDataRecordLength: 38,
+    numberOfVariableLengthRecords: 3,
+    numberOfExtendedVariableLengthRecords: 1,
+    isCompressedPointFormat: false,
+    crsDiagnosticsWarnings: [{ code: "evlr-skipped", message: "skip" }],
+  };
+  const report = vm.runInContext(
+    "window.__pcwTestApi.buildLineageReport(__header)",
+    context,
+  );
+  expect(report).toMatchObject({
+    projectId: "12345678-9abc-def0-1122-3344aabbccdd",
+    systemIdentifier: "RIEGL",
+    generatingSoftware: "TerraScan",
+    fileCreationDayOfYear: 145,
+    fileCreationYear: 2026,
+    pointDataRecordFormat: 8,
+    pointDataRecordLength: 38,
+    vlrCount: 3,
+    evlrCount: 1,
+    isCompressedPointFormat: false,
+  });
+  expect(report.warnings).toContain("LINEAGE_EVRL_OR_VLR_WARNING");
+  expect(report.warnings).not.toContain("LINEAGE_GENERATOR_MISSING");
+});
+
+test("buildAttributeAvailabilityReport infers attributes from point format and record length", () => {
+  const context = createContext();
+  context.__header = {
+    pointDataRecordFormat: 8,
+    pointDataRecordLength: 38,
+  };
+  const report = vm.runInContext(
+    "window.__pcwTestApi.buildAttributeAvailabilityReport(__header)",
+    context,
+  );
+  expect(report.available).toEqual([
+    "xyz",
+    "intensity",
+    "return",
+    "classification",
+    "scanAngle",
+    "gpsTime",
+    "rgb",
+    "nir",
+    "scannerChannel",
+    "classificationFlags",
+  ]);
+  expect(report.warnings).toEqual([]);
+});
+
+test("buildAttributeAvailabilityReport warns when record length exceeds known format baseline", () => {
+  const context = createContext();
+  context.__header = {
+    pointDataRecordFormat: 6,
+    pointDataRecordLength: 40,
+  };
+  const report = vm.runInContext(
+    "window.__pcwTestApi.buildAttributeAvailabilityReport(__header)",
+    context,
+  );
+  expect(report.available).toContain("gpsTime");
+  expect(report.extraBytesLength).toBe(10);
+  expect(report.warnings).toContain("ATTRIBUTES_EXTRA_BYTES_PRESENT");
+});
+
+test("buildAcquisitionQualityReport rates quality high when return, scan angle, and gps time are available", () => {
+  const context = createContext();
+  context.__header = {
+    pointDataRecordFormat: 7,
+    pointDataRecordLength: 36,
+  };
+  const report = vm.runInContext(
+    "window.__pcwTestApi.buildAcquisitionQualityReport(__header)",
+    context,
+  );
+  expect(report.status).toBe("high");
+  expect(report.score).toBe(100);
+  expect(report.availableSignals).toEqual(["return", "scanAngle", "gpsTime"]);
+  expect(report.missingSignals).toEqual([]);
+  expect(report.warnings).toEqual([]);
+});
+
+test("buildAcquisitionQualityReport emits warnings when key acquisition signals are missing", () => {
+  const context = createContext();
+  context.__header = {
+    pointDataRecordFormat: 0,
+    pointDataRecordLength: 20,
+  };
+  const report = vm.runInContext(
+    "window.__pcwTestApi.buildAcquisitionQualityReport(__header)",
+    context,
+  );
+  expect(report.status).toBe("medium");
+  expect(report.score).toBe(70);
+  expect(report.availableSignals).toEqual(["return", "scanAngle"]);
+  expect(report.missingSignals).toEqual(["gpsTime"]);
+  expect(report.warnings).toContain("ACQ_GPS_TIME_MISSING");
+});
+
+test("decodeLASPointRecord extracts legacy acquisition fields", () => {
+  const context = createContext();
+  context.__buffer = new ArrayBuffer(28);
+  vm.runInContext(
+    `
+      const view = new DataView(__buffer);
+      view.setInt32(0, 100, true);
+      view.setInt32(4, 200, true);
+      view.setInt32(8, 300, true);
+      view.setUint16(12, 42, true);
+      view.setUint8(14, 3 | (5 << 3));
+      view.setUint8(15, 2);
+      view.setInt8(16, -12);
+      view.setFloat64(20, 123.5, true);
+    `,
+    context,
+  );
+  context.__header = {
+    pointDataRecordFormat: 1,
+    xScaleFactor: 0.01,
+    yScaleFactor: 0.01,
+    zScaleFactor: 0.01,
+    xOffset: 0,
+    yOffset: 0,
+    zOffset: 0,
+  };
+
+  const point = vm.runInContext(
+    "window.__pcwTestApi.decodeLASPointRecord(new DataView(__buffer), 0, __header)",
+    context,
+  );
+
+  expect(point).toMatchObject({
+    x: 1,
+    y: 2,
+    z: 3,
+    intensity: 42,
+    classification: 2,
+    returnNumber: 3,
+    numberOfReturns: 5,
+    scanAngle: -12,
+    gpsTime: 123.5,
+  });
+});
+
+test("decodeLASPointRecord extracts extended acquisition fields", () => {
+  const context = createContext();
+  context.__buffer = new ArrayBuffer(30);
+  vm.runInContext(
+    `
+      const view = new DataView(__buffer);
+      view.setInt32(0, 100, true);
+      view.setInt32(4, 200, true);
+      view.setInt32(8, 300, true);
+      view.setUint16(12, 42, true);
+      view.setUint8(14, 4 | (6 << 4));
+      view.setUint8(16, 2);
+      view.setInt16(18, 1000, true);
+      view.setFloat64(22, 456.25, true);
+    `,
+    context,
+  );
+  context.__header = {
+    pointDataRecordFormat: 6,
+    xScaleFactor: 0.01,
+    yScaleFactor: 0.01,
+    zScaleFactor: 0.01,
+    xOffset: 0,
+    yOffset: 0,
+    zOffset: 0,
+  };
+
+  const point = vm.runInContext(
+    "window.__pcwTestApi.decodeLASPointRecord(new DataView(__buffer), 0, __header)",
+    context,
+  );
+
+  expect(point).toMatchObject({
+    returnNumber: 4,
+    numberOfReturns: 6,
+    scanAngle: 6,
+    gpsTime: 456.25,
+  });
+});
+
+test("decodeLASPointRecord returns null for truncated mandatory point bytes", () => {
+  const context = createContext();
+  context.__buffer = new ArrayBuffer(14);
+  context.__header = {
+    pointDataRecordFormat: 6,
+    xScaleFactor: 0.01,
+    yScaleFactor: 0.01,
+    zScaleFactor: 0.01,
+    xOffset: 0,
+    yOffset: 0,
+    zOffset: 0,
+  };
+
+  const point = vm.runInContext(
+    "window.__pcwTestApi.decodeLASPointRecord(new DataView(__buffer), 0, __header)",
+    context,
+  );
+
+  expect(point).toBeNull();
+});
+
+test("decodeLASPointRecord keeps optional acquisition fields null when truncated", () => {
+  const context = createContext();
+  context.__buffer = new ArrayBuffer(15);
+  vm.runInContext(
+    `
+      const view = new DataView(__buffer);
+      view.setInt32(0, 100, true);
+      view.setInt32(4, 200, true);
+      view.setInt32(8, 300, true);
+      view.setUint16(12, 42, true);
+      view.setUint8(14, 1 | (1 << 4));
+    `,
+    context,
+  );
+  context.__header = {
+    pointDataRecordFormat: 6,
+    xScaleFactor: 0.01,
+    yScaleFactor: 0.01,
+    zScaleFactor: 0.01,
+    xOffset: 0,
+    yOffset: 0,
+    zOffset: 0,
+  };
+
+  const point = vm.runInContext(
+    "window.__pcwTestApi.decodeLASPointRecord(new DataView(__buffer), 0, __header)",
+    context,
+  );
+
+  expect(point).toMatchObject({
+    returnNumber: 1,
+    numberOfReturns: 1,
+    classification: 1,
+    scanAngle: null,
+    gpsTime: null,
+  });
+});
+
+test("decodeLAZPoint extracts extended acquisition fields", () => {
+  const context = createContext();
+  context.__buffer = new ArrayBuffer(38);
+  vm.runInContext(
+    `
+      const view = new DataView(__buffer);
+      view.setInt32(0, 100, true);
+      view.setInt32(4, 200, true);
+      view.setInt32(8, 300, true);
+      view.setUint16(12, 42, true);
+      view.setUint8(14, 2 | (3 << 4));
+      view.setUint8(16, 5);
+      view.setInt16(18, -500, true);
+      view.setFloat64(22, 789.75, true);
+    `,
+    context,
+  );
+  context.__header = {
+    xScaleFactor: 0.01,
+    yScaleFactor: 0.01,
+    zScaleFactor: 0.01,
+    xOffset: 0,
+    yOffset: 0,
+    zOffset: 0,
+  };
+
+  const point = vm.runInContext(
+    "window.__pcwTestApi.decodeLAZPoint(new DataView(__buffer), 8, __header)",
+    context,
+  );
+
+  expect(point).toMatchObject({
+    classification: 5,
+    returnNumber: 2,
+    numberOfReturns: 3,
+    scanAngle: -3,
+    gpsTime: 789.75,
+  });
+});
+
+test("decodeLAZPoint returns null for truncated mandatory point bytes", () => {
+  const context = createContext();
+  context.__buffer = new ArrayBuffer(14);
+  context.__header = {
+    xScaleFactor: 0.01,
+    yScaleFactor: 0.01,
+    zScaleFactor: 0.01,
+    xOffset: 0,
+    yOffset: 0,
+    zOffset: 0,
+  };
+
+  const point = vm.runInContext(
+    "window.__pcwTestApi.decodeLAZPoint(new DataView(__buffer), 8, __header)",
+    context,
+  );
+
+  expect(point).toBeNull();
+});
+
+test("decodeLAZPoint keeps optional extended fields null when truncated", () => {
+  const context = createContext();
+  context.__buffer = new ArrayBuffer(15);
+  vm.runInContext(
+    `
+      const view = new DataView(__buffer);
+      view.setInt32(0, 100, true);
+      view.setInt32(4, 200, true);
+      view.setInt32(8, 300, true);
+      view.setUint16(12, 42, true);
+      view.setUint8(14, 2 | (3 << 4));
+    `,
+    context,
+  );
+  context.__header = {
+    xScaleFactor: 0.01,
+    yScaleFactor: 0.01,
+    zScaleFactor: 0.01,
+    xOffset: 0,
+    yOffset: 0,
+    zOffset: 0,
+  };
+
+  const point = vm.runInContext(
+    "window.__pcwTestApi.decodeLAZPoint(new DataView(__buffer), 8, __header)",
+    context,
+  );
+
+  expect(point).toMatchObject({
+    returnNumber: 2,
+    numberOfReturns: 3,
+    classification: 1,
+    classificationFlags: null,
+    scanAngle: null,
+    gpsTime: null,
+  });
+});
+
+test("buildAcquisitionMetricsReport computes coverage and GPS monotonic ratio", () => {
+  const context = createContext();
+  context.__points = [
+    { returnNumber: 1, numberOfReturns: 2, scanAngle: -2, gpsTime: 10 },
+    { returnNumber: 1, numberOfReturns: 1, scanAngle: 0, gpsTime: 11 },
+    { returnNumber: null, numberOfReturns: null, scanAngle: null, gpsTime: 9 },
+    { returnNumber: 2, numberOfReturns: 2, scanAngle: 3, gpsTime: null },
+  ];
+
+  const metrics = vm.runInContext(
+    "window.__pcwTestApi.buildAcquisitionMetricsReport(__points, { sampleCap: 500000 })",
+    context,
+  );
+
+  expect(metrics.sampledPointCount).toBe(4);
+  expect(metrics.returnSignalCoverage).toBe(0.75);
+  expect(metrics.scanAngleCoverage).toBe(0.75);
+  expect(metrics.gpsTimeCoverage).toBe(0.75);
+  expect(metrics.gpsTimeMonotonicRatio).toBe(0.5);
+  expect(metrics.warnings).toContain("ACQ_GPS_TIME_NON_MONOTONIC");
+});
+
+test("buildAcquisitionQualityReport applies measured coverage deductions", () => {
+  const context = createContext();
+  context.__header = {
+    pointDataRecordFormat: 7,
+    pointDataRecordLength: 36,
+  };
+  context.__metrics = {
+    sampledPointCount: 4,
+    returnSignalCoverage: 0.25,
+    scanAngleCoverage: 0.25,
+    gpsTimeCoverage: 0.25,
+    gpsTimeMonotonicRatio: 0.5,
+    warnings: ["ACQ_GPS_TIME_NON_MONOTONIC"],
+  };
+
+  const report = vm.runInContext(
+    "window.__pcwTestApi.buildAcquisitionQualityReport(__header, __metrics)",
+    context,
+  );
+
+  expect(report.evaluationMode).toBe("availability-plus-measured");
+  expect(report.score).toBe(70);
+  expect(report.status).toBe("medium");
+  expect(report.metrics).toEqual(context.__metrics);
+  expect(report.warnings).toContain("ACQ_RETURN_SIGNAL_SPARSE");
+  expect(report.warnings).toContain("ACQ_SCAN_ANGLE_SPARSE");
+  expect(report.warnings).toContain("ACQ_GPS_TIME_SPARSE");
+  expect(report.warnings).toContain("ACQ_GPS_TIME_NON_MONOTONIC");
 });
 
 test("ReaderRegistry exposes LAS and LAZ local readers", () => {
@@ -1167,6 +1850,71 @@ test("buildDensityGrid reports missing and spike density cells from displayed po
   expect(grid.summary.emptyInteriorCells).toBeGreaterThan(0);
   expect(grid.summary.densitySpikeCells).toBeGreaterThan(0);
   expect(grid.status).toBe("warn");
+});
+
+test("buildGroundCandidateGrid uses class 2 ground when available", () => {
+  const context = createContext();
+  context.__points = [
+    { x: 0.2, y: 0.2, z: 10, classification: 2 },
+    { x: 0.4, y: 0.3, z: 11, classification: 2 },
+    { x: 1.2, y: 0.2, z: 15, classification: 1 },
+    { x: 1.4, y: 0.4, z: 16, classification: 1 },
+    { x: 0.2, y: 1.2, z: 12, classification: 2 },
+    { x: 0.4, y: 1.4, z: 13, classification: 2 },
+  ];
+  context.__bounds = { minX: 0, maxX: 2, minY: 0, maxY: 2, minZ: 10, maxZ: 16 };
+
+  const report = vm.runInContext(
+    "window.__pcwTestApi.buildGroundCandidateGrid(__points, __bounds, { cellSize: 1 })",
+    context,
+  );
+
+  expect(report.status).toBe("ok");
+  expect(report.method).toBe("classification_ground");
+  expect(report.grid).toMatchObject({
+    cellSize: 1,
+    cols: 2,
+    rows: 2,
+    originX: 0,
+    originY: 0,
+  });
+  expect(report.summary.groundPointCount).toBe(4);
+  expect(report.summary.nonGroundPointCount).toBe(2);
+  expect(report.summary.validCellRatio).toBeGreaterThan(0);
+  expect(report.summary.confidence).toBe("high");
+  expect(report.cells.find((cell) => cell.ix === 0 && cell.iy === 0)).toMatchObject({
+    pointCount: 2,
+    groundCandidateZ: 10.5,
+    zMin: 10,
+    confidence: "high",
+  });
+});
+
+test("buildGroundCandidateGrid falls back to p05 when ground class is sparse", () => {
+  const context = createContext();
+  context.__points = [
+    { x: 0.2, y: 0.2, z: 100, classification: 1 },
+    { x: 0.3, y: 0.2, z: 102, classification: 1 },
+    { x: 0.4, y: 0.3, z: 110, classification: 1 },
+    { x: 1.2, y: 0.2, z: 50, classification: 1 },
+    { x: 1.3, y: 0.3, z: 70, classification: 1 },
+  ];
+  context.__bounds = { minX: 0, maxX: 2, minY: 0, maxY: 1, minZ: 50, maxZ: 110 };
+
+  const report = vm.runInContext(
+    "window.__pcwTestApi.buildGroundCandidateGrid(__points, __bounds, { cellSize: 1 })",
+    context,
+  );
+
+  const firstCell = report.cells.find((cell) => cell.ix === 0 && cell.iy === 0);
+  expect(report.method).toBe("low_percentile_grid");
+  expect(report.status).toBe("warn");
+  expect(report.summary.groundPointCount).toBe(0);
+  expect(report.summary.confidence).toBe("low");
+  expect(report.warnings).toContain("GROUND_CLASS_MISSING");
+  expect(report.warnings).toContain("GROUND_ESTIMATE_LOW_CONFIDENCE");
+  expect(firstCell.zP05).toBe(100.2);
+  expect(firstCell.groundCandidateZ).toBe(100.2);
 });
 
 test("detectZOutliers uses robust quartile thresholds", () => {
@@ -1985,14 +2733,14 @@ test("parseLASPointsFromFile reads sampled LAS data via slices without full file
   );
 
   expect(points).toHaveLength(3);
-  expect(points[0]).toEqual({
+  expect(points[0]).toMatchObject({
     x: 1,
     y: 11,
     z: 21,
     intensity: 100,
     classification: 2,
   });
-  expect(points[2]).toEqual({
+  expect(points[2]).toMatchObject({
     x: 3,
     y: 13,
     z: 23,

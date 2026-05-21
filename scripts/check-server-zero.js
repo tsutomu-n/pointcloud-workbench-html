@@ -9,7 +9,10 @@ const ignoredDirs = new Set([
   ".tmp",
   ".ai_memory",
   ".serena",
+  ".plan",
+  ".codex",
   "node_modules",
+  "samples",
   "test-results",
 ]);
 
