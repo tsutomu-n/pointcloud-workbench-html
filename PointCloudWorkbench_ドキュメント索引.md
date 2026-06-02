@@ -2,7 +2,7 @@
 
 `PointCloudWorkbench.html` 向けの資料を用途別に分割しました。
 
-更新日時: 2026-05-21 00:00:00 JST
+更新日時: 2026-06-02_10:25 JST
 検証対象: `PointCloudWorkbench.html`
 
 ## この索引の前提
@@ -23,6 +23,8 @@
 ## 開発者向け
 - `PointCloudWorkbench_実装リファレンス.md`
 - 実装構造、主要関数、状態モデル、拡張ポイント、改修時の注意点
+- `docs/current-state-and-implemented-features.ja.md`
+- 現在の repo 状態、実装済み機能、制約、公開 API、検証入口の一覧
 
 ## 計画・仕様
 - `docs/crs-diagnostics-implementation-plan.ja.md`

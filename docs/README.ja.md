@@ -31,6 +31,7 @@
 - トラブルシューティング: [`./troubleshooting.ja.md`](./troubleshooting.ja.md)
 - FAQ: [`./faq.ja.md`](./faq.ja.md)
 - 用語集: [`./glossary.ja.md`](./glossary.ja.md)
+- 現状と実装済み機能: [`./current-state-and-implemented-features.ja.md`](./current-state-and-implemented-features.ja.md)
 
 ## PointCloudWorkbench の特徴
 
