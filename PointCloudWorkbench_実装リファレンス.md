@@ -300,6 +300,9 @@
 - `toggleCADMode`
 - `autoClassify`
 - `copyCrsInquiryText`
+- `setDensityOverlayEnabled`
+- `toggleDensityOverlay`
+- `setDensityOverlayOpacity`
 
 ### 14.4 開発補助
 - `debugClassification`
