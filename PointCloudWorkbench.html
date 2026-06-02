@@ -1590,6 +1590,91 @@
         cursor: pointer;
       }
 
+      .density-overlay-controls {
+        display: grid;
+        grid-template-columns: minmax(0, auto) minmax(96px, 1fr) auto;
+        align-items: center;
+        gap: 8px;
+        margin-top: 8px;
+        padding: 8px;
+        border: 1px solid rgba(14, 165, 233, 0.24);
+        border-radius: 6px;
+        background: rgba(15, 23, 42, 0.44);
+      }
+
+      .density-overlay-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: #dbeafe;
+        font-size: 12px;
+        white-space: nowrap;
+      }
+
+      .density-overlay-toggle input,
+      .density-overlay-controls input[type="range"] {
+        accent-color: var(--ec-accent);
+      }
+
+      .density-overlay-opacity {
+        width: 100%;
+        min-width: 0;
+      }
+
+      .density-overlay-value {
+        color: var(--ec-accent);
+        font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
+        font-size: 12px;
+        min-width: 38px;
+        text-align: right;
+      }
+
+      .density-overlay-legend {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 4px;
+        margin-top: 6px;
+        font-size: 10px;
+        color: var(--ec-muted);
+      }
+
+      .density-overlay-legend span::before {
+        content: "";
+        display: block;
+        height: 6px;
+        border-radius: 999px;
+        margin-bottom: 3px;
+      }
+
+      .density-overlay-legend .density-low::before {
+        background: #0369a1;
+      }
+
+      .density-overlay-legend .density-mid::before {
+        background: #22c55e;
+      }
+
+      .density-overlay-legend .density-high::before {
+        background: #facc15;
+      }
+
+      .density-overlay-legend .density-spike::before {
+        background: #ef4444;
+      }
+
+      .density-overlay-note {
+        margin-top: 6px;
+        color: #94a3b8;
+        font-size: 11px;
+        line-height: 1.45;
+      }
+
+      .density-overlay-status {
+        margin-top: 4px;
+        color: var(--ec-muted);
+        font-size: 11px;
+      }
+
       .diagnostic-candidate-btn {
         width: 100%;
         min-height: 34px;
@@ -5116,6 +5201,55 @@
                   height="96"
                   aria-label="表示点ベース密度ヒートマップ"
                 ></canvas>
+                <div
+                  class="density-overlay-controls"
+                  id="densityOverlayControls"
+                >
+                  <label class="density-overlay-toggle">
+                    <input
+                      type="checkbox"
+                      id="densityOverlayToggle"
+                      onchange="setDensityOverlayEnabled(this.checked)"
+                      aria-describedby="densityOverlayNote densityOverlayStatus"
+                    />
+                    Overlay
+                  </label>
+                  <input
+                    class="density-overlay-opacity"
+                    type="range"
+                    id="densityOverlayOpacity"
+                    min="0.15"
+                    max="0.85"
+                    step="0.05"
+                    value="0.55"
+                    oninput="setDensityOverlayOpacity(this.value)"
+                    aria-label="密度ヒートマップ overlay 透明度"
+                    aria-describedby="densityOverlayStatus"
+                  />
+                  <span
+                    class="density-overlay-value"
+                    id="densityOverlayOpacityValue"
+                  >55%</span>
+                </div>
+                <div
+                  class="density-overlay-legend"
+                  aria-label="密度ヒートマップ凡例"
+                >
+                  <span class="density-low">low</span>
+                  <span class="density-mid">mid</span>
+                  <span class="density-high">high</span>
+                  <span class="density-spike">spike</span>
+                </div>
+                <div class="density-overlay-note" id="densityOverlayNote">
+                  このヒートマップは表示点ベースの参考表示です。元LAS/LAZ全点の厳密密度ではありません。
+                </div>
+                <div
+                  class="density-overlay-status"
+                  id="densityOverlayStatus"
+                  aria-live="polite"
+                >
+                  点群読込後に利用できます
+                </div>
                 <div class="diagnostic-candidate-controls">
                   <select
                     class="diagnostic-candidate-filter"
@@ -6320,6 +6454,15 @@
         selectedRecordId: null,
       };
       let measurementPointerHandlerBound = false;
+      const DENSITY_OVERLAY_DEFAULT_OPACITY = 0.55;
+      const DENSITY_OVERLAY_TEXTURE_SIZE = 512;
+      let densityOverlayState = {
+        enabled: false,
+        opacity: DENSITY_OVERLAY_DEFAULT_OPACITY,
+        mesh: null,
+        texture: null,
+        canvas: null,
+      };
 
       // キーボード状態管理
       const keys = {
@@ -8285,12 +8428,97 @@
         );
       }
 
-      function drawFallbackDensityHeatmap(canvas, densityGrid) {
+      function clampDensityOverlayOpacity(value) {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return DENSITY_OVERLAY_DEFAULT_OPACITY;
+        return Math.max(0.15, Math.min(0.85, numeric));
+      }
+
+      function getDensityOverlayReport(report = statsData.diagnosticsReport) {
+        if (!report?.densityGrid?.cells?.length || !report.densityGrid.gridSize) {
+          return null;
+        }
+        return report;
+      }
+
+      function buildDensityOverlayPlaneSpec(bounds, header, options = {}) {
+        if (!bounds || !header) return null;
+        const minX = Number(bounds.minX);
+        const maxX = Number(bounds.maxX);
+        const minY = Number(bounds.minY);
+        const maxY = Number(bounds.maxY);
+        const minZ = Number(bounds.minZ);
+        const headerMinX = Number(header.minX);
+        const headerMaxX = Number(header.maxX);
+        const headerMinY = Number(header.minY);
+        const headerMaxY = Number(header.maxY);
+        const headerMinZ = Number(header.minZ);
+        const headerMaxZ = Number(header.maxZ);
+        if (
+          ![
+            minX,
+            maxX,
+            minY,
+            maxY,
+            minZ,
+            headerMinX,
+            headerMaxX,
+            headerMinY,
+            headerMaxY,
+            headerMinZ,
+          ].every(Number.isFinite)
+        ) {
+          return null;
+        }
+
+        const width = maxX - minX;
+        const depth = maxY - minY;
+        if (width <= 0 || depth <= 0) return null;
+
+        const headerCenterX = (headerMinX + headerMaxX) / 2;
+        const headerCenterY = (headerMinY + headerMaxY) / 2;
+        const boundsCenterX = (minX + maxX) / 2;
+        const boundsCenterY = (minY + maxY) / 2;
+        const headerZRange = Number.isFinite(headerMaxZ)
+          ? Math.max(0, headerMaxZ - headerMinZ)
+          : 0;
+        const largestRange = Math.max(width, depth, headerZRange);
+        const requestedLift = Number(options.lift);
+        const lift = Number.isFinite(requestedLift)
+          ? requestedLift
+          : Math.max(0.02, Math.min(2, largestRange * 0.001));
+
+        return {
+          width,
+          depth,
+          lift,
+          position: {
+            x: boundsCenterX - headerCenterX,
+            y: Math.max(0, minZ - headerMinZ) + lift,
+            z: -(boundsCenterY - headerCenterY),
+          },
+          rotation: {
+            x: -Math.PI / 2,
+            y: 0,
+            z: 0,
+          },
+          sourceBounds: {
+            minX,
+            maxX,
+            minY,
+            maxY,
+            minZ,
+          },
+        };
+      }
+
+      function drawFallbackDensityHeatmap(canvas, densityGrid, options = {}) {
         const ctx = canvas?.getContext?.("2d");
         if (!ctx || !densityGrid?.cells?.length) return false;
         const width = canvas.width || 220;
         const height = canvas.height || 96;
         ctx.clearRect(0, 0, width, height);
+        const bottomUp = options.bottomUp === true;
         const maxCount = Math.max(
           1,
           ...densityGrid.cells.map((cell) => Number(cell.count) || 0),
@@ -8300,10 +8528,13 @@
         densityGrid.cells.forEach((cell) => {
           if (!cell.count) return;
           const intensity = Math.min(1, cell.count / maxCount);
+          const row = bottomUp
+            ? densityGrid.gridSize - 1 - cell.row
+            : cell.row;
           ctx.fillStyle = `rgba(${Math.round(56 + intensity * 220)}, ${Math.round(189 - intensity * 90)}, ${Math.round(248 - intensity * 180)}, ${0.22 + intensity * 0.62})`;
           ctx.fillRect(
             cell.column * cellWidth,
-            cell.row * cellHeight,
+            row * cellHeight,
             Math.max(1, cellWidth - 1),
             Math.max(1, cellHeight - 1),
           );
@@ -8311,7 +8542,7 @@
         return true;
       }
 
-      function renderDensityHeatmap(report, canvas) {
+      function renderDensityHeatmap(report, canvas, options = {}) {
         const densityGrid = report?.densityGrid;
         const ctx = canvas?.getContext?.("2d");
         if (!canvas || !ctx) return { rendered: false, mode: "none" };
@@ -8324,13 +8555,19 @@
           1,
           ...densityGrid.cells.map((cell) => Number(cell.count) || 0),
         );
+        const bottomUp = options.bottomUp === true;
         const heatData = densityGrid.cells
           .filter((cell) => cell.count > 0)
-          .map((cell) => [
-            ((cell.column + 0.5) / densityGrid.gridSize) * canvas.width,
-            ((cell.row + 0.5) / densityGrid.gridSize) * canvas.height,
-            cell.count,
-          ]);
+          .map((cell) => {
+            const row = bottomUp
+              ? densityGrid.gridSize - 1 - cell.row
+              : cell.row;
+            return [
+              ((cell.column + 0.5) / densityGrid.gridSize) * canvas.width,
+              ((row + 0.5) / densityGrid.gridSize) * canvas.height,
+              cell.count,
+            ];
+          });
         const simpleheatFactory = getSimpleheatFactory();
         if (simpleheatFactory && heatData.length) {
           try {
@@ -8353,10 +8590,133 @@
         }
 
         return {
-          rendered: drawFallbackDensityHeatmap(canvas, densityGrid),
+          rendered: drawFallbackDensityHeatmap(canvas, densityGrid, options),
           mode: "fallback",
         };
       }
+
+      function disposeDensityOverlay() {
+        if (densityOverlayState.mesh?.parent) {
+          densityOverlayState.mesh.parent.remove(densityOverlayState.mesh);
+        }
+        disposeObject3D(densityOverlayState.mesh);
+        densityOverlayState.mesh = null;
+        densityOverlayState.texture = null;
+        densityOverlayState.canvas = null;
+      }
+
+      function syncDensityOverlayControls(report = statsData.diagnosticsReport) {
+        const hasGrid = !!getDensityOverlayReport(report) && !!pointCloud;
+        const toggle = document.getElementById("densityOverlayToggle");
+        const opacityInput = document.getElementById("densityOverlayOpacity");
+        const opacityValue = document.getElementById("densityOverlayOpacityValue");
+        const status = document.getElementById("densityOverlayStatus");
+
+        if (toggle) {
+          toggle.checked = !!densityOverlayState.enabled && hasGrid;
+          toggle.disabled = !hasGrid;
+        }
+        if (opacityInput) {
+          opacityInput.value = densityOverlayState.opacity.toFixed(2);
+          opacityInput.disabled = !hasGrid;
+        }
+        if (opacityValue) {
+          opacityValue.textContent = `${Math.round(densityOverlayState.opacity * 100)}%`;
+        }
+        if (status) {
+          status.textContent = hasGrid
+            ? densityOverlayState.enabled
+              ? "点群ビューに表示中"
+              : "OFF"
+            : "点群読込後に利用できます";
+        }
+      }
+
+      function createDensityOverlayTexture(report) {
+        if (!THREE.CanvasTexture) return null;
+        const canvas = document.createElement("canvas");
+        canvas.width = DENSITY_OVERLAY_TEXTURE_SIZE;
+        canvas.height = DENSITY_OVERLAY_TEXTURE_SIZE;
+        const renderResult = renderDensityHeatmap(report, canvas, {
+          bottomUp: true,
+        });
+        if (!renderResult.rendered) return null;
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.needsUpdate = true;
+        return { canvas, texture };
+      }
+
+      function createDensityOverlayMesh(report = statsData.diagnosticsReport) {
+        const overlayReport = getDensityOverlayReport(report);
+        const bounds = statsData.pointCloudData?.bounds || null;
+        const spec = buildDensityOverlayPlaneSpec(bounds, statsData.header);
+        if (!overlayReport || !spec || !THREE.PlaneGeometry || !THREE.MeshBasicMaterial || !THREE.Mesh) {
+          return null;
+        }
+
+        const textureResult = createDensityOverlayTexture(overlayReport);
+        if (!textureResult) return null;
+
+        const geometry = new THREE.PlaneGeometry(spec.width, spec.depth);
+        const material = new THREE.MeshBasicMaterial({
+          map: textureResult.texture,
+          transparent: true,
+          opacity: densityOverlayState.opacity,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+          depthTest: true,
+        });
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.name = "densityOverlay";
+        mesh.renderOrder = 2;
+        mesh.position.set(spec.position.x, spec.position.y, spec.position.z);
+        mesh.rotation.set(spec.rotation.x, spec.rotation.y, spec.rotation.z);
+        densityOverlayState.canvas = textureResult.canvas;
+        densityOverlayState.texture = textureResult.texture;
+        return mesh;
+      }
+
+      function updateDensityOverlay(report = statsData.diagnosticsReport) {
+        disposeDensityOverlay();
+        if (!densityOverlayState.enabled || !scene || !pointCloud) {
+          syncDensityOverlayControls(report);
+          return false;
+        }
+
+        const mesh = createDensityOverlayMesh(report);
+        if (!mesh) {
+          syncDensityOverlayControls(report);
+          return false;
+        }
+
+        densityOverlayState.mesh = mesh;
+        scene.add(mesh);
+        syncDensityOverlayControls(report);
+        return true;
+      }
+
+      window.setDensityOverlayEnabled = function (enabled) {
+        densityOverlayState.enabled = enabled === true;
+        const updated = updateDensityOverlay(statsData.diagnosticsReport);
+        if (densityOverlayState.enabled && !updated) {
+          showToast("密度ヒートマップ overlay は点群読込後に利用できます", "warning");
+        }
+        return updated;
+      };
+
+      window.toggleDensityOverlay = function () {
+        return window.setDensityOverlayEnabled(!densityOverlayState.enabled);
+      };
+
+      window.setDensityOverlayOpacity = function (value) {
+        densityOverlayState.opacity = clampDensityOverlayOpacity(value);
+        if (densityOverlayState.mesh?.material) {
+          densityOverlayState.mesh.material.opacity = densityOverlayState.opacity;
+          densityOverlayState.mesh.material.needsUpdate = true;
+        }
+        syncDensityOverlayControls(statsData.diagnosticsReport);
+        return densityOverlayState.opacity;
+      };
 
       function buildDiagnosticCandidateItems(report, options = {}) {
         const perCategoryLimit = Math.max(1, Math.floor(Number(options.perCategoryLimit) || 10));
@@ -12133,6 +12493,9 @@
         try {
           clearMeasurement();
           disposeDiagnosticCandidateMarker();
+          densityOverlayState.enabled = false;
+          disposeDensityOverlay();
+          syncDensityOverlayControls(null);
           statsData.selectedDiagnosticCandidateKey = null;
           statsData.diagnosticCandidateMap = {};
           statsData.diagnosticCandidateFilterKind = "all";
@@ -15419,6 +15782,7 @@
 
         // カメラ位置調整
         adjustCameraToData();
+        syncDensityOverlayControls(statsData.diagnosticsReport);
 
         console.log("点群表示完了");
       }
@@ -15612,6 +15976,11 @@
 
           if (typeof updateStatsDisplay === "function") {
             updateStatsDisplay();
+          }
+          if (densityOverlayState.enabled) {
+            updateDensityOverlay(statsData.diagnosticsReport);
+          } else {
+            syncDensityOverlayControls(statsData.diagnosticsReport);
           }
 
           console.log(
@@ -19516,6 +19885,11 @@
           report,
           document.getElementById("densityHeatmapCanvas"),
         );
+        if (densityOverlayState.enabled) {
+          updateDensityOverlay(report);
+        } else {
+          syncDensityOverlayControls(report);
+        }
         renderDiagnosticCandidateList(
           report,
           document.getElementById("diagnosticCandidateList"),
@@ -19939,7 +20313,14 @@
           buildDiagnosticsWarningCodes,
           buildDiagnosticsScore,
           buildPointCloudDiagnostics,
+          clampDensityOverlayOpacity,
+          buildDensityOverlayPlaneSpec,
           renderDensityHeatmap,
+          disposeDensityOverlay,
+          updateDensityOverlay,
+          setDensityOverlayEnabled: window.setDensityOverlayEnabled,
+          setDensityOverlayOpacity: window.setDensityOverlayOpacity,
+          toggleDensityOverlay: window.toggleDensityOverlay,
           buildDiagnosticCandidateItems,
           buildDiagnosticCandidateSummary,
           selectDiagnosticCandidate,

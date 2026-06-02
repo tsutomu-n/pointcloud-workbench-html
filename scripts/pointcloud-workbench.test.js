@@ -2449,6 +2449,88 @@ test("renderDensityHeatmap falls back without simpleheat", () => {
   expect(context.__draws).toBeGreaterThan(0);
 });
 
+test("clampDensityOverlayOpacity limits overlay opacity to supported range", () => {
+  const context = createContext();
+
+  const values = vm.runInContext(
+    `[
+      window.__pcwTestApi.clampDensityOverlayOpacity(-1),
+      window.__pcwTestApi.clampDensityOverlayOpacity(0.4),
+      window.__pcwTestApi.clampDensityOverlayOpacity(2),
+      window.__pcwTestApi.clampDensityOverlayOpacity("bad")
+    ]`,
+    context,
+  );
+
+  expect(values).toEqual([0.15, 0.4, 0.85, 0.55]);
+});
+
+test("buildDensityOverlayPlaneSpec maps source XY bounds onto display XZ plane", () => {
+  const context = createContext();
+  context.__bounds = {
+    minX: 2,
+    maxX: 6,
+    minY: 104,
+    maxY: 112,
+    minZ: 55,
+    maxZ: 58,
+  };
+  context.__header = {
+    minX: 0,
+    maxX: 10,
+    minY: 100,
+    maxY: 120,
+    minZ: 50,
+    maxZ: 70,
+  };
+
+  const spec = vm.runInContext(
+    "window.__pcwTestApi.buildDensityOverlayPlaneSpec(__bounds, __header)",
+    context,
+  );
+
+  expect(spec.width).toBe(4);
+  expect(spec.depth).toBe(8);
+  expect(spec.position.x).toBe(-1);
+  expect(spec.position.z).toBe(2);
+  expect(spec.position.y).toBeCloseTo(55 - 50 + 0.02, 8);
+  expect(spec.rotation.x).toBeCloseTo(-Math.PI / 2, 8);
+});
+
+test("renderDensityHeatmap can draw overlay texture bottom-up for source Y mapping", () => {
+  const context = createContext();
+  context.__draws = [];
+  context.__canvas = {
+    width: 120,
+    height: 60,
+    getContext() {
+      return {
+        clearRect() {},
+        fillRect(x, y, width, height) {
+          context.__draws.push({ x, y, width, height });
+        },
+      };
+    },
+  };
+  context.__report = {
+    densityGrid: {
+      gridSize: 2,
+      cells: [
+        { row: 0, column: 0, count: 1 },
+        { row: 1, column: 0, count: 2 },
+      ],
+    },
+  };
+
+  const result = vm.runInContext(
+    "window.__pcwTestApi.renderDensityHeatmap(__report, __canvas, { bottomUp: true })",
+    context,
+  );
+
+  expect(result).toEqual({ rendered: true, mode: "fallback" });
+  expect(context.__draws.map((draw) => draw.y)).toEqual([30, 0]);
+});
+
 test("buildDiagnosticCandidateItems limits categories and total results", () => {
   const context = createContext();
   context.__report = {
