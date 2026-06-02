@@ -1,6 +1,6 @@
 # PointCloudWorkbench 運用手順書
 
-更新日時: 2026-06-02_10:25 JST
+更新日時: 2026-06-02_11:41 JST
 
 ## 1. 目的
 - 対象: `PointCloudWorkbench.html` の日常運用を担当する利用者、運用担当、検証担当
@@ -72,6 +72,13 @@
 3. `confidence` と有効セル率が低い場合、地表候補を勾配、土量、成果品DTMの根拠にしない
 4. 地表候補アシストは表示点ベースの参考診断であり、測量成果DTM、設計面、切盛根拠ではない
 
+### 4.8 密度ヒートマップ overlay の確認
+1. 読み込み完了後、統計パネルの「診断 / 異常候補」を開く
+2. `Overlay` を ON にし、点群ビュー上に表示点ベースの密度ヒートマップが重なることを確認する
+3. 透明度 slider で点群と overlay の見え方を調整する
+4. 凡例は `low / mid / high / spike` の参考色であり、元 LAS/LAZ 全点の厳密密度や欠測証明として扱わない
+5. 2D上面では密度分布を平面で確認し、3Dでは半透明の床面参考表示として扱う
+
 ## 5. ファイルサイズ警告の運用基準
 
 | サイズ帯 | 表示レベル | 推奨対応 |
@@ -98,6 +105,7 @@
 - CRS 診断: LAS/LAZ の header / VLR / EVLR に含まれる WKT、GeoTIFF、EPSG 候補を統計パネルで確認
 - 取得品質: LAS/LAZ の point format と sampled return / scan-angle / GPS-time coverage を手動診断 JSON で確認
 - 地表候補: class 2 ground または p05 推定による表示点ベースの参考地表を統計パネルで確認
+- 密度ヒートマップ overlay: 表示点ベースの density grid を点群ビューへ重ね、ON/OFF、透明度、凡例を確認
 - 作業メモコピー: 現在の表示、断面、計測、異常候補、取得品質の要約をファイル名なしでコピー
 - CADモード: Z-up 表示へ切替
 - 凡例パネル: `window.toggleLegendPanel()` で開閉可能（現在のUIに専用ボタン導線はない）

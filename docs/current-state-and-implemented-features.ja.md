@@ -1,6 +1,7 @@
 # PointCloudWorkbench 現状と実装済み機能
 
 作成日時: 2026-06-02_10:25 JST
+更新日時: 2026-06-02_11:41 JST
 
 確認対象:
 
@@ -186,6 +187,7 @@ LAZ は `laz-perf` と WASM を使います。
 ### 6.4 統計パネル
 
 統計パネルでは、点数、LAS header、bounds、分類内訳、読み込み時間、処理時間、密度、読み込み profile、CRS 診断、取得品質、診断 summary を確認できます。
+診断 / 異常候補では、表示点ベースの密度ヒートマップ overlay を ON/OFF し、透明度と凡例を確認できます。
 
 ### 6.5 距離計測
 
@@ -327,6 +329,7 @@ GPS-time monotonic ratio は warning signal であり、測量級の証明では
 - density grid の low-density cell
 - density spike cell
 - empty interior cell
+- 表示点ベースの密度ヒートマップ overlay
 - Z outlier
 - isolated point
 - section profile
@@ -334,6 +337,7 @@ GPS-time monotonic ratio は warning signal であり、測量級の証明では
 
 候補は数を制限し、安定した順序で並べます。
 copy payload には `warningCodes`、`score`、`scoreStatus` を含みます。
+密度ヒートマップ overlay は既存の density grid を Three.js の X/Z 平面へ重ねる参考表示であり、元 LAS/LAZ 全点の厳密密度や測量成果としては扱いません。
 
 ### 8.6 warning code と score
 

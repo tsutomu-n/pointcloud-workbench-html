@@ -1,5 +1,7 @@
 # PointCloudWorkbench
 
+Last updated: 2026-06-02_11:41 JST
+
 Browser-native LAS/LAZ point cloud workbench delivered as a single HTML file.
 
 No install. No build. Open the live demo, load a bundled sample LAS, and inspect point clouds in 3D/2D with slice, classification, and statistics tools.
@@ -70,6 +72,7 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 - Slice view and 2D cross-section inspection
 - Automatic classification assistance and classification quality review
 - Statistics panel for point counts, class breakdowns, and processing time
+- Displayed-point density heatmap overlay with ON/OFF, opacity, and legend controls
 - Diagnostics warning codes are normalized, deduplicated, and emitted in a stable order (`CRS_MISSING`, `CLASSIFICATION_*`, `DISPLAY_RATIO_LOW`, `DENSITY_*`, `Z_OUTLIERS`, `ISOLATED_POINTS`)
 - Diagnostic candidate summary/selected copy payloads include normalized warning codes and score metadata (`score`, `scoreStatus`)
 
@@ -91,6 +94,7 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 - CRS diagnostics read bounded LAS header / VLR / EVLR slices and do not upload LAS/LAZ files or copy local file names into CRS inquiry text.
 - Acquisition quality is a local dimension-coverage aid. It follows the stable LAS 1.4 R15 point-record layout used by the app, keeps PDRF 0-5 and PDRF 6+ return / scan-angle interpretation separate, and treats GPS-time monotonicity as a warning signal rather than survey-grade proof.
 - Ground candidate assist is approximate and displayed-point based. It is not a survey-grade DTM, design surface, cut/fill basis, or deliverable terrain model.
+- The density heatmap overlay is a displayed-point reference view only. Do not treat it as exact full-source LAS/LAZ density, survey evidence, or proof of missing data.
 - Work-assist memo copy is temporary in-page context for handoff and review. It does not save ROI geometry, write files, upload LAS/LAZ data, or include source point coordinates.
 - LAS files in the `2GB to 3GB` range are experimental. Start from `LOW` quality and verify memory use and responsiveness.
 - LAZ has a narrower safety margin because the decoder consumes extra memory. Files above `2GB` are rejected.

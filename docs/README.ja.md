@@ -1,5 +1,7 @@
 # PointCloudWorkbench
 
+最終更新: 2026-06-02_11:41 JST
+
 ブラウザーで動く LAS/LAZ 点群ワークベンチです。単一の HTML ファイルとして配布します。
 
 インストール不要。ビルド不要。ライブデモを開き、同梱サンプル LAS を読み込み、3D/2D 表示、スライス、分類、統計ツールで点群を確認できます。
@@ -74,6 +76,7 @@
 - スライス表示と 2D 断面確認
 - 自動分類補助と分類品質レビュー
 - 点数、分類内訳、処理時間を確認する統計パネル
+- 表示点ベースの密度ヒートマップ overlay（ON/OFF、透明度、凡例付き）
 - 正規化、重複排除、安定順序化された診断 warning code（`CRS_MISSING`, `CLASSIFICATION_*`, `DISPLAY_RATIO_LOW`, `DENSITY_*`, `Z_OUTLIERS`, `ISOLATED_POINTS`）
 - `score` / `scoreStatus` を含む診断候補 summary / selected copy payload
 
@@ -95,6 +98,7 @@
 - CRS diagnostics は LAS header / VLR / EVLR を上限付きで読み、LAS/LAZ ファイルやローカルファイル名をアップロードまたは問い合わせ文へコピーしません。
 - 取得品質はローカルの属性 coverage 補助です。アプリが使う LAS 1.4 R15 point-record layout に従い、PDRF 0-5 と PDRF 6+ の return / scan-angle interpretation を分け、GPS-time monotonicity は測量級証明ではなく warning signal として扱います。
 - 地表候補アシストは近似的で、表示点ベースです。測量成果 DTM、設計面、切盛根拠、納品用地形モデルではありません。
+- 密度ヒートマップ overlay は表示点ベースの参考表示です。元 LAS/LAZ 全点の厳密密度、測量成果、欠測証明としては扱わないでください。
 - 作業メモコピーはレビューや引き継ぎのための一時的なページ内 context です。ROI geometry の保存、ファイル書き込み、LAS/LAZ upload、source point coordinates の含有は行いません。
 - LAS の `2GB to 3GB` 帯は experimental です。`LOW` 品質から開始し、メモリ使用量と応答性を確認してください。
 - LAZ は decoder が追加メモリを使うため安全域が狭く、`2GB` 超は拒否します。

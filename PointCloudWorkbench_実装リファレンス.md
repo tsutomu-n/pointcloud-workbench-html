@@ -1,6 +1,6 @@
 # PointCloudWorkbench 実装リファレンス
 
-更新日時: 2026-06-02_10:25 JST
+更新日時: 2026-06-02_11:41 JST
 
 ## 1. スコープ
 - 対象: `PointCloudWorkbench.html`（単一ファイル構成）
@@ -144,7 +144,16 @@
 - `buildDiagnosticCandidateItems()` は point/cell 候補を index / row-column でソートして、同一候補集合で順序を安定化する
 - `copySelectedDiagnosticCandidate()` と `copyDiagnosticCandidateSummary()` は `warningCodes`, `score`, `scoreStatus` を含む
 
-## 7.7 取得品質 / 属性 / 来歴 / 作業メモ
+## 7.7 密度ヒートマップ overlay
+- `buildDensityGrid(points, bounds, options)` は表示点ベースの density grid を作る。元 LAS/LAZ 全点の厳密密度は作らない
+- `renderDensityHeatmap(report, canvas, options)` は統計パネル用 mini heatmap と overlay texture 用 canvas の両方で使う。`options.bottomUp === true` の場合は source Y を Three.js 表示の Z 反転に合わせて下から描く
+- `buildDensityOverlayPlaneSpec(bounds, header, options)` は source XY bounds を Three.js の X/Z 平面へ変換する。source X は display X、source Y は display Z の反転、source Z は display Y 高さとして扱う
+- `createDensityOverlayMesh()` は `THREE.CanvasTexture`、`THREE.PlaneGeometry`、`THREE.MeshBasicMaterial` で半透明 overlay を作る。material は `transparent: true`, `depthWrite: false`, `side: THREE.DoubleSide`
+- `window.setDensityOverlayEnabled(enabled)`, `window.toggleDensityOverlay()`, `window.setDensityOverlayOpacity(value)` を公開する
+- overlay state は点群破棄時に mesh / texture / material / geometry を dispose し、downsample 後は再生成された `statsData.diagnosticsReport.densityGrid` に追従する
+- overlay は表示点ベースの参考表示であり、測量成果、欠測証明、元 LAS/LAZ 全点密度、サーバー処理、CRS 補正は扱わない
+
+## 7.8 取得品質 / 属性 / 来歴 / 作業メモ
 - `buildLineageReport()` は LAS header の project id、system identifier、generating software、作成日、PDRF、VLR/EVLR 数を要約する
 - `buildAttributeAvailabilityReport()` は LAS 1.4 R15 の安定した point-record layout を基準に、`xyz`, `intensity`, `return`, `classification`, `scanAngle`, `gpsTime`, `rgb`, `nir`, `waveform`, `scannerChannel`, `classificationFlags` の利用可否を返す
 - PDRF 0-5 と PDRF 6+ は return / classification / scan-angle の byte layout が異なるため、decode 側で別分岐にする。PDRF 6+ の scan angle は raw int16 に `0.006 degree` を掛ける
@@ -161,7 +170,7 @@
 - `buildWorkAssistSnapshot()` は `schemaVersion: 1` の作業メモ JSON を作り、表示、断面、計測履歴、異常候補、取得品質を要約する。ファイル名、点群配列、元LAS座標配列、ROI geometry の永続化情報は含めない
 - `copyWorkAssistSnapshot()` は `copyTextToClipboard()` 経由で作業メモ JSON をコピーする。外部送信、ファイル書き込み、サーバー処理は行わない
 
-## 7.8 地表候補アシスト
+## 7.9 地表候補アシスト
 - `buildGroundCandidateGrid(points, bounds, options)` は表示点ベースの参考地表候補を作る。測量成果DTM、設計面、土量根拠は作らない
 - `classification_ground` は class 2 ground が一定比率以上ある場合に使い、セル内 ground 点の median Z を `groundCandidateZ` にする
 - `low_percentile_grid` は ground 分類がない、または薄い場合に使い、セル内全点の p05 Z を `groundCandidateZ` にする
@@ -239,6 +248,9 @@
 - `window.copyMeasurementRecord(id)`
 - `window.copyMeasurementRecordCsv(id)`
 - `window.deleteMeasurementRecord(id)`
+- `window.setDensityOverlayEnabled(enabled)`
+- `window.toggleDensityOverlay()`
+- `window.setDensityOverlayOpacity(value)`
 - `measurementState.mode` は `distance | polyline | areaXY`
 - 距離モードは2点クリックで自動確定し、元LAS基準の `3D距離 / 水平距離 / 高さ差 / 勾配% / dX / dY / dZ` を表示する
 - 折れ線モードは2点以上をクリックし、「確定」または `Enter` で累計3D距離、累計水平距離、始点終点高低差、平均勾配%を保存する
