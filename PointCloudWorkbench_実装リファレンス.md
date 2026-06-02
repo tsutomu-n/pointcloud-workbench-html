@@ -1,6 +1,6 @@
 # PointCloudWorkbench 実装リファレンス
 
-更新日時: 2026-05-21 00:00:00 JST
+更新日時: 2026-06-02_10:25 JST
 
 ## 1. スコープ
 - 対象: `PointCloudWorkbench.html`（単一ファイル構成）
@@ -228,19 +228,29 @@
 - 2D:
 - `window.set2DView(view)`
 - `window.exit2DView()`
-- 距離計測:
+- 測定:
 - `window.toggleMeasurementMode()`
+- `window.setMeasurementMode(mode)`
+- `window.finalizeMeasurementDraft()`
+- `window.undoMeasurementPoint()`
 - `window.clearMeasurement()`
 - `window.copyMeasurementResult()`
+- `window.copyMeasurementResultCsv()`
 - `window.copyMeasurementRecord(id)`
+- `window.copyMeasurementRecordCsv(id)`
 - `window.deleteMeasurementRecord(id)`
-- 2点クリックで表示点に吸着し、元LAS基準の `3D距離 / 水平距離 / 高さ差 / dX / dY / dZ` を表示
-- 距離は `m相当` 表示であり、元データの座標単位に依存する
+- `measurementState.mode` は `distance | polyline | areaXY`
+- 距離モードは2点クリックで自動確定し、元LAS基準の `3D距離 / 水平距離 / 高さ差 / 勾配% / dX / dY / dZ` を表示する
+- 折れ線モードは2点以上をクリックし、「確定」または `Enter` で累計3D距離、累計水平距離、始点終点高低差、平均勾配%を保存する
+- 面積モードは3点以上をクリックし、「確定」または `Enter` で source X/Y の shoelace formula によるXY投影面積と周長を保存する。斜面表面積ではない
+- 距離と面積は `m相当` / `m²相当` 表示であり、元データの座標単位に依存する
 - `measurementState.history` がページ内の一時履歴を最大20件まで保持する
+- 通常コピーは日本語テキスト、CSVコピーは mode 別のCSV風テキストを出す。Clipboard は `copyTextToClipboard()` 経由で fallback を持つ
 - 各履歴 record が自分の helper group を保持し、個別削除、全消去、点群破棄時に dispose する
 - 3D空間内の距離ラベル sprite は使わず、距離値は右パネルと履歴で表示する
-- 各履歴は始点・終点の色付きピンと線を残し、履歴行の hover / focus は一時プレビュー、click / Enter / Space は固定選択として対応する3D表示を強調する
-- `Esc` または「計測モード終了」は選択モードだけを止め、履歴は「計測を全消去」まで残す
+- 各履歴は色付きピンと線を残す。折れ線は `THREE.Line`、面積輪郭は `THREE.LineLoop` を使い、線幅ではなく色・opacity・ピンサイズで強調する
+- 履歴行の hover / focus は一時プレビュー、click / Enter / Space は固定選択として対応する3D表示を強調する
+- `Ctrl+Z` は測定中の最後の点を取り消す。`Esc` は測定中の点があれば draft だけ消し、点がなければ計測モードだけ止める。履歴は「計測を全消去」まで残す
 - スライス:
 - `window.toggleSlicing()`
 - `updateSlicing()`

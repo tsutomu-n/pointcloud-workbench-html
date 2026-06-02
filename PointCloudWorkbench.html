@@ -3311,6 +3311,24 @@
         margin-bottom: var(--space-2);
       }
 
+      .measurement-mode-control {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: var(--space-1);
+        margin-bottom: var(--space-2);
+      }
+
+      .measurement-mode-btn {
+        min-height: 32px;
+        padding: var(--space-1) var(--space-2);
+      }
+
+      .measurement-mode-btn.active {
+        background: rgba(56, 189, 248, 0.18);
+        border-color: var(--ec-accent);
+        color: var(--ec-accent);
+      }
+
       .measurement-summary {
         color: var(--ec-accent);
         font-size: var(--font-size-lg);
@@ -3342,6 +3360,10 @@
         grid-template-columns: 1fr 1fr;
         gap: var(--space-2);
         margin-bottom: var(--space-2);
+      }
+
+      .measurement-actions.measurement-actions--wide {
+        grid-template-columns: 1fr 1fr 1fr;
       }
 
       .measurement-history {
@@ -4573,6 +4595,29 @@
                   <span>距離計測を開始</span>
                 </button>
                 <div class="measurement-panel" id="measurementPanel">
+                  <div class="measurement-mode-control" role="group" aria-label="計測モード">
+                    <button
+                      class="control-btn measurement-mode-btn active"
+                      id="measurementModeDistance"
+                      onclick="setMeasurementMode('distance')"
+                    >
+                      距離
+                    </button>
+                    <button
+                      class="control-btn measurement-mode-btn"
+                      id="measurementModePolyline"
+                      onclick="setMeasurementMode('polyline')"
+                    >
+                      折れ線
+                    </button>
+                    <button
+                      class="control-btn measurement-mode-btn"
+                      id="measurementModeAreaXY"
+                      onclick="setMeasurementMode('areaXY')"
+                    >
+                      面積
+                    </button>
+                  </div>
                   <div class="measurement-status" id="measurementStatus">
                     1点目をクリック
                   </div>
@@ -4580,6 +4625,17 @@
                     -
                   </div>
                   <dl class="measurement-results" id="measurementResults"></dl>
+                  <div class="measurement-actions measurement-actions--wide">
+                    <button class="control-btn" id="measurementFinalizeBtn" onclick="finalizeMeasurementDraft()">
+                      確定
+                    </button>
+                    <button class="control-btn" id="measurementUndoBtn" onclick="undoMeasurementPoint()">
+                      1点戻す
+                    </button>
+                    <button class="control-btn" onclick="copyMeasurementResultCsv()">
+                      CSVコピー
+                    </button>
+                  </div>
                   <div class="measurement-actions">
                     <button class="control-btn" onclick="clearMeasurement()">
                       計測を全消去
@@ -6230,11 +6286,32 @@
       let pointSize = 1.0;
       const MEASUREMENT_NOTE =
         "表示点への計測です。距離はLAS座標単位をm相当として表示し、元データの座標単位に依存します。";
+      const MEASUREMENT_AREA_NOTE =
+        "面積はXY投影面積です。斜面表面積ではありません。";
       const MEASUREMENT_HISTORY_LIMIT = 20;
+      const MEASUREMENT_MODES = {
+        distance: {
+          label: "距離",
+          minPoints: 2,
+          autoFinalizePointCount: 2,
+        },
+        polyline: {
+          label: "折れ線",
+          minPoints: 2,
+          autoFinalizePointCount: null,
+        },
+        areaXY: {
+          label: "面積",
+          minPoints: 3,
+          autoFinalizePointCount: null,
+        },
+      };
       let measurementState = {
         enabled: false,
+        mode: "distance",
         selectedPoints: [],
         helperGroup: null,
+        draftHelperGroup: null,
         history: [],
         nextRecordId: 1,
         pointerDown: null,
@@ -6950,6 +7027,7 @@
       }
 
       function roundWorkAssistNumber(value, digits = 4) {
+        if (value === null || value === undefined) return null;
         const numeric = Number(value);
         if (!Number.isFinite(numeric)) return null;
         const factor = 10 ** digits;
@@ -6987,11 +7065,35 @@
       function summarizeMeasurementRecordForWorkAssist(record) {
         if (!record?.metrics) return null;
         const metrics = record.metrics;
+        const mode = record.mode || metrics.mode || "distance";
+        if (mode === "polyline") {
+          return {
+            id: Number.isFinite(Number(record.id)) ? Number(record.id) : null,
+            mode,
+            pointCount: Number(metrics.pointCount || 0),
+            segmentCount: Number(metrics.segmentCount || 0),
+            total3d: roundWorkAssistNumber(metrics.total3d, 3),
+            totalHorizontal: roundWorkAssistNumber(metrics.totalHorizontal, 3),
+            verticalDelta: roundWorkAssistNumber(metrics.verticalDelta, 3),
+            slopePercent: roundWorkAssistNumber(metrics.slopePercent, 2),
+          };
+        }
+        if (mode === "areaXY") {
+          return {
+            id: Number.isFinite(Number(record.id)) ? Number(record.id) : null,
+            mode,
+            pointCount: Number(metrics.pointCount || 0),
+            areaXY: roundWorkAssistNumber(metrics.areaXY, 3),
+            perimeter: roundWorkAssistNumber(metrics.perimeter, 3),
+          };
+        }
         return {
           id: Number.isFinite(Number(record.id)) ? Number(record.id) : null,
+          mode,
           distance3d: roundWorkAssistNumber(metrics.distance3d, 3),
           horizontalDistance: roundWorkAssistNumber(metrics.horizontalDistance, 3),
           heightDifference: roundWorkAssistNumber(metrics.heightDifference, 3),
+          slopePercent: roundWorkAssistNumber(metrics.slopePercent, 2),
           dx: roundWorkAssistNumber(metrics.dx, 3),
           dy: roundWorkAssistNumber(metrics.dy, 3),
           dz: roundWorkAssistNumber(metrics.dz, 3),
@@ -10681,6 +10783,24 @@
       function calculateMeasurementMetrics(startPoint, endPoint) {
         const start = getMeasurementPointCoordinates(startPoint);
         const end = getMeasurementPointCoordinates(endPoint);
+        const segment = calculateMeasurementSegmentMetrics(start, end);
+
+        return {
+          mode: "distance",
+          start,
+          end,
+          ...segment,
+          heightDifference: Math.abs(segment.dz),
+          slopePercent: calculateSlopePercent(
+            segment.dz,
+            segment.horizontalDistance,
+          ),
+        };
+      }
+
+      function calculateMeasurementSegmentMetrics(startPoint, endPoint) {
+        const start = getMeasurementPointCoordinates(startPoint);
+        const end = getMeasurementPointCoordinates(endPoint);
         const dx = end.x - start.x;
         const dy = end.y - start.y;
         const dz = end.z - start.z;
@@ -10695,7 +10815,80 @@
           dz,
           distance3d,
           horizontalDistance,
-          heightDifference: Math.abs(dz),
+        };
+      }
+
+      function calculateSlopePercent(verticalDelta, horizontalDistance) {
+        const dz = Number(verticalDelta);
+        const horizontal = Number(horizontalDistance);
+        if (!Number.isFinite(dz) || !Number.isFinite(horizontal) || horizontal === 0) {
+          return null;
+        }
+        return (dz / horizontal) * 100;
+      }
+
+      function getMeasurementSourcePoints(points = []) {
+        if (!Array.isArray(points) || points.length === 0) {
+          throw new Error("計測点が不足しています");
+        }
+        return points.map(getMeasurementPointCoordinates);
+      }
+
+      function calculatePolylineMeasurementMetrics(points = []) {
+        const sourcePoints = getMeasurementSourcePoints(points);
+        if (sourcePoints.length < 2) {
+          throw new Error("折れ線計測には2点以上が必要です");
+        }
+        const segments = [];
+        for (let i = 1; i < sourcePoints.length; i += 1) {
+          segments.push(
+            calculateMeasurementSegmentMetrics(sourcePoints[i - 1], sourcePoints[i]),
+          );
+        }
+        const total3d = segments.reduce((sum, segment) => sum + segment.distance3d, 0);
+        const totalHorizontal = segments.reduce(
+          (sum, segment) => sum + segment.horizontalDistance,
+          0,
+        );
+        const verticalDelta =
+          sourcePoints[sourcePoints.length - 1].z - sourcePoints[0].z;
+
+        return {
+          mode: "polyline",
+          points: sourcePoints,
+          pointCount: sourcePoints.length,
+          segmentCount: segments.length,
+          segments,
+          total3d,
+          totalHorizontal,
+          verticalDelta,
+          slopePercent: calculateSlopePercent(verticalDelta, totalHorizontal),
+        };
+      }
+
+      function calculateAreaXYMeasurementMetrics(points = []) {
+        const sourcePoints = getMeasurementSourcePoints(points);
+        if (sourcePoints.length < 3) {
+          throw new Error("面積計測には3点以上が必要です");
+        }
+        let signedArea = 0;
+        let perimeter = 0;
+        for (let i = 0; i < sourcePoints.length; i += 1) {
+          const current = sourcePoints[i];
+          const next = sourcePoints[(i + 1) % sourcePoints.length];
+          signedArea += current.x * next.y - next.x * current.y;
+          const dx = next.x - current.x;
+          const dy = next.y - current.y;
+          perimeter += Math.sqrt(dx * dx + dy * dy);
+        }
+
+        return {
+          mode: "areaXY",
+          points: sourcePoints,
+          pointCount: sourcePoints.length,
+          areaXY: Math.abs(signedArea) / 2,
+          signedAreaXY: signedArea / 2,
+          perimeter,
         };
       }
 
@@ -10705,17 +10898,71 @@
         return `${numeric.toFixed(3)} m相当`;
       }
 
+      function formatMeasurementAreaValue(value) {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return "-";
+        return `${numeric.toFixed(3)} m²相当`;
+      }
+
+      function formatMeasurementPercentValue(value) {
+        if (value === null || value === undefined) return "-";
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return "-";
+        return `${numeric >= 0 ? "+" : ""}${numeric.toFixed(2)} %`;
+      }
+
+      function resolveMeasurementSlopePercent(metrics) {
+        if (metrics?.slopePercent === null) return null;
+        if (Number.isFinite(Number(metrics?.slopePercent))) {
+          return Number(metrics.slopePercent);
+        }
+        return calculateSlopePercent(metrics?.dz, metrics?.horizontalDistance);
+      }
+
+      function formatMeasurementCsvNumber(value, digits = 3) {
+        if (value === null || value === undefined) return "";
+        const numeric = Number(value);
+        return Number.isFinite(numeric) ? numeric.toFixed(digits) : "";
+      }
+
       function formatMeasurementCoordinate(value) {
         const numeric = Number(value);
         return Number.isFinite(numeric) ? numeric.toFixed(3) : "-";
       }
 
       function formatMeasurementResult(metrics) {
+        const mode = metrics?.mode || "distance";
+        if (mode === "polyline") {
+          return {
+            summary: formatMeasurementValue(metrics.total3d),
+            rows: [
+              ["点数", `${metrics.pointCount || 0}`],
+              ["区間数", `${metrics.segmentCount || 0}`],
+              ["累計3D距離", formatMeasurementValue(metrics.total3d)],
+              ["累計水平距離", formatMeasurementValue(metrics.totalHorizontal)],
+              ["始点終点高低差", formatMeasurementValue(metrics.verticalDelta)],
+              ["平均勾配", formatMeasurementPercentValue(metrics.slopePercent)],
+            ],
+            note: MEASUREMENT_NOTE,
+          };
+        }
+        if (mode === "areaXY") {
+          return {
+            summary: formatMeasurementAreaValue(metrics.areaXY),
+            rows: [
+              ["点数", `${metrics.pointCount || 0}`],
+              ["XY投影面積", formatMeasurementAreaValue(metrics.areaXY)],
+              ["周長", formatMeasurementValue(metrics.perimeter)],
+            ],
+            note: `${MEASUREMENT_NOTE} ${MEASUREMENT_AREA_NOTE}`,
+          };
+        }
         return {
           summary: formatMeasurementValue(metrics.distance3d),
           rows: [
             ["水平距離", formatMeasurementValue(metrics.horizontalDistance)],
             ["高さ差", formatMeasurementValue(metrics.heightDifference)],
+            ["勾配", formatMeasurementPercentValue(resolveMeasurementSlopePercent(metrics))],
             ["dX", formatMeasurementValue(metrics.dx)],
             ["dY", formatMeasurementValue(metrics.dy)],
             ["dZ", formatMeasurementValue(metrics.dz)],
@@ -10726,7 +10973,25 @@
 
       function formatMeasurementCopyText(metrics) {
         const formatted = formatMeasurementResult(metrics);
+        const mode = metrics?.mode || "distance";
+        if (mode === "polyline") {
+          return [
+            `モード: 折れ線`,
+            `累計3D距離: ${formatted.summary}`,
+            ...formatted.rows.map(([label, value]) => `${label}: ${value}`),
+            formatted.note,
+          ].join("\n");
+        }
+        if (mode === "areaXY") {
+          return [
+            `モード: 面積`,
+            `面積: ${formatted.summary}`,
+            ...formatted.rows.map(([label, value]) => `${label}: ${value}`),
+            formatted.note,
+          ].join("\n");
+        }
         return [
+          `モード: 距離`,
           `距離: ${formatted.summary}`,
           ...formatted.rows.map(([label, value]) => `${label}: ${value}`),
           `点1 元LAS座標: X=${formatMeasurementCoordinate(metrics.start?.x)}, Y=${formatMeasurementCoordinate(metrics.start?.y)}, Z=${formatMeasurementCoordinate(metrics.start?.z)}`,
@@ -10735,15 +11000,87 @@
         ].join("\n");
       }
 
+      function formatMeasurementCsvText(metrics) {
+        const mode = metrics?.mode || "distance";
+        if (mode === "polyline") {
+          return [
+            "mode,pointCount,segmentCount,total3d,totalHorizontal,verticalDelta,slopePercent",
+            [
+              "polyline",
+              metrics.pointCount || 0,
+              metrics.segmentCount || 0,
+              formatMeasurementCsvNumber(metrics.total3d),
+              formatMeasurementCsvNumber(metrics.totalHorizontal),
+              formatMeasurementCsvNumber(metrics.verticalDelta),
+              formatMeasurementCsvNumber(metrics.slopePercent, 2),
+            ].join(","),
+          ].join("\n");
+        }
+        if (mode === "areaXY") {
+          return [
+            "mode,pointCount,areaXY,perimeter",
+            [
+              "areaXY",
+              metrics.pointCount || 0,
+              formatMeasurementCsvNumber(metrics.areaXY),
+              formatMeasurementCsvNumber(metrics.perimeter),
+            ].join(","),
+          ].join("\n");
+        }
+        return [
+          "mode,distance3d,horizontal,dz,slopePercent,dx,dy",
+          [
+            "distance",
+            formatMeasurementCsvNumber(metrics.distance3d),
+            formatMeasurementCsvNumber(metrics.horizontalDistance),
+            formatMeasurementCsvNumber(metrics.dz),
+            formatMeasurementCsvNumber(resolveMeasurementSlopePercent(metrics), 2),
+            formatMeasurementCsvNumber(metrics.dx),
+            formatMeasurementCsvNumber(metrics.dy),
+          ].join(","),
+        ].join("\n");
+      }
+
       function createMeasurementRecord(id, startPoint, endPoint, helperGroup = null) {
         const metrics = calculateMeasurementMetrics(startPoint, endPoint);
         return {
           id,
+          mode: "distance",
+          points: [startPoint, endPoint],
           startPoint,
           endPoint,
           metrics,
           helperGroup,
         };
+      }
+
+      function createMeasurementRecordFromPoints(
+        id,
+        mode,
+        points,
+        helperGroup = null,
+      ) {
+        const safeMode = MEASUREMENT_MODES[mode] ? mode : "distance";
+        let metrics;
+        if (safeMode === "polyline") {
+          metrics = calculatePolylineMeasurementMetrics(points);
+        } else if (safeMode === "areaXY") {
+          metrics = calculateAreaXYMeasurementMetrics(points);
+        } else {
+          metrics = calculateMeasurementMetrics(points[0], points[1]);
+        }
+        const record = {
+          id,
+          mode: safeMode,
+          points: Array.isArray(points) ? [...points] : [],
+          metrics,
+          helperGroup,
+        };
+        if (safeMode === "distance") {
+          record.startPoint = points[0];
+          record.endPoint = points[1];
+        }
+        return record;
       }
 
       function appendMeasurementRecord(history, record, limit = MEASUREMENT_HISTORY_LIMIT) {
@@ -10809,6 +11146,16 @@
         }
         disposeObject3D(measurementState.helperGroup);
         measurementState.helperGroup = null;
+        if (
+          measurementState.draftHelperGroup &&
+          measurementState.draftHelperGroup.parent
+        ) {
+          measurementState.draftHelperGroup.parent.remove(
+            measurementState.draftHelperGroup,
+          );
+        }
+        disposeObject3D(measurementState.draftHelperGroup);
+        measurementState.draftHelperGroup = null;
       }
 
       function syncLatestMeasurementResult() {
@@ -10821,6 +11168,7 @@
       function resetMeasurementDraft() {
         measurementState.selectedPoints = [];
         measurementState.pointerDown = null;
+        clearMeasurementDraftHelper();
       }
 
       function getMeasurementPinVisualSpec(role) {
@@ -10906,26 +11254,112 @@
         return marker;
       }
 
+      function clearMeasurementDraftHelper() {
+        if (
+          measurementState.draftHelperGroup &&
+          measurementState.draftHelperGroup.parent
+        ) {
+          measurementState.draftHelperGroup.parent.remove(
+            measurementState.draftHelperGroup,
+          );
+        }
+        disposeObject3D(measurementState.draftHelperGroup);
+        measurementState.draftHelperGroup = null;
+      }
+
+      function createMeasurementLineObject(points, mode = "distance") {
+        if (!THREE.BufferGeometry || !THREE.Line || !THREE.LineBasicMaterial) {
+          return null;
+        }
+        const displayPoints = (points || [])
+          .map((point) => point?.display)
+          .filter(Boolean);
+        if (displayPoints.length < 2) return null;
+        const geometry = new THREE.BufferGeometry().setFromPoints(displayPoints);
+        const material = new THREE.LineBasicMaterial({
+          color: mode === "areaXY" ? 0x22c55e : 0xfacc15,
+          depthTest: false,
+          opacity: mode === "areaXY" ? 0.82 : 0.88,
+          transparent: true,
+        });
+        const LineCtor =
+          mode === "areaXY" && THREE.LineLoop ? THREE.LineLoop : THREE.Line;
+        const line = new LineCtor(geometry, material);
+        line.name = "measurementLine";
+        line.renderOrder = 20;
+        return line;
+      }
+
+      function renderMeasurementDraftHelper() {
+        clearMeasurementDraftHelper();
+        if (!scene || !THREE.Group || measurementState.selectedPoints.length === 0) {
+          return null;
+        }
+        const group = new THREE.Group();
+        group.name = "measurementDraftHelper";
+        group.userData = {
+          mode: measurementState.mode,
+          draft: true,
+        };
+        measurementState.selectedPoints.forEach((point, index) => {
+          const isLast = index === measurementState.selectedPoints.length - 1;
+          const marker = createMeasurementPinMarker(point, isLast ? "end" : "start");
+          if (marker) {
+            marker.material.opacity = 0.86;
+            marker.userData.baseOpacity = 0.86;
+            group.add(marker);
+          }
+        });
+        const line = createMeasurementLineObject(
+          measurementState.selectedPoints,
+          measurementState.mode,
+        );
+        if (line) {
+          line.material.opacity = 0.52;
+          group.add(line);
+        }
+        scene.add(group);
+        measurementState.draftHelperGroup = group;
+        return group;
+      }
+
       function formatMeasurementHistoryItem(record) {
         const formatted = formatMeasurementResult(record.metrics);
-        return {
-          id: record.id,
-          distance: formatted.summary,
-          meta: [
+        const mode = record.mode || record.metrics?.mode || "distance";
+        const modeLabel = MEASUREMENT_MODES[mode]?.label || "距離";
+        let meta = "";
+        if (mode === "polyline") {
+          meta = [
+            `${record.metrics.pointCount || 0}点`,
+            `水平 ${formatMeasurementValue(record.metrics.totalHorizontal)}`,
+            `平均勾配 ${formatMeasurementPercentValue(record.metrics.slopePercent)}`,
+          ].join(" / ");
+        } else if (mode === "areaXY") {
+          meta = [
+            `${record.metrics.pointCount || 0}点`,
+            `周長 ${formatMeasurementValue(record.metrics.perimeter)}`,
+            MEASUREMENT_AREA_NOTE,
+          ].join(" / ");
+        } else {
+          meta = [
             `水平 ${formatMeasurementValue(record.metrics.horizontalDistance)}`,
             `高さ差 ${formatMeasurementValue(record.metrics.heightDifference)}`,
-          ].join(" / "),
+            `勾配 ${formatMeasurementPercentValue(record.metrics.slopePercent)}`,
+          ].join(" / ");
+        }
+        return {
+          id: record.id,
+          distance: `${modeLabel} ${formatted.summary}`,
+          meta,
         };
       }
 
       function formatMeasurementTooltip(record) {
         if (!record?.metrics) return null;
+        const formatted = formatMeasurementResult(record.metrics);
         return {
-          title: `#${record.id} ${formatMeasurementValue(record.metrics.distance3d)}`,
-          rows: [
-            ["水平", formatMeasurementValue(record.metrics.horizontalDistance)],
-            ["高さ差", formatMeasurementValue(record.metrics.heightDifference)],
-          ],
+          title: `#${record.id} ${formatted.summary}`,
+          rows: formatted.rows.slice(0, 4),
         };
       }
 
@@ -11128,6 +11562,63 @@
         refreshMeasurementRecordActive();
       }
 
+      function getActiveOrLatestMeasurementRecord() {
+        const activeId = getActiveMeasurementRecordId(measurementState);
+        return (
+          findMeasurementRecordById(activeId) ||
+          measurementState.history[measurementState.history.length - 1] ||
+          null
+        );
+      }
+
+      function canFinalizeMeasurementDraft(
+        mode = measurementState.mode,
+        points = measurementState.selectedPoints,
+      ) {
+        const config = MEASUREMENT_MODES[mode] || MEASUREMENT_MODES.distance;
+        return Array.isArray(points) && points.length >= config.minPoints;
+      }
+
+      function setMeasurementMode(mode) {
+        if (!MEASUREMENT_MODES[mode]) return;
+        measurementState.mode = mode;
+        resetMeasurementDraft();
+        updateMeasurementUi();
+      }
+
+      window.setMeasurementMode = setMeasurementMode;
+
+      function finalizeMeasurementDraft() {
+        if (!canFinalizeMeasurementDraft()) {
+          const label = MEASUREMENT_MODES[measurementState.mode]?.label || "計測";
+          showToast(`${label}を確定できる点数が足りません`, "warning");
+          updateMeasurementUi();
+          return null;
+        }
+        const record = addMeasurementRecord(
+          measurementState.selectedPoints,
+          measurementState.mode,
+        );
+        resetMeasurementDraft();
+        updateMeasurementUi();
+        showToast("計測結果を履歴に追加しました", "success");
+        return record;
+      }
+
+      window.finalizeMeasurementDraft = finalizeMeasurementDraft;
+
+      function undoMeasurementPoint() {
+        if (measurementState.selectedPoints.length === 0) {
+          showToast("取り消せる計測点がありません", "warning");
+          return;
+        }
+        measurementState.selectedPoints.pop();
+        renderMeasurementDraftHelper();
+        updateMeasurementUi();
+      }
+
+      window.undoMeasurementPoint = undoMeasurementPoint;
+
       function renderMeasurementHistoryList() {
         const historyPanel = document.getElementById("measurementHistory");
         const count = document.getElementById("measurementHistoryCount");
@@ -11156,6 +11647,7 @@
               `<div class="measurement-history-distance">#${item.id} ${escapeHtml(item.distance)}</div>`,
               '<div class="measurement-history-actions">',
               `<button class="control-btn" onclick="event.stopPropagation(); copyMeasurementRecord(${item.id})">コピー</button>`,
+              `<button class="control-btn" onclick="event.stopPropagation(); copyMeasurementRecordCsv(${item.id})">CSV</button>`,
               `<button class="control-btn" onclick="event.stopPropagation(); deleteMeasurementRecord(${item.id})">削除</button>`,
               "</div>",
               "</div>",
@@ -11174,6 +11666,8 @@
         const summary = document.getElementById("measurementSummary");
         const results = document.getElementById("measurementResults");
         const note = document.getElementById("measurementNote");
+        const finalizeBtn = document.getElementById("measurementFinalizeBtn");
+        const undoBtn = document.getElementById("measurementUndoBtn");
 
         if (toggleBtn) {
           toggleBtn.classList.toggle("active", measurementState.enabled);
@@ -11184,6 +11678,21 @@
               : "距離計測を開始";
           }
         }
+        Object.keys(MEASUREMENT_MODES).forEach((mode) => {
+          const id =
+            mode === "distance"
+              ? "measurementModeDistance"
+              : mode === "polyline"
+                ? "measurementModePolyline"
+                : "measurementModeAreaXY";
+          const button = document.getElementById(id);
+          if (!button) return;
+          button.classList.toggle("active", measurementState.mode === mode);
+          button.setAttribute(
+            "aria-pressed",
+            measurementState.mode === mode ? "true" : "false",
+          );
+        });
         if (panel) {
           panel.classList.toggle(
             "visible",
@@ -11192,22 +11701,45 @@
               measurementState.selectedPoints.length > 0
           );
         }
-        if (note) note.textContent = MEASUREMENT_NOTE;
+        if (finalizeBtn) {
+          finalizeBtn.disabled = !canFinalizeMeasurementDraft();
+        }
+        if (undoBtn) {
+          undoBtn.disabled = measurementState.selectedPoints.length === 0;
+        }
+        if (note) {
+          note.textContent =
+            measurementState.mode === "areaXY"
+              ? `${MEASUREMENT_NOTE} ${MEASUREMENT_AREA_NOTE}`
+              : MEASUREMENT_NOTE;
+        }
 
         if (status) {
-          if (measurementState.selectedPoints.length === 1) {
-            status.textContent = "2点目をクリック";
+          const pointCount = measurementState.selectedPoints.length;
+          const modeLabel =
+            MEASUREMENT_MODES[measurementState.mode]?.label || "計測";
+          if (pointCount > 0) {
+            if (measurementState.mode === "distance") {
+              status.textContent = "2点目をクリック";
+            } else if (canFinalizeMeasurementDraft()) {
+              status.textContent =
+                `${modeLabel}: ${pointCount}点選択中。確定またはEnterで保存`;
+            } else {
+              status.textContent =
+                `${modeLabel}: ${pointCount}点選択中。点を追加してください`;
+            }
           } else if (measurementState.lastResult) {
             status.textContent = measurementState.enabled
-              ? "計測完了。次の1点目をクリック"
+              ? `${modeLabel}: 1点目をクリック`
               : "計測完了";
           } else {
-            status.textContent = "1点目をクリック";
+            status.textContent = `${modeLabel}: 1点目をクリック`;
           }
         }
 
-        const formatted = measurementState.lastResult
-          ? formatMeasurementResult(measurementState.lastResult)
+        const activeRecord = getActiveOrLatestMeasurementRecord();
+        const formatted = activeRecord?.metrics
+          ? formatMeasurementResult(activeRecord.metrics)
           : null;
         if (summary) summary.textContent = formatted?.summary || "-";
         if (results) {
@@ -11323,58 +11855,54 @@
         };
       }
 
-      function createMeasurementHelpers(startPoint, endPoint, metrics, id = null) {
+      function createMeasurementHelpers(points, metrics, id = null) {
         if (!scene || !THREE.Group) return null;
+        const safePoints = Array.isArray(points) ? points : [];
+        if (safePoints.length === 0) return null;
+        const mode = metrics?.mode || "distance";
 
         const group = new THREE.Group();
         group.name = "measurementHelper";
         group.userData = {
           measurementId: id,
+          mode,
         };
 
-        [
-          ["start", startPoint],
-          ["end", endPoint],
-        ].forEach(([role, point]) => {
+        safePoints.forEach((point, index) => {
+          const role = index === safePoints.length - 1 ? "end" : "start";
           const marker = createMeasurementPinMarker(point, role);
           if (marker) group.add(marker);
         });
 
-        const lineGeometry = new THREE.BufferGeometry().setFromPoints([
-          startPoint.display,
-          endPoint.display,
-        ]);
-        const line = new THREE.Line(
-          lineGeometry,
-          new THREE.LineBasicMaterial({
-            color: 0xfacc15,
-            depthTest: false,
-            opacity: 0.88,
-            transparent: true,
-          }),
-        );
-        line.name = "measurementLine";
-        line.renderOrder = 20;
-        line.userData = {
-          measurementId: id,
-        };
-        group.add(line);
+        const line = createMeasurementLineObject(safePoints, mode);
+        if (line) {
+          line.userData = {
+            measurementId: id,
+            mode,
+          };
+          group.add(line);
+        }
 
         scene.add(group);
         return group;
       }
 
-      function addMeasurementRecord(startPoint, endPoint) {
+      function addMeasurementRecord(points, mode = measurementState.mode) {
         const id = measurementState.nextRecordId++;
-        const metrics = calculateMeasurementMetrics(startPoint, endPoint);
-        const helperGroup = createMeasurementHelpers(startPoint, endPoint, metrics, id);
-        const record = {
+        const safePoints = Array.isArray(points) ? [...points] : [];
+        const metrics =
+          mode === "polyline"
+            ? calculatePolylineMeasurementMetrics(safePoints)
+            : mode === "areaXY"
+              ? calculateAreaXYMeasurementMetrics(safePoints)
+              : calculateMeasurementMetrics(safePoints[0], safePoints[1]);
+        const helperGroup = createMeasurementHelpers(safePoints, metrics, id);
+        const record = createMeasurementRecordFromPoints(
           id,
-          startPoint,
-          endPoint,
-          metrics,
+          metrics.mode || mode,
+          safePoints,
           helperGroup,
-        };
+        );
         const next = appendMeasurementRecord(
           measurementState.history,
           record,
@@ -11406,10 +11934,14 @@
 
       function handleMeasurementPoint(point) {
         measurementState.selectedPoints.push(point);
+        renderMeasurementDraftHelper();
 
-        if (measurementState.selectedPoints.length === 2) {
-          const [startPoint, endPoint] = measurementState.selectedPoints;
-          addMeasurementRecord(startPoint, endPoint);
+        const modeConfig = MEASUREMENT_MODES[measurementState.mode];
+        if (
+          modeConfig?.autoFinalizePointCount &&
+          measurementState.selectedPoints.length === modeConfig.autoFinalizePointCount
+        ) {
+          addMeasurementRecord(measurementState.selectedPoints, measurementState.mode);
           resetMeasurementDraft();
         }
 
@@ -11423,15 +11955,21 @@
 
         renderer.domElement.addEventListener("pointerdown", (event) => {
           if (!measurementState.enabled) return;
+          if (event.button !== 0 || event.isPrimary === false) return;
           measurementState.pointerDown = {
             x: event.clientX,
             y: event.clientY,
             time: performance.now(),
+            button: event.button,
           };
         });
 
         renderer.domElement.addEventListener("pointerup", (event) => {
           if (!measurementState.enabled || !measurementState.pointerDown) return;
+          if (event.button !== 0 || event.isPrimary === false) {
+            measurementState.pointerDown = null;
+            return;
+          }
           const start = measurementState.pointerDown;
           measurementState.pointerDown = null;
           const moved = Math.hypot(
@@ -11469,13 +12007,14 @@
       };
 
       window.copyMeasurementResult = async function () {
-        if (!measurementState.lastResult) {
+        const record = getActiveOrLatestMeasurementRecord();
+        if (!record?.metrics) {
           showToast("コピーできる計測結果がありません", "warning");
           return;
         }
-        const text = formatMeasurementCopyText(measurementState.lastResult);
+        const text = formatMeasurementCopyText(record.metrics);
         try {
-          await navigator.clipboard.writeText(text);
+          await copyTextToClipboard(text);
           showToast("計測結果をコピーしました", "success");
         } catch (error) {
           console.warn("計測結果のコピーに失敗:", error);
@@ -11494,10 +12033,45 @@
         }
         const text = formatMeasurementCopyText(record.metrics);
         try {
-          await navigator.clipboard.writeText(text);
+          await copyTextToClipboard(text);
           showToast("計測履歴をコピーしました", "success");
         } catch (error) {
           console.warn("計測履歴のコピーに失敗:", error);
+          showToast("コピーに失敗しました", "warning");
+        }
+      };
+
+      window.copyMeasurementResultCsv = async function () {
+        const record = getActiveOrLatestMeasurementRecord();
+        if (!record?.metrics) {
+          showToast("CSVコピーできる計測結果がありません", "warning");
+          return;
+        }
+        const text = formatMeasurementCsvText(record.metrics);
+        try {
+          await copyTextToClipboard(text);
+          showToast("計測CSVをコピーしました", "success");
+        } catch (error) {
+          console.warn("計測CSVのコピーに失敗:", error);
+          showToast("コピーに失敗しました", "warning");
+        }
+      };
+
+      window.copyMeasurementRecordCsv = async function (id) {
+        const numericId = Number(id);
+        const record = measurementState.history.find(
+          (item) => item.id === numericId,
+        );
+        if (!record) {
+          showToast("CSVコピーできる計測履歴がありません", "warning");
+          return;
+        }
+        const text = formatMeasurementCsvText(record.metrics);
+        try {
+          await copyTextToClipboard(text);
+          showToast("計測履歴CSVをコピーしました", "success");
+        } catch (error) {
+          console.warn("計測履歴CSVのコピーに失敗:", error);
           showToast("コピーに失敗しました", "warning");
         }
       };
@@ -18320,9 +18894,20 @@
       // ========================================
 
       // キーボード押下処理
+      function isEditableKeyboardTarget(target) {
+        if (!target) return false;
+        const tagName = String(target.tagName || "").toUpperCase();
+        return (
+          tagName === "INPUT" ||
+          tagName === "TEXTAREA" ||
+          tagName === "SELECT" ||
+          target.isContentEditable
+        );
+      }
+
       function handleKeyDown(event) {
         // 読み込み中はEscapeのみ通過させる
-        if (event.target.tagName === "INPUT") return;
+        if (isEditableKeyboardTarget(event.target)) return;
         if (workflowState.step === "loading") {
           if (event.key.toLowerCase() === "escape") {
             window.cancelLoading();
@@ -18332,6 +18917,20 @@
         if (workflowState.step !== "complete") return;
 
         const key = event.key.toLowerCase();
+        if (measurementState.enabled && event.ctrlKey && key === "z") {
+          undoMeasurementPoint();
+          event.preventDefault();
+          return;
+        }
+        if (
+          measurementState.enabled &&
+          key === "enter" &&
+          measurementState.mode !== "distance"
+        ) {
+          finalizeMeasurementDraft();
+          event.preventDefault();
+          return;
+        }
 
         switch (key) {
           // WASD移動
@@ -18422,6 +19021,12 @@
             // 読み込み中はキャンセル
             if (workflowState.step === "loading") {
               window.cancelLoading();
+              break;
+            }
+            if (measurementState.enabled && measurementState.selectedPoints.length > 0) {
+              resetMeasurementDraft();
+              updateMeasurementUi();
+              event.preventDefault();
               break;
             }
             if (measurementState.enabled) {
@@ -19352,11 +19957,17 @@
           readFileIntoWasmHeap,
           decompressLAZFile,
           updateEstimations,
+          calculateSlopePercent,
           calculateMeasurementMetrics,
+          calculatePolylineMeasurementMetrics,
+          calculateAreaXYMeasurementMetrics,
           formatMeasurementResult,
           formatMeasurementCopyText,
+          formatMeasurementCsvText,
           createMeasurementRecord,
+          createMeasurementRecordFromPoints,
           appendMeasurementRecord,
+          canFinalizeMeasurementDraft,
           formatMeasurementHistoryItem,
           formatMeasurementTooltip,
           getMeasurementPinVisualSpec,

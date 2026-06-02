@@ -3333,6 +3333,86 @@ test("calculateMeasurementMetrics reports source-coordinate distances", () => {
   expect(metrics.distance3d).toBe(13);
   expect(metrics.horizontalDistance).toBe(5);
   expect(metrics.heightDifference).toBe(12);
+  expect(metrics.slopePercent).toBe(240);
+});
+
+test("calculateMeasurementMetrics returns null slope for zero horizontal distance", () => {
+  const context = createContext();
+
+  const metrics = vm.runInContext(
+    `
+      window.__pcwTestApi.calculateMeasurementMetrics(
+        { source: { x: 10, y: 20, z: 30 } },
+        { source: { x: 10, y: 20, z: 42 } }
+      )
+    `,
+    context,
+  );
+
+  expect(metrics.horizontalDistance).toBe(0);
+  expect(metrics.dz).toBe(12);
+  expect(metrics.slopePercent).toBeNull();
+
+  const result = vm.runInContext(
+    `
+      window.__pcwTestApi.formatMeasurementResult({
+        mode: "distance",
+        distance3d: 12,
+        horizontalDistance: 0,
+        heightDifference: 12,
+        dx: 0,
+        dy: 0,
+        dz: 12,
+        slopePercent: null,
+      })
+    `,
+    context,
+  );
+  expect(result.rows).toContainEqual(["勾配", "-"]);
+});
+
+test("calculatePolylineMeasurementMetrics summarizes total length and slope", () => {
+  const context = createContext();
+
+  const metrics = vm.runInContext(
+    `
+      window.__pcwTestApi.calculatePolylineMeasurementMetrics([
+        { source: { x: 0, y: 0, z: 0 } },
+        { source: { x: 3, y: 4, z: 0 } },
+        { source: { x: 3, y: 4, z: 12 } },
+      ])
+    `,
+    context,
+  );
+
+  expect(metrics.mode).toBe("polyline");
+  expect(metrics.pointCount).toBe(3);
+  expect(metrics.segmentCount).toBe(2);
+  expect(metrics.total3d).toBe(17);
+  expect(metrics.totalHorizontal).toBe(5);
+  expect(metrics.verticalDelta).toBe(12);
+  expect(metrics.slopePercent).toBe(240);
+});
+
+test("calculateAreaXYMeasurementMetrics reports projected area and perimeter", () => {
+  const context = createContext();
+
+  const metrics = vm.runInContext(
+    `
+      window.__pcwTestApi.calculateAreaXYMeasurementMetrics([
+        { source: { x: 0, y: 0, z: 0 } },
+        { source: { x: 10, y: 0, z: 0 } },
+        { source: { x: 10, y: 5, z: 0 } },
+        { source: { x: 0, y: 5, z: 0 } },
+      ])
+    `,
+    context,
+  );
+
+  expect(metrics.mode).toBe("areaXY");
+  expect(metrics.pointCount).toBe(4);
+  expect(metrics.areaXY).toBe(50);
+  expect(metrics.perimeter).toBe(30);
 });
 
 test("calculateMeasurementMetrics rejects invalid source coordinates", () => {
@@ -3372,6 +3452,7 @@ test("formatMeasurementResult labels displayed-point measurement and meter-equiv
   expect(result.note).toContain("表示点への計測");
   expect(result.note).toContain("元データの座標単位に依存");
   expect(result.rows).toContainEqual(["高さ差", "12.000 m相当"]);
+  expect(result.rows).toContainEqual(["勾配", "+240.00 %"]);
   expect(result.rows).toContainEqual(["dZ", "12.000 m相当"]);
 });
 
@@ -3389,15 +3470,72 @@ test("formatMeasurementCopyText includes source point coordinates", () => {
         dx: 3,
         dy: 4,
         dz: 12,
+        slopePercent: 240,
       })
     `,
     context,
   );
 
+  expect(text).toContain("モード: 距離");
   expect(text).toContain("距離: 13.000 m相当");
+  expect(text).toContain("勾配: +240.00 %");
   expect(text).toContain("点1 元LAS座標: X=10.000, Y=20.000, Z=30.000");
   expect(text).toContain("点2 元LAS座標: X=13.000, Y=24.000, Z=42.000");
   expect(text).toContain("表示点への計測");
+});
+
+test("formatMeasurementCsvText emits mode-specific CSV summaries", () => {
+  const context = createContext();
+
+  const csv = vm.runInContext(
+    `
+      [
+        window.__pcwTestApi.formatMeasurementCsvText({
+          mode: "distance",
+          distance3d: 13,
+          horizontalDistance: 5,
+          dz: 12,
+          slopePercent: 240,
+          dx: 3,
+          dy: 4,
+        }),
+        window.__pcwTestApi.formatMeasurementCsvText({
+          mode: "polyline",
+          pointCount: 3,
+          segmentCount: 2,
+          total3d: 17,
+          totalHorizontal: 5,
+          verticalDelta: 12,
+          slopePercent: 240,
+        }),
+        window.__pcwTestApi.formatMeasurementCsvText({
+          mode: "areaXY",
+          pointCount: 4,
+          areaXY: 50,
+          perimeter: 30,
+        }),
+      ]
+    `,
+    context,
+  );
+
+  expect(csv[0]).toBe(
+    [
+      "mode,distance3d,horizontal,dz,slopePercent,dx,dy",
+      "distance,13.000,5.000,12.000,240.00,3.000,4.000",
+    ].join("\n"),
+  );
+  expect(csv[1]).toBe(
+    [
+      "mode,pointCount,segmentCount,total3d,totalHorizontal,verticalDelta,slopePercent",
+      "polyline,3,2,17.000,5.000,12.000,240.00",
+    ].join("\n"),
+  );
+  expect(csv[2]).toBe(
+    ["mode,pointCount,areaXY,perimeter", "areaXY,4,50.000,30.000"].join(
+      "\n",
+    ),
+  );
 });
 
 test("createMeasurementRecord stores metrics for measurement history", () => {
@@ -3415,6 +3553,8 @@ test("createMeasurementRecord stores metrics for measurement history", () => {
   );
 
   expect(record.id).toBe(7);
+  expect(record.mode).toBe("distance");
+  expect(record.points).toHaveLength(2);
   expect(record.metrics.distance3d).toBe(13);
   expect(record.metrics.horizontalDistance).toBe(5);
   expect(record.metrics.heightDifference).toBe(12);
@@ -3448,6 +3588,7 @@ test("formatMeasurementHistoryItem summarizes distance and deltas", () => {
           dx: 3,
           dy: 4,
           dz: 12,
+          slopePercent: 240,
         },
       })
     `,
@@ -3455,9 +3596,10 @@ test("formatMeasurementHistoryItem summarizes distance and deltas", () => {
   );
 
   expect(item.id).toBe(4);
-  expect(item.distance).toBe("13.000 m相当");
+  expect(item.distance).toBe("距離 13.000 m相当");
   expect(item.meta).toContain("水平 5.000 m相当");
   expect(item.meta).toContain("高さ差 12.000 m相当");
+  expect(item.meta).toContain("勾配 +240.00 %");
 });
 
 test("measurement pin visual specs use fixed screen-size markers", () => {
@@ -3502,7 +3644,7 @@ test("formatMeasurementTooltip summarizes the hovered history record", () => {
   );
 
   expect(tooltip.title).toBe("#4 13.000 m相当");
-  expect(tooltip.rows).toContainEqual(["水平", "5.000 m相当"]);
+  expect(tooltip.rows).toContainEqual(["水平距離", "5.000 m相当"]);
   expect(tooltip.rows).toContainEqual(["高さ差", "12.000 m相当"]);
 });
 

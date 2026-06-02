@@ -65,7 +65,7 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 - Work-assist memo copy for the current view, section, measurement, diagnostics, and acquisition-quality state without file names or point payloads
 - Load quality selection (`LOW` / `MEDIUM` / `HIGH` / `MAX`)
 - 3D and 2D view switching
-- Displayed-point distance measurement history with 3D distance, horizontal distance, height difference, and source-coordinate dX / dY / dZ
+- Displayed-point measurement history for two-point distance, slope %, polyline totals, XY projected area, and source-coordinate dX / dY / dZ
 - Elevation and classification color modes
 - Slice view and 2D cross-section inspection
 - Automatic classification assistance and classification quality review
@@ -97,7 +97,7 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 - Local LAS uses header-first preview plus chunked point-data reads. Local LAZ uses chunked transfers into WASM. URL loading and some compatibility paths may still use full `ArrayBuffer` reads.
 - Raising file-size acceptance does not change the actual render cap. Confirm `source points / rendered points / render ratio` in the quality screen and statistics panel.
 - Automatic classification is a height-based assist feature, not a survey-grade classification guarantee.
-- Distance measurement snaps to displayed sampled points, not the full source LAS/LAZ point set. Up to 20 measurement results are kept as temporary in-page history. Distances are shown as `m-equivalent` and depend on the source coordinate unit. The load profile includes the extra source-coordinate memory kept for measurement.
+- Measurement snaps to displayed sampled points, not the full source LAS/LAZ point set. Up to 20 distance, polyline, and XY projected area results are kept as temporary in-page history. Distances and areas are shown as `m-equivalent` / `m²-equivalent` and depend on the source coordinate unit. Area mode reports XY projected area, not slope surface area. The load profile includes the extra source-coordinate memory kept for measurement.
 
 ## Repository Layout
 

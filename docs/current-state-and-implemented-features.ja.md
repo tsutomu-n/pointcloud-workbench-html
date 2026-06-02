@@ -4,9 +4,6 @@
 
 確認対象:
 
-- repository: `/home/tn/projects/pointcloud-workbench`
-- branch: `main`
-- HEAD: `43ce16d`
 - 主成果物: `PointCloudWorkbench.html`
 - 確認時の作業ツリー: 文書追加前は `git status --short --branch` が `## main...origin/main`
 

@@ -69,7 +69,7 @@
 - 現在表示、断面、計測、診断、取得品質を、file name や point payload なしでコピーする Work-assist memo copy
 - 読み込み品質選択（`LOW` / `MEDIUM` / `HIGH` / `MAX`）
 - 3D / 2D 表示切替
-- 表示点ベースの距離計測履歴（3D距離、水平距離、高低差、元座標 dX / dY / dZ）
+- 表示点ベースの測定履歴（2点距離、勾配%、折れ線の累計距離、XY投影面積、元座標 dX / dY / dZ）
 - 標高色分けと分類色分け
 - スライス表示と 2D 断面確認
 - 自動分類補助と分類品質レビュー
@@ -101,7 +101,7 @@
 - ローカル LAS は header-first preview と chunked point-data reads を使います。ローカル LAZ は chunked transfers into WASM を使います。URL 読み込みや一部互換経路では full `ArrayBuffer` read を使う場合があります。
 - ファイルサイズ上限を拡張しても、実際の render cap は変わりません。品質画面と統計パネルで `source points / rendered points / render ratio` を確認してください。
 - 自動分類は高さベースの補助機能であり、測量級分類を保証しません。
-- 距離計測は元 LAS/LAZ の全点ではなく、表示中のサンプリング点に snap します。最大20件の計測結果をページ内の一時履歴として保持します。距離は `m-equivalent` として表示され、元データの座標単位に依存します。読み込み profile には計測用に保持する source-coordinate memory も含まれます。
+- 測定は元 LAS/LAZ の全点ではなく、表示中のサンプリング点に snap します。2点距離、折れ線、XY投影面積の結果を最大20件までページ内の一時履歴として保持します。距離と面積は `m-equivalent` / `m²-equivalent` として表示され、元データの座標単位に依存します。面積はXY投影面積であり、斜面表面積ではありません。読み込み profile には計測用に保持する source-coordinate memory も含まれます。
 
 ## リポジトリ構成
 
