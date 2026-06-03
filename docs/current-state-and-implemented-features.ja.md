@@ -1,7 +1,7 @@
 # PointCloudWorkbench 現状と実装済み機能
 
 作成日時: 2026-06-02_10:25 JST
-更新日時: 2026-06-02_11:41 JST
+更新日時: 2026-06-03_09:06 JST
 
 確認対象:
 
@@ -79,12 +79,13 @@ bunx --package playwright node scripts/e2e/run-diagnostics-smoke.mjs --las sampl
 
 ファイル選択画面では、現在の runtime capability を表示します。
 表示対象は、実行モード、ブラウザー種別、renderer 候補、Worker 可否、isolation 状態などです。
+これは実行環境の能力表示であり、現行実装が Worker parser や WebGPU renderer を使っているという意味ではありません。
 
 実装上の mode は大きく次の分類です。
 
 - Portable Online Mode: ローカルの HTML をブラウザーで開く想定
 - Hosted High Performance Mode: HTTPS 配信、COOP/COEP などの header を利用できる配信想定
-- Fallback Mode: renderer や Worker などの能力が不足した場合の劣化表示
+- Fallback Mode: renderer やブラウザー能力に制約がある場合の劣化表示
 
 ## 4. 入力と読み込み
 
@@ -463,6 +464,9 @@ warning:
 - `autoClassify`
 - `copyCrsInquiryText`
 - `copyWorkAssistSnapshot`
+- `setDensityOverlayEnabled`
+- `toggleDensityOverlay`
+- `setDensityOverlayOpacity`
 
 ### 12.4 開発・保守補助
 
@@ -515,6 +519,10 @@ CDN 未到達または SRI 不一致の場合、緯度経度リンク生成は�
 - telemetry
 - 自動ログ収集
 - DB 書き込み
+- Worker parser
+- WebGPU renderer
+- OPFS / IndexedDB キャッシュ
+- アプリ内の地図タイル表示
 - ユーザー管理
 - セッション管理
 - 点群 payload の自動共有

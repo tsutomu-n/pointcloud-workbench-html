@@ -11,6 +11,7 @@ PointCloudWorkbenchは、サーバー負荷を最小化し、重い処理をユ�
 ## Runtime Modes
 
 アプリのファイル選択画面には、現在のRuntime Mode、ブラウザー種別、Renderer候補、Worker可否、Isolation状態を表示します。
+これらは実行環境の能力表示であり、現行実装が Worker parser や WebGPU renderer を使っているという意味ではありません。
 
 ### 1. Portable Online Mode
 
@@ -19,11 +20,11 @@ PointCloudWorkbenchは、サーバー負荷を最小化し、重い処理をユ�
 特徴:
 
 - ネットワーク接続が必要
-- JS/WASM/Workerを取得する
+- JS/WASM と描画・解析に必要なCDN依存を取得する
 - 点群ファイルはアップロードしない
 - SharedArrayBufferは前提にしない
 - Transferable ArrayBufferを使う
-- WebGPUまたはWebGL2で描画する
+- Three.js / WebGLRenderer で描画する
 
 ### 2. Hosted High Performance Mode
 
@@ -40,12 +41,11 @@ Cloudflare Pages上のURLで開くモードです。
 
 ### 3. Fallback Mode
 
-WebGPUやWorkerが使えない場合の劣化モードです。
+renderer やブラウザー能力に制約がある場合の劣化表示です。
 
 特徴:
 
 - WebGL2 fallback
-- Single Worker fallback
 - Main thread低速処理 fallback
 - 機能制限をUIに表示する
 

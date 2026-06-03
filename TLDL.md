@@ -6,7 +6,7 @@ PointCloudWorkbench は `PointCloudWorkbench.html` 単体で動作する、ブ�
 基本方針は Client-Max / Server-Zero で、点群本体はサーバーに送信せずローカル処理します。  
 一方で実行時は CDN 依存（`three.js` / `laz-perf` / `simple-statistics` / `Flatbush` / `simpleheat`）があり、完全オフライン常用には向きません。  
 品質面は Bun テスト、README 整合チェック、Server-Zero ガードで守られています。  
-主要な注意点は、Chrome/Edge 限定、LAZ 2GB 上限、LAS 2-3GB 実験帯、計測は表示点ベース、CRS は診断のみで変換しないことです。  
+主要な注意点は、Chrome/Edge 限定、LAZ 2GB 上限、LAS 2-3GB 実験帯、Measurement v2 と Density Heatmap Overlay は表示点ベース、CRS の緯度経度変換は対応 JGD2011 平面直角座標系の bounds 中心に限ることです。
 この文書は、現状事実・誤謬リスク・改善余地を1ファイルで判断できるようにまとめた監査用サマリです。
 
 ## 2. リポジトリの事実
@@ -27,7 +27,7 @@ PointCloudWorkbench は `PointCloudWorkbench.html` 単体で動作する、ブ�
 
 ### 2.3 実行モデル
 
-- Server-Zero: API/DB/Worker/Functions なし（通常経路）
+- Server-Zero: API/DB/Functions なし（通常経路）。Worker parser は現行実装済み機能ではない
 - 点群データ: ブラウザー内ローカル処理（アップロードなし）
 - 依存: CDN 配信の `three.js` / `laz-perf` / `simple-statistics` / `Flatbush` / `simpleheat`
 - ブラウザー方針: Chrome / Edge のみ対象（Safari / Firefox 非対応）
@@ -38,17 +38,18 @@ PointCloudWorkbench は `PointCloudWorkbench.html` 単体で動作する、ブ�
 
 - `.las` / `.laz` のローカル読み込みと可視化
 - 3D/2D 切替、スライス確認、分類確認、統計確認
-- 表示点ベース距離計測（履歴付き）
+- 表示点ベース Measurement v2（距離、折れ線、XY投影面積、履歴付き）
 - LAS/LAZ ヘッダ・VLR・EVLR 由来 CRS 診断（WKT/GeoTIFF/EPSG 候補）
 - 取得品質の参考診断（point format、return、scan angle、GPS time の availability / sampled coverage）
 - 表示点ベースの地表候補アシスト（class 2 ground 優先、薄い場合は下位パーセンタイル推定）
+- 表示点ベースの Density Heatmap Overlay（ON/OFF、透明度、凡例）
 - 手動コピー型診断レポートと作業メモ出力（自動送信なし）
 
 ### 3.2 できないこと（仕様境界）
 
 - 点群のサーバーアップロード
 - サーバー側点群処理、DB 書き込み、テレメトリ自動送信
-- CRS 座標変換、EPSG DB 照会、ジオコーディング、外部 CRS 解決
+- 全点 CRS 座標変換、EPSG DB 照会、ジオコーディング、外部 CRS 解決、アプリ内地図タイル表示
 - 測量成果DTM、設計面、切盛根拠、納品用地形モデルの生成
 - 勾配、土量、2時期差分、ROI保存、視点保存、workspace import/export
 - Safari/Firefox 対応

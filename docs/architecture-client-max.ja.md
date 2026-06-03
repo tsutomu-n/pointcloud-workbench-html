@@ -39,9 +39,9 @@ Cloudflare側の禁止事項:
 - ReaderRegistryによる形式別Reader選択
 - PointCloudDataによる点数、bounds、scale/offset基準の整理
 - Preflight
-- Worker解析
+- 現行実装ではメインスレッド中心のLAS/LAZ解析
 - WebAssembly LAZ展開
-- WebGPU/WebGL2描画
+- Three.js / WebGLRenderer による描画
 - 統計
 - 分類補助
 - CRS診断
@@ -52,7 +52,9 @@ Cloudflare側の禁止事項:
 - スクリーンショット
 - 手動診断情報コピー
 - 手動作業メモコピー
-- OPFS/IndexedDBキャッシュ
+
+現行実装では、Worker解析、WebGPU renderer、OPFS/IndexedDBキャッシュは実装済み機能ではありません。
+ファイル選択画面の Worker、renderer、isolation 表示は、主にブラウザー能力と配信条件の確認用です。
 
 診断情報コピーと作業メモコピーは、ユーザーが明示的に押した場合だけクリップボードへJSONを作ります。
 ローカルファイル名、LAS/LAZ本体、点群payload、元LAS座標配列は含めません。

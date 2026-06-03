@@ -74,7 +74,7 @@ test("CRS diagnostics docs keep local-only and no-conversion boundaries aligned"
   const ref = read("PointCloudWorkbench_実装リファレンス.md");
   const index = read("PointCloudWorkbench_ドキュメント索引.md");
   const spec = read("docs/crs-diagnostics-final-spec.ja.md");
-  const plan = read("docs/crs-diagnostics-implementation-plan.ja.md");
+  const plan = read("docs/archive/crs-diagnostics-implementation-plan.ja.md");
 
   expect(readme).toContain("CRS diagnostics");
   expect(readme).toContain("coordinate conversion");

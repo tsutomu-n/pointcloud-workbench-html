@@ -43,6 +43,7 @@ class 2 ground または下位パーセンタイル推定から、表示点ベ�
 ## WebGPU
 
 ブラウザーでGPUを使うための新しいAPIです。
+現行の PointCloudWorkbench では WebGPU renderer は実装済み機能ではありません。
 
 ## WebGL2
 
@@ -51,6 +52,7 @@ class 2 ground または下位パーセンタイル推定から、表示点ベ�
 ## Worker
 
 ブラウザー内のバックグラウンドスレッドです。
+現行の PointCloudWorkbench では通常経路の点群解析に Worker を使いません。
 
 ## WASM
 
@@ -59,6 +61,7 @@ WebAssemblyの略です。C/C++/Rust等で作った高速処理をブラウザ�
 ## OPFS
 
 Origin Private File Systemの略です。ブラウザー内の高速なローカル保存領域です。
+現行の PointCloudWorkbench では OPFS キャッシュや IndexedDB キャッシュは実装済み機能ではありません。
 
 ## Client-Max / Server-Zero
 

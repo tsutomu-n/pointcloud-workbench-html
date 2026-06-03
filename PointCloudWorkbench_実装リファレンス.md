@@ -1,13 +1,13 @@
 # PointCloudWorkbench 実装リファレンス
 
-更新日時: 2026-06-02_11:41 JST
+更新日時: 2026-06-03_09:06 JST
 
 ## 1. スコープ
 - 対象: `PointCloudWorkbench.html`（単一ファイル構成）
 - 目的: 保守・改修時に、関数群と状態遷移を追跡しやすくする
 
 ### 1.1 誤読防止の前提
-- 本書の行番号リンクは更新日時時点で検証済み。`PointCloudWorkbench.html` 変更後は再確認が必要。
+- 関数位置は `PointCloudWorkbench.html` 内の関数名検索を正とする。固定行番号リンクは編集でずれやすいため、主要表では最小限にする。
 - 言語セレクタは `setAppLanguage()` により `document.documentElement.lang` と `localStorage.viewerLanguage` を更新する。UI文言の動的翻訳機構はない。
 - ファイルサイズ拒否条件は LAS は `3GB超`、LAZ は `2GB超` を拒否します。
 - LAS は `3GBちょうど`、LAZ は `2GBちょうど` まで `critical` 扱いで継続可能です。
@@ -340,87 +340,87 @@
 
 ### 18.1 初期化・監視
 
-| 関数/クラス | 行番号リンク | 役割 |
+| 関数/クラス | 探し方 | 役割 |
 |---|---|---|
-| `ErrorTracker` | [PointCloudWorkbench.html#L5115](PointCloudWorkbench.html#L5115) | グローバル例外収集と表示 |
-| `MemoryMonitor` | [PointCloudWorkbench.html#L5444](PointCloudWorkbench.html#L5444) | メモリ圧監視と自動最適化 |
-| `PerformanceMonitor` | [PointCloudWorkbench.html#L5620](PointCloudWorkbench.html#L5620) | FPS監視と性能劣化対応 |
-| `CompatibilityChecker` | [PointCloudWorkbench.html#L5848](PointCloudWorkbench.html#L5848) | ブラウザ機能互換チェック |
-| `init` | [PointCloudWorkbench.html#L8966](PointCloudWorkbench.html#L8966) | 全体初期化エントリ |
-| `safeInitializeComponents` | [PointCloudWorkbench.html#L8987](PointCloudWorkbench.html#L8987) | 初期化タスクの順次実行 |
-| `setupEventListeners` | [PointCloudWorkbench.html#L9224](PointCloudWorkbench.html#L9224) | UI/キー/離脱イベント登録 |
-| `cleanupEventListeners` | [PointCloudWorkbench.html#L9503](PointCloudWorkbench.html#L9503) | 登録済みイベント一括解除 |
-| `setAppLanguage` | [PointCloudWorkbench.html#L8906](PointCloudWorkbench.html#L8906) | 表示言語反映と保存 |
-| `initializeLanguagePreference` | [PointCloudWorkbench.html#L8924](PointCloudWorkbench.html#L8924) | 言語設定の復元 |
+| `ErrorTracker` | 関数名/クラス名検索 | グローバル例外収集と表示 |
+| `MemoryMonitor` | 関数名/クラス名検索 | メモリ圧監視と自動最適化 |
+| `PerformanceMonitor` | 関数名/クラス名検索 | FPS監視と性能劣化対応 |
+| `CompatibilityChecker` | 関数名/クラス名検索 | ブラウザ機能互換チェック |
+| `init` | 関数名検索 | 全体初期化エントリ |
+| `safeInitializeComponents` | 関数名検索 | 初期化タスクの順次実行 |
+| `setupEventListeners` | 関数名検索 | UI/キー/離脱イベント登録 |
+| `cleanupEventListeners` | 関数名検索 | 登録済みイベント一括解除 |
+| `setAppLanguage` | 関数名検索 | 表示言語反映と保存 |
+| `initializeLanguagePreference` | 関数名検索 | 言語設定の復元 |
 
 ### 18.2 ワークフロー・入力
 
-| 関数 | 行番号リンク | 役割 |
+| 関数 | 探し方 | 役割 |
 |---|---|---|
-| `handleFileSelect` | [PointCloudWorkbench.html#L9533](PointCloudWorkbench.html#L9533) | ファイル選択ハンドラ |
-| `checkFileSizeLimits` | [PointCloudWorkbench.html#L9753](PointCloudWorkbench.html#L9753) | サイズ判定の共通関数 |
-| `updateFileInfo` | [PointCloudWorkbench.html#L9950](PointCloudWorkbench.html#L9950) | ファイル情報UI更新 |
-| `proceedToQualitySelection` | [PointCloudWorkbench.html#L10075](PointCloudWorkbench.html#L10075) | 品質設定画面遷移 |
-| `applyQualitySelection` | [PointCloudWorkbench.html#L10145](PointCloudWorkbench.html#L10145) | 品質状態の正規化反映 |
-| `startDataLoading` | [PointCloudWorkbench.html#L11356](PointCloudWorkbench.html#L11356) | 読み込み開始制御 |
-| `updateLoadingInfo` | [PointCloudWorkbench.html#L11517](PointCloudWorkbench.html#L11517) | 読み込み情報表示更新 |
-| `updateProgress` | [PointCloudWorkbench.html#L11823](PointCloudWorkbench.html#L11823) | 進捗バー・文言更新 |
-| `loadLASFileActual` | [PointCloudWorkbench.html#L11876](PointCloudWorkbench.html#L11876) | 実データ読み込み本体 |
-| `completeLoading` | [PointCloudWorkbench.html#L14991](PointCloudWorkbench.html#L14991) | 完了状態へ遷移 |
+| `handleFileSelect` | 関数名検索 | ファイル選択ハンドラ |
+| `checkFileSizeLimits` | 関数名検索 | サイズ判定の共通関数 |
+| `updateFileInfo` | 関数名検索 | ファイル情報UI更新 |
+| `proceedToQualitySelection` | 関数名検索 | 品質設定画面遷移 |
+| `applyQualitySelection` | 関数名検索 | 品質状態の正規化反映 |
+| `startDataLoading` | 関数名検索 | 読み込み開始制御 |
+| `updateLoadingInfo` | 関数名検索 | 読み込み情報表示更新 |
+| `updateProgress` | 関数名検索 | 進捗バー・文言更新 |
+| `loadLASFileActual` | 関数名検索 | 実データ読み込み本体 |
+| `completeLoading` | 関数名検索 | 完了状態へ遷移 |
 
 ### 18.3 データ処理・描画
 
-| 関数 | 行番号リンク | 役割 |
+| 関数 | 探し方 | 役割 |
 |---|---|---|
-| `setupPointCloudVisualization` | [PointCloudWorkbench.html#L12179](PointCloudWorkbench.html#L12179) | 点群表示セットアップ |
-| `parseLASHeaderFromFile` | [PointCloudWorkbench.html#L12320](PointCloudWorkbench.html#L12320) | LASヘッダー先読み |
-| `parseLASPointsFromFile` | [PointCloudWorkbench.html#L12430](PointCloudWorkbench.html#L12430) | LAS chunked 点抽出 |
-| `readFileIntoWasmHeap` | [PointCloudWorkbench.html#L12569](PointCloudWorkbench.html#L12569) | LAZ chunked 転送 |
-| `buildPointCloudFromLASFile` | [PointCloudWorkbench.html#L12693](PointCloudWorkbench.html#L12693) | LAS ローカル読込入口 |
-| `buildPointCloudFromLAZFile` | [PointCloudWorkbench.html#L12728](PointCloudWorkbench.html#L12728) | LAZ ローカル読込入口 |
-| `buildPointCloudFromArrayBuffer` | [PointCloudWorkbench.html#L12757](PointCloudWorkbench.html#L12757) | 読み込み共通処理入口 |
-| `parsePointsFromArrayBuffer` | [PointCloudWorkbench.html#L12776](PointCloudWorkbench.html#L12776) | LAS/LAZ 分岐パーサ |
-| `parseLASHeader` | [PointCloudWorkbench.html#L13417](PointCloudWorkbench.html#L13417) | LASヘッダー解析 |
-| `parseLASPoints` | [PointCloudWorkbench.html#L13594](PointCloudWorkbench.html#L13594) | LAS点群抽出 |
-| `decompressLAZFile` | [PointCloudWorkbench.html#L13670](PointCloudWorkbench.html#L13670) | LAZ解凍処理 |
-| `decodeLAZPoint` | [PointCloudWorkbench.html#L13997](PointCloudWorkbench.html#L13997) | LAZ 1点デコード |
-| `createPointCloudFromData` | [PointCloudWorkbench.html#L14086](PointCloudWorkbench.html#L14086) | BufferGeometry生成 |
-| `downsamplePointCloud` | [PointCloudWorkbench.html#L14486](PointCloudWorkbench.html#L14486) | 点群間引き最適化 |
-| `adjustCameraToData` | [PointCloudWorkbench.html#L14689](PointCloudWorkbench.html#L14689) | データ範囲フィット |
-| `animate` | [PointCloudWorkbench.html#L17350](PointCloudWorkbench.html#L17350) | メインレンダーループ |
-| `updateStatsDisplay` | [PointCloudWorkbench.html#L18557](PointCloudWorkbench.html#L18557) | 統計UI再計算 |
+| `setupPointCloudVisualization` | 関数名検索 | 点群表示セットアップ |
+| `parseLASHeaderFromFile` | 関数名検索 | LASヘッダー先読み |
+| `parseLASPointsFromFile` | 関数名検索 | LAS chunked 点抽出 |
+| `readFileIntoWasmHeap` | 関数名検索 | LAZ chunked 転送 |
+| `buildPointCloudFromLASFile` | 関数名検索 | LAS ローカル読込入口 |
+| `buildPointCloudFromLAZFile` | 関数名検索 | LAZ ローカル読込入口 |
+| `buildPointCloudFromArrayBuffer` | 関数名検索 | 読み込み共通処理入口 |
+| `parsePointsFromArrayBuffer` | 関数名検索 | LAS/LAZ 分岐パーサ |
+| `parseLASHeader` | 関数名検索 | LASヘッダー解析 |
+| `parseLASPoints` | 関数名検索 | LAS点群抽出 |
+| `decompressLAZFile` | 関数名検索 | LAZ解凍処理 |
+| `decodeLAZPoint` | 関数名検索 | LAZ 1点デコード |
+| `createPointCloudFromData` | 関数名検索 | BufferGeometry生成 |
+| `downsamplePointCloud` | 関数名検索 | 点群間引き最適化 |
+| `adjustCameraToData` | 関数名検索 | データ範囲フィット |
+| `animate` | 関数名検索 | メインレンダーループ |
+| `updateStatsDisplay` | 関数名検索 | 統計UI再計算 |
 
 ### 18.4 表示モード・UI補助
 
-| 関数 | 行番号リンク | 役割 |
+| 関数 | 探し方 | 役割 |
 |---|---|---|
-| `set2DView` | [PointCloudWorkbench.html#L14868](PointCloudWorkbench.html#L14868) | 2Dビュー切替 |
-| `exit2DView` | [PointCloudWorkbench.html#L14878](PointCloudWorkbench.html#L14878) | 3Dビュー復帰 |
-| `setColorMode` | [PointCloudWorkbench.html#L15222](PointCloudWorkbench.html#L15222) | 色分けモード切替入口 |
-| `executeColorModeChange` | [PointCloudWorkbench.html#L15240](PointCloudWorkbench.html#L15240) | 色バッファ再計算 |
-| `updateLegendPanel` | [PointCloudWorkbench.html#L15568](PointCloudWorkbench.html#L15568) | 分類凡例の描画 |
-| `determineBestVisualizationMode` | [PointCloudWorkbench.html#L15673](PointCloudWorkbench.html#L15673) | 推奨表示モード判定 |
-| `toggleSlicing` | [PointCloudWorkbench.html#L15886](PointCloudWorkbench.html#L15886) | スライスUI切替 |
-| `updateSlicing` | [PointCloudWorkbench.html#L15968](PointCloudWorkbench.html#L15968) | スライス面更新 |
-| `autoClassify` | [PointCloudWorkbench.html#L17333](PointCloudWorkbench.html#L17333) | 自動分類起動 |
-| `detectSystemPerformanceBackground` | [PointCloudWorkbench.html#L17404](PointCloudWorkbench.html#L17404) | バックグラウンド性能検出 |
-| `getRecommendationAnalysis` | [PointCloudWorkbench.html#L17588](PointCloudWorkbench.html#L17588) | 品質推奨計算 |
-| `updatePerformanceDisplay` | [PointCloudWorkbench.html#L17675](PointCloudWorkbench.html#L17675) | 性能情報UI反映 |
-| `showConfirmDialog` | [PointCloudWorkbench.html#L17753](PointCloudWorkbench.html#L17753) | 確認ダイアログ |
-| `showToast` | [PointCloudWorkbench.html#L17864](PointCloudWorkbench.html#L17864) | 通知表示 |
-| `handleKeyDown` | [PointCloudWorkbench.html#L17956](PointCloudWorkbench.html#L17956) | キー入力処理 |
-| `handleKeyUp` | [PointCloudWorkbench.html#L18085](PointCloudWorkbench.html#L18085) | キー入力解放処理 |
-| `performFinalCleanup` | [PointCloudWorkbench.html#L18891](PointCloudWorkbench.html#L18891) | 終了時クリーンアップ |
+| `set2DView` | 関数名検索 | 2Dビュー切替 |
+| `exit2DView` | 関数名検索 | 3Dビュー復帰 |
+| `setColorMode` | 関数名検索 | 色分けモード切替入口 |
+| `executeColorModeChange` | 関数名検索 | 色バッファ再計算 |
+| `updateLegendPanel` | 関数名検索 | 分類凡例の描画 |
+| `determineBestVisualizationMode` | 関数名検索 | 推奨表示モード判定 |
+| `toggleSlicing` | 関数名検索 | スライスUI切替 |
+| `updateSlicing` | 関数名検索 | スライス面更新 |
+| `autoClassify` | 関数名検索 | 自動分類起動 |
+| `detectSystemPerformanceBackground` | 関数名検索 | バックグラウンド性能検出 |
+| `getRecommendationAnalysis` | 関数名検索 | 品質推奨計算 |
+| `updatePerformanceDisplay` | 関数名検索 | 性能情報UI反映 |
+| `showConfirmDialog` | 関数名検索 | 確認ダイアログ |
+| `showToast` | 関数名検索 | 通知表示 |
+| `handleKeyDown` | 関数名検索 | キー入力処理 |
+| `handleKeyUp` | 関数名検索 | キー入力解放処理 |
+| `performFinalCleanup` | 関数名検索 | 終了時クリーンアップ |
 
 ## 19. ユースケース別トレース（事実ベース）
 
 ### 19.1 大容量ファイル（500MB超）を選択したとき
 
 処理経路:
-1. `handleFileSelect` → [PointCloudWorkbench.html#L9533](PointCloudWorkbench.html#L9533)
-2. `checkFileSizeLimits` → [PointCloudWorkbench.html#L9753](PointCloudWorkbench.html#L9753)
-3. `showFileSizeWarning`（必要時）→ [PointCloudWorkbench.html#L9868](PointCloudWorkbench.html#L9868)
-4. `updateFileInfo` → [PointCloudWorkbench.html#L9950](PointCloudWorkbench.html#L9950)
+1. `handleFileSelect`
+2. `checkFileSizeLimits`
+3. `showFileSizeWarning`（必要時）
+4. `updateFileInfo`
 
 ポイント:
 - 閾値帯は `FILE_SIZE_THRESHOLDS`、形式別上限は `FILE_SIZE_LIMITS` で管理
@@ -429,9 +429,9 @@
 ### 19.2 形式別上限を読み込み開始時に防ぐ
 
 処理経路:
-1. `startDataLoading` → [PointCloudWorkbench.html#L11356](PointCloudWorkbench.html#L11356)
-2. `loadLASFileActual` → [PointCloudWorkbench.html#L11876](PointCloudWorkbench.html#L11876)
-3. `checkFileSizeLimits` 再評価 → [PointCloudWorkbench.html#L9753](PointCloudWorkbench.html#L9753)
+1. `startDataLoading`
+2. `loadLASFileActual`
+3. `checkFileSizeLimits` 再評価
 4. `canProceed=false` なら警告表示して例外終了
 
 ポイント:
@@ -441,13 +441,13 @@
 ### 19.3 通常読み込み（LAS/LAZ）から表示完了まで
 
 処理経路:
-1. `startDataLoading` → [PointCloudWorkbench.html#L11356](PointCloudWorkbench.html#L11356)
-2. `loadLASFileActual` → [PointCloudWorkbench.html#L11876](PointCloudWorkbench.html#L11876)
-3. `buildPointCloudFromLASFile` / `buildPointCloudFromLAZFile` / `buildPointCloudFromArrayBuffer` → [PointCloudWorkbench.html#L12693](PointCloudWorkbench.html#L12693) / [PointCloudWorkbench.html#L12728](PointCloudWorkbench.html#L12728) / [PointCloudWorkbench.html#L12757](PointCloudWorkbench.html#L12757)
-4. `parseLASPointsFromFile` / `readFileIntoWasmHeap` / `parsePointsFromArrayBuffer` → [PointCloudWorkbench.html#L12430](PointCloudWorkbench.html#L12430) / [PointCloudWorkbench.html#L12569](PointCloudWorkbench.html#L12569) / [PointCloudWorkbench.html#L12776](PointCloudWorkbench.html#L12776)
-5. `parseLASPoints` or `decompressLAZFile` → [PointCloudWorkbench.html#L13594](PointCloudWorkbench.html#L13594) / [PointCloudWorkbench.html#L13670](PointCloudWorkbench.html#L13670)
-6. `createPointCloudFromData` → [PointCloudWorkbench.html#L14086](PointCloudWorkbench.html#L14086)
-7. `completeLoading` → [PointCloudWorkbench.html#L14991](PointCloudWorkbench.html#L14991)
+1. `startDataLoading`
+2. `loadLASFileActual`
+3. `buildPointCloudFromLASFile` / `buildPointCloudFromLAZFile` / `buildPointCloudFromArrayBuffer`
+4. `parseLASPointsFromFile` / `readFileIntoWasmHeap` / `parsePointsFromArrayBuffer`
+5. `parseLASPoints` or `decompressLAZFile`
+6. `createPointCloudFromData`
+7. `completeLoading`
 
 ポイント:
 - 点群生成後に `statsData` と分類統計が更新される
@@ -457,9 +457,9 @@
 ### 19.4 分類表示の品質が低いデータ
 
 処理経路:
-1. `setColorMode('classification')` → [PointCloudWorkbench.html#L15222](PointCloudWorkbench.html#L15222)
-2. `executeColorModeChange` → [PointCloudWorkbench.html#L15240](PointCloudWorkbench.html#L15240)
-3. `getClassificationStats` / `updateLegendPanel` → [PointCloudWorkbench.html#L15398](PointCloudWorkbench.html#L15398) / [PointCloudWorkbench.html#L15568](PointCloudWorkbench.html#L15568)
+1. `setColorMode('classification')`
+2. `executeColorModeChange`
+3. `getClassificationStats` / `updateLegendPanel`
 
 ポイント:
 - 未分類率や分類種類数に基づいて警告ログとUI指標が更新される
@@ -469,9 +469,9 @@
 ### 19.5 メモリ圧・性能低下時の自動劣化
 
 処理経路:
-1. `MemoryMonitor.checkMemoryUsage`（定期）→ [PointCloudWorkbench.html#L5444](PointCloudWorkbench.html#L5444)
-2. `PerformanceMonitor.checkPerformance`（FPS監視）→ [PointCloudWorkbench.html#L5620](PointCloudWorkbench.html#L5620)
-3. `downsamplePointCloud` → [PointCloudWorkbench.html#L14486](PointCloudWorkbench.html#L14486)
+1. `MemoryMonitor.checkMemoryUsage`（定期）
+2. `PerformanceMonitor.checkPerformance`（FPS監視）
+3. `downsamplePointCloud`
 
 ポイント:
 - 条件を満たすと点数間引き・点サイズ調整が行われる

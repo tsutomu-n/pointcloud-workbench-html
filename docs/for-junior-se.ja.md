@@ -27,7 +27,8 @@ LASは非圧縮、LAZは圧縮版です。
 ### Worker
 
 ブラウザー内の別スレッドです。
-重いLAS/LAZ解析をUIから分離して、画面が固まりにくくします。
+一般には重い処理をUIから分離して画面を固まりにくくする仕組みです。
+ただし、現行の PointCloudWorkbench は通常経路で Worker 点群解析を行いません。
 
 ### ReaderRegistry
 
@@ -36,7 +37,8 @@ LASは非圧縮、LAZは圧縮版です。
 ### WebGPU / WebGL2
 
 ブラウザーでGPU描画を行うための仕組みです。
-WebGPUが使える場合は高速化できます。
+現行の PointCloudWorkbench は Three.js / WebGLRenderer で描画します。
+WebGPU は実装済み renderer ではなく、将来候補または環境能力の説明として扱います。
 
 ### Client-Max / Server-Zero
 
