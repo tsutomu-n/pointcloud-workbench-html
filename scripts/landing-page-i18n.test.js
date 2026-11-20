@@ -73,7 +73,6 @@ function buildContext({
   const nodes = {
     landingLanguageSelector: selector,
     themeToggle,
-    heroLanguageNote: textNode(),
   };
 
   const documentElement = {
@@ -201,18 +200,16 @@ test("landing page normalizes language tags and persists only explicit selection
   expect(harness.nodes.landingLanguageSelector.value).toBe("en");
 });
 
-test("landing app links preserve the sample and use English for Chinese", () => {
-  const { api, appLinks, nodes } = loadApi();
+test("landing app links preserve the sample and all three languages", () => {
+  const { api, appLinks } = loadApi();
 
-  for (const [language, expectedLang] of [["zh", "en"], ["ja", "ja"], ["en", "en"]]) {
+  for (const language of ["zh", "ja", "en"]) {
     api.applyLandingLanguage(language);
     const routes = appLinks.map(({ href }) => href);
     expect(routes).toEqual([
-      `./PointCloudWorkbench.html?lang=${expectedLang}&demo=river`,
-      `./PointCloudWorkbench.html?lang=${expectedLang}`,
+      `./PointCloudWorkbench.html?lang=${language}&demo=river`,
+      `./PointCloudWorkbench.html?lang=${language}`,
     ]);
-    expect(nodes.heroLanguageNote.hidden).toBe(language !== "zh");
-    if (language === "zh") expect(nodes.heroLanguageNote.textContent).toBe("应用将以英文打开。");
   }
 });
 

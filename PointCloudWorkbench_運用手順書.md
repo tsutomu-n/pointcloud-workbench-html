@@ -1,6 +1,6 @@
 # PointCloudWorkbench 運用手順書
 
-timestamp="2026-11-20(金)_23:45 JST"
+timestamp="2026-11-21(土)_00:00 JST"
 
 ## 1. 目的
 - 対象: `PointCloudWorkbench.html` の日常運用を担当する利用者、運用担当、検証担当
@@ -19,7 +19,7 @@ timestamp="2026-11-20(金)_23:45 JST"
 ## 3. 起動手順
 1. [公開アプリ](https://tsutomu-n.github.io/pointcloud-workbench-html/PointCloudWorkbench.html?lang=ja)を開く。手元のファイルを処理する場合は、ダウンロードした `PointCloudWorkbench.html` を Chrome または Edge で開く方法もある。
 2. 初期画面で「ファイル選択」パネルが表示されることを確認する
-3. アプリ右上の言語セレクタで日本語または English を選ぶ。主要な操作ラベルやメッセージが切り替わる。中文はランディングページで選べる。
+3. アプリ右上の言語セレクタで日本語・English・中文（簡体字）を選ぶ。ランディングページで選んだ言語はアプリにも引き継がれる。
 4. ファイルなしで試す場合は「河川サンプルを試す」を選ぶ。最初の操作は[クイックスタート](./docs/quickstart.ja.md)を参照。
 
 ## 4. 標準操作フロー

@@ -356,8 +356,7 @@
       }
 
       .hero-desc,
-      .hero-support,
-      .hero-language-note {
+      .hero-support {
         color: var(--color-muted);
       }
 
@@ -406,14 +405,9 @@
         background: var(--color-accent-hover);
       }
 
-      .hero-support,
-      .hero-language-note {
+      .hero-support {
         margin: 0.65rem 0 0;
         font-size: 0.86rem;
-      }
-
-      .hero-language-note {
-        margin-top: 0.25rem;
       }
 
       .hero-slab {
@@ -665,15 +659,14 @@
             <p class="hero-desc" id="heroDesc">Start with a river and bridge sample to explore cross-sections, measurements, and point density.</p>
 
             <div class="trigger-matrix">
-              <a class="terminal-btn primary" href="./PointCloudWorkbench.html?lang=en&amp;demo=river" aria-describedby="heroSupport heroLanguageNote">
+              <a class="terminal-btn primary" href="./PointCloudWorkbench.html?lang=en&amp;demo=river" aria-describedby="heroSupport">
                 <span id="ctaLaunch">Try the river sample</span><span aria-hidden="true">→</span>
               </a>
-              <a class="terminal-btn" href="./PointCloudWorkbench.html?lang=en" aria-describedby="heroSupport heroLanguageNote">
+              <a class="terminal-btn" href="./PointCloudWorkbench.html?lang=en" aria-describedby="heroSupport">
                 <span id="ctaOpenFile">Open LAS / LAZ</span>
               </a>
             </div>
             <p class="hero-support" id="heroSupport">Supported browsers: latest Chrome or Edge.</p>
-            <p class="hero-language-note" id="heroLanguageNote" hidden></p>
           </div>
 
           <figure class="hero-slab">
@@ -940,7 +933,6 @@
           heroLead: "在浏览器中查看和测量 LAS / LAZ 点云。",
           heroDesc: "用河流和桥梁样本查看剖面、测量距离并检查点密度。",
           heroSupport: "支持最新版 Chrome 或 Edge。",
-          heroLanguageNote: "应用将以英文打开。",
           heroSlabLabel: "河流和桥梁合成样本",
           heroSlabPoints: "23,746 个点",
           ctaLaunch: "试用河流样本",
@@ -1121,17 +1113,10 @@
         setLandingHtml("docsNote", copy.docsNote);
         setLandingText("footerLicense", copy.footerLicense);
 
-        const appLanguage = normalized === "zh" ? "en" : normalized;
         for (const link of document.querySelectorAll('a[href^="./PointCloudWorkbench.html"]')) {
           const destination = new URL(link.getAttribute("href"), document.baseURI);
-          destination.searchParams.set("lang", appLanguage);
+          destination.searchParams.set("lang", normalized);
           link.setAttribute("href", `./PointCloudWorkbench.html${destination.search}${destination.hash}`);
-        }
-
-        const languageNote = document.getElementById("heroLanguageNote");
-        if (languageNote) {
-          languageNote.hidden = !copy.heroLanguageNote;
-          languageNote.textContent = copy.heroLanguageNote ?? "";
         }
 
         const themeToggle = document.getElementById("themeToggle");

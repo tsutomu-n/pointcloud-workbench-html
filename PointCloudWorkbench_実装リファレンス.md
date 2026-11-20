@@ -1,6 +1,6 @@
 # PointCloudWorkbench 実装リファレンス
 
-timestamp="2026-11-20(金)_23:35 JST"
+timestamp="2026-11-21(土)_00:00 JST"
 
 ## 1. スコープ
 - 対象: `PointCloudWorkbench.html`（単一ファイル構成）
@@ -8,7 +8,7 @@ timestamp="2026-11-20(金)_23:35 JST"
 
 ### 1.1 誤読防止の前提
 - 関数位置は `PointCloudWorkbench.html` 内の関数名検索を正とする。固定行番号リンクは編集でずれやすいため、主要表では最小限にする。
-- 言語セレクタは `setAppLanguage()` により `document.documentElement.lang` と `localStorage.viewerLanguage` を更新する。`applyAppUiLanguage()` が主要なUI文言を切り替える。アプリは日本語と英語に対応する。起動時は対応する `?lang=` を保存値より優先し、`zh` は英語として扱う。URL指定は保存値を上書きせず、言語セレクタからの変更を保存する。
+- 言語セレクタは `setAppLanguage()` により `document.documentElement.lang` と `localStorage.viewerLanguage` を更新する。`applyAppUiLanguage()` が主要なUI文言を切り替える。アプリは日本語・英語・中国語（簡体字）に対応する。起動時は `?lang=ja`、`?lang=en`、`?lang=zh`（地域タグ付きも可）を保存値より優先する。静的な文言は `appUiStrings`、数値を含む表示は `appUiPatterns` で管理する。URL指定は保存値を上書きせず、言語セレクタからの変更を保存する。
 - ファイルサイズ拒否条件は LAS は `3GB超`、LAZ は `2GB超` を拒否します。
 - LAS は `3GBちょうど`、LAZ は `2GBちょうど` まで `critical` 扱いで継続可能です。
 
