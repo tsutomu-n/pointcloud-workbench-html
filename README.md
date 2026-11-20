@@ -1,6 +1,6 @@
 # PointCloudWorkbench
 
-timestamp="2026-11-20(金)_22:54 JST"
+timestamp="2026-11-20(金)_23:35 JST"
 
 [日本語](./docs/README.ja.md) · [Project website](https://tsutomu-n.github.io/pointcloud-workbench-html/)
 
@@ -10,7 +10,7 @@ Inspect LAS and LAZ point clouds in your browser. Use 3D and 2D views, cross-sec
 
 - [Try the river and bridge sample](https://tsutomu-n.github.io/pointcloud-workbench-html/PointCloudWorkbench.html?lang=en&demo=river) in the latest Chrome or Edge. Open the bridge cross-section, measure between A and B, or use **Explore density** to find the gap on the right bank.
 - [Open your own LAS or LAZ file](https://tsutomu-n.github.io/pointcloud-workbench-html/PointCloudWorkbench.html?lang=en). Select a file, review the estimated memory use and display ratio, then choose a quality preset.
-- On a phone, drag with one finger to rotate in 3D or move in 2D. Pinch to zoom or drag with two fingers to pan. Use **Top / 3D**, **Fit**, and **Tools** above the model.
+- On a phone, drag with one finger to rotate in 3D or move in 2D. Pinch to zoom or drag with two fingers to pan. Use **2D top / 3D**, **Fit**, and **Tools** above the model.
 
 ## What you can inspect
 

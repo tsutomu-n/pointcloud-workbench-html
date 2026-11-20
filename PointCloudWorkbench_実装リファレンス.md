@@ -1,6 +1,6 @@
 # PointCloudWorkbench 実装リファレンス
 
-timestamp="2026-11-20(金)_22:56 JST"
+timestamp="2026-11-20(金)_23:35 JST"
 
 ## 1. スコープ
 - 対象: `PointCloudWorkbench.html`（単一ファイル構成）
@@ -253,8 +253,8 @@ timestamp="2026-11-20(金)_22:56 JST"
 - `window.setDensityOverlayOpacity(value)`
 - `measurementState.mode` は `distance | polyline | areaXY`
 - 距離モードは2点クリックで自動確定し、元LAS基準の `3D距離 / 水平距離 / 高さ差 / 勾配% / dX / dY / dZ` を表示する
-- 折れ線モードは2点以上をクリックし、「確定」または `Enter` で累計3D距離、累計水平距離、始点終点高低差、平均勾配%を保存する
-- 面積モードは3点以上をクリックし、「確定」または `Enter` で source X/Y の shoelace formula によるXY投影面積と周長を保存する。斜面表面積ではない
+- 折れ線モードは2点以上をクリックし、「計測を保存」または `Enter` で累計3D距離、累計水平距離、始点終点高低差、平均勾配%を保存する
+- 面積モードは3点以上をクリックし、「計測を保存」または `Enter` で source X/Y の shoelace formula によるXY投影面積と周長を保存する。斜面表面積ではない
 - 距離と面積は `m相当` / `m²相当` 表示であり、元データの座標単位に依存する
 - `measurementState.history` がページ内の一時履歴を最大20件まで保持する
 - 通常コピーは日本語テキスト、CSVコピーは mode 別のCSV風テキストを出す。Clipboard は `copyTextToClipboard()` 経由で fallback を持つ
@@ -264,9 +264,10 @@ timestamp="2026-11-20(金)_22:56 JST"
 - 履歴行の hover / focus は一時プレビュー、click / Enter / Space は固定選択として対応する3D表示を強調する
 - `Ctrl+Z` は測定中の最後の点を取り消す。`Esc` は測定中の点があれば draft だけ消し、点がなければ計測モードだけ止める。履歴は「計測を全消去」まで残す
 - スライス:
-- `window.toggleSlicing()`
-- `updateSlicing()`
-- `window.show2DSliceView()`
+- `window.toggleSlicing()` は設定欄を開閉する。適用中の切断は維持する
+- `toggleSliceApplication()` は軸・位置・向きを保持して切断を一時解除／再適用する。 `window.resetSlicing()` は設定を初期化する
+- `updateSlicing()` は適用中の軸からクリッピング平面を更新する
+- `window.show2DSliceView()` は適用中の軸に対応する断面を開く
 
 ## 13. イベントとクリーンアップ
 - `setupEventListeners()` で登録したハンドラは `window.eventListeners` に記録

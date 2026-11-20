@@ -2750,8 +2750,11 @@
         display: flex !important;
         align-items: center;
         gap: 8px;
-        justify-content: center;
+        justify-content: flex-start;
+        padding-inline: 12px;
+        min-height: 40px;
       }
+      .ec-right .stats-toggle .chevron-icon { margin-inline-start: auto; }
       .ec-right .stats-grid {
         grid-template-columns: 1fr;
       }
@@ -3058,7 +3061,13 @@
         min-width: 0 !important;
         margin: 0 !important;
         padding: 0 !important;
-        display: block !important;
+        background: none;
+        border: 0;
+        box-shadow: none;
+      }
+      .ec-right .controls.visible {
+        display: grid;
+        gap: 8px;
       }
       .ec-right .slice-panel,
       .ec-right .stats-panel,
@@ -4057,7 +4066,47 @@
       .panel-section-title {
         font-size: clamp(0.75rem, 0.7rem + 0.25vw, 0.8125rem);
       }
+      .tool-section {
+        margin-top: 0;
+      }
+      .tool-section > summary, #guidePanel > summary {
+        box-sizing: border-box;
+        min-height: 40px;
+      }
+      .tool-section > summary {
+        justify-content: flex-start;
+        gap: 8px;
+        cursor: pointer;
+        list-style: none;
+        text-transform: none;
+        letter-spacing: normal;
+      }
+      .tool-section > summary::after {
+        content: "";
+        width: 6px;
+        height: 6px;
+        border: solid currentColor;
+        border-width: 0 1px 1px 0;
+        color: var(--ec-muted);
+        transform: rotate(-45deg);
+        flex: none;
+      }
+      .tool-section > summary > span:first-child { flex: 1; }
+      .tool-section[open] > summary::after { transform: rotate(45deg); }
+      .tool-section:not([open]) > summary { border-bottom: 0; }
+      .tool-section > summary:hover { background: var(--ec-hover); }
+      .tool-section > summary:focus-visible { outline-offset: -2px; }
+      .tool-section > summary .tool-section-status {
+        color: var(--ec-muted);
+        font-size: .75rem;
+        text-align: end;
+      }
+      .tool-section-status:empty { display: none; }
+      .slice-axes { min-inline-size: 0; padding: 0; margin: 0; border: 0; }
+      .stats-tile > summary { cursor: pointer; }
+      .stats-tile:not([open]) > summary { margin-bottom: 0; }
       .section-width-control { display: grid; gap: 8px; margin-top: 12px; }
+      .section-width-control[hidden] { display: none; }
       .section-width-label, .section-ground-filter { display: flex; align-items: center; gap: 8px; }
       .section-width-label { justify-content: space-between; }
       .section-width-label .slice-value { margin: 0; white-space: nowrap; }
@@ -4070,11 +4119,9 @@
       #runtimeStatusPanel[open] summary::before { content: "▾"; }
       .measurement-history-main { flex-wrap: wrap; }
       .measurement-history-distance { flex: 1 1 8rem; }
-      #measurementDraftActions[hidden], #measurementResultPanel[hidden], #sliceControlPanel[hidden] { display: none; }
+      #measurementDraftActions[hidden], #measurementResultPanel[hidden] { display: none; }
       .measurement-actions.measurement-actions--wide { grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); }
       .measurement-result-label { margin: 12px 0 4px; color: var(--ec-muted); }
-      #sliceControlPanel { margin-top: 8px; }
-      #sliceControlPanel .panel-card__body { padding-inline: 0; }
       #sliceControlPanel .slice-side, .slice-control-note { color: var(--ec-muted); }
       .slice-control-note { font-size: var(--font-size-xs); }
       #sliceControlPanel [disabled] { opacity: .45; cursor: default; }
@@ -4277,6 +4324,9 @@
           width: 44px;
           height: 44px;
         }
+        .tool-section > summary, #guidePanel > summary, #statsToggle {
+          min-height: 44px;
+        }
         .river-demo-actions .ec-button,
         .river-demo-actions .sample-help-button,
         #bridgeGuideDistance button {
@@ -4311,6 +4361,16 @@
             text-align: end;
           }
         }
+      }
+
+      @media (max-width: 360px) {
+        .viewer-navigation {
+          inset-inline-end: 4px;
+          max-width: calc(100% - 8px);
+          box-sizing: border-box;
+        }
+        .viewer-navigation-actions { gap: 2px; }
+        .viewer-navigation button.ec-button { padding-inline: 6px; }
       }
 
       @media (min-width: 660px) and (max-width: 1200px) and (max-height: 600px) and (orientation: landscape) and (pointer: coarse) {
@@ -4719,7 +4779,7 @@
         <div class="viewer-navigation" role="group" aria-label="表示操作">
           <div class="viewer-navigation-actions">
             <span id="viewerView" aria-live="polite">3D</span>
-            <button id="mobileViewToggle" class="ec-button ec-button--secondary mobile-viewer-control" type="button" aria-label="上面に切替" onclick="toggleTopView()">上面</button>
+            <button id="mobileViewToggle" class="ec-button ec-button--secondary mobile-viewer-control" type="button" aria-label="2D上面に切替" onclick="toggleTopView()">2D上面</button>
             <button type="button" class="ec-button ec-button--secondary" aria-label="近づく" title="近づく" onclick="moveCloser()">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M12 5v14"/></svg>
             </button>
@@ -4752,7 +4812,7 @@
             <p>合成データ · ローカル座標（m）</p>
             <div class="river-demo-actions">
               <div class="sample-feature">
-                <button id="sampleViewToggle" type="button" class="ec-button ec-button--secondary" onclick="toggleTopView()">上面に切替</button>
+                <button id="sampleViewToggle" type="button" class="ec-button ec-button--secondary" onclick="toggleTopView()">2D上面に切替</button>
                 <button class="sample-help-button sample-view-help" type="button" data-sample-help="view" aria-labelledby="sampleViewHelpName" aria-haspopup="dialog" onclick="showSampleFeatureHelp('view', this)">
                   <span id="sampleViewHelpName" class="sample-view-help-label">ヘルプ: 3D / 上面</span>
                   <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sampleHelpIcon"/></svg>
@@ -4831,438 +4891,194 @@
             <button id="showSampleGuide" type="button" class="link-btn" aria-controls="sampleGuide" aria-expanded="false" onclick="setSampleGuideVisible(true, true)" hidden>サンプルガイドを表示</button>
             <button class="link-btn" onclick="goHome()">自分のファイルを開く</button>
           </section>
-          <!-- 操作ガイド（上部に配置） -->
-          <details class="panel-card guide-panel" id="guidePanel" style="overflow: hidden">
-            <summary
-              class="panel-card__header guide-header"
-              style="cursor: pointer"
-            >
-              <span style="display: flex; align-items: center; gap: 8px">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  style="color: var(--ec-accent)"
-                  aria-hidden="true"
-                >
-                  <circle cx="12" cy="12" r="10"></circle>
-                  <path d="M12 16v-4"></path>
-                  <path d="M12 8h.01"></path>
-                </svg>
-                操作ガイド
-              </span>
-              <svg class="chevron-icon" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M9 5l7 7-7 7"></path>
-              </svg>
-            </summary>
-            <div
-              class="panel-card__body"
-              style="color: var(--ec-muted); font-size: 13px; line-height: 1.6"
-            >
-              <div class="guide-section">
-                <div class="guide-section-title">
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M12 2a10 10 0 1 0 10 10H12V2z"></path>
-                    <path d="M12 2v10l8.66 5"></path>
-                  </svg>
-                  マウス操作
-                </div>
-                <div class="guide-item">
-                  <svg
-                    width="18"
-                    height="18"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"
-                    ></path>
-                  </svg>
-                  <div>
-                    <strong>見る角度を変える</strong>
-                    <span class="guide-desc">左ボタンを押しながら動かす</span>
-                  </div>
-                </div>
-                <div class="guide-item">
-                  <svg
-                    width="18"
-                    height="18"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    aria-hidden="true"
-                  >
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <path d="m21 21-4.35-4.35"></path>
-                    <line x1="11" y1="8" x2="11" y2="14"></line>
-                    <line x1="8" y1="11" x2="14" y2="11"></line>
-                  </svg>
-                  <div>
-                    <strong>近づく・遠ざかる</strong>
-                    <span class="guide-desc">ホイールを回す</span>
-                  </div>
-                </div>
-                <div class="guide-item">
-                  <svg
-                    width="18"
-                    height="18"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20"
-                    ></path>
-                  </svg>
-                  <div>
-                    <strong>位置をずらす</strong>
-                    <span class="guide-desc">右ボタンを押しながら動かす</span>
-                  </div>
-                </div>
-              </div>
-
-              <div class="guide-section">
-                <div class="guide-section-title">
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    aria-hidden="true"
-                  >
-                    <rect
-                      x="3"
-                      y="3"
-                      width="18"
-                      height="18"
-                      rx="2"
-                      ry="2"
-                    ></rect>
-                    <line x1="9" y1="9" x2="15" y2="9"></line>
-                    <line x1="9" y1="15" x2="15" y2="15"></line>
-                  </svg>
-                  ショートカットキー
-                </div>
-                <div class="guide-item">
-                  <kbd class="guide-key">R</kbd>
-                  <div>
-                    <strong>正面から見る</strong>
-                    <span class="guide-desc">視点をリセット</span>
-                  </div>
-                </div>
-                <div class="guide-item">
-                  <kbd class="guide-key">T</kbd>
-                  <div>
-                    <strong>真上から見る</strong>
-                    <span class="guide-desc">全体確認</span>
-                  </div>
-                </div>
-                <div class="guide-item">
-                  <kbd class="guide-key">I</kbd>
-                  <div>
-                    <strong>詳細データ</strong>
-                    <span class="guide-desc">表示/非表示</span>
-                  </div>
-                </div>
-                <div class="guide-item">
-                  <kbd class="guide-key">H</kbd>
-                  <div>
-                    <strong>ヘルプ表示</strong>
-                    <span class="guide-desc">詳しい操作説明</span>
-                  </div>
-                </div>
-              </div>
-
-              <div class="guide-section">
-                <div class="guide-section-title">
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    aria-hidden="true"
-                  >
-                    <circle cx="12" cy="12" r="3"></circle>
-                    <path
-                      d="M12 1v6m0 6v6m5.2-13.2l-4.2 4.2m0 6l4.2 4.2M23 12h-6m-6 0H1m18.2 5.2l-4.2-4.2m0-6l4.2-4.2"
-                    ></path>
-                  </svg>
-                  表示の切り替え
-                </div>
-                <div class="guide-item">
-                  <kbd class="guide-key">1</kbd>
-                  <div>
-                    <strong>標高で色分け</strong>
-                    <span class="guide-desc">地形の高低がわかる</span>
-                  </div>
-                </div>
-                <div class="guide-item">
-                  <kbd class="guide-key">2</kbd>
-                  <div>
-                    <strong>種類で色分け</strong>
-                    <span class="guide-desc">地面・植生・水などがわかる</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </details>
-
           <!-- 制御パネル（表示完了後） -->
-          <div class="controls panel-card control-panel" id="controls">
-            <div class="panel-card__header">
-              <span style="display: flex; align-items: center; gap: 8px">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  style="color: var(--ec-accent)"
-                  aria-hidden="true"
-                >
-                  <circle cx="12" cy="12" r="3"></circle>
-                  <path d="M12 1v6m0 6v6"></path>
-                  <path d="m4.93 4.93 4.24 4.24m5.66 5.66 4.24 4.24"></path>
-                  <path d="M1 12h6m6 0h6"></path>
-                  <path d="m4.93 19.07 4.24-4.24m5.66-5.66 4.24-4.24"></path>
-                </svg>
-                表示制御
-              </span>
-            </div>
-            <div class="panel-card__body">
-              <div class="panel-section">
-                <div class="panel-section-title">
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"
-                    ></path>
-                    <circle cx="12" cy="12" r="3"></circle>
-                  </svg>
-                  視点
+          <div class="controls" id="controls">
+            <details class="panel-card tool-section" id="viewControlsSection">
+              <summary class="panel-card__header" id="viewControlsToggle"><span>表示制御</span><span class="tool-section-status" id="viewControlsStatus">3D</span></summary>
+              <div class="panel-card__body">
+                <div class="panel-section">
+                  <div class="panel-section-title">
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path
+                        d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"
+                      ></path>
+                      <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                    3D視点
+                  </div>
+                  <div class="control-btn-grid">
+                    <button class="control-btn" id="viewFrontBtn" onclick="resetView()" title="正面から見る (R)">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                        <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                      </svg>
+                      正面
+                    </button>
+                    <button class="control-btn" id="viewTopBtn" onclick="topView()" title="真上から見る (T)">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <circle cx="12" cy="12" r="9"></circle>
+                        <line x1="12" y1="3" x2="12" y2="8"></line>
+                        <polyline points="9 6 12 3 15 6"></polyline>
+                      </svg>
+                      3Dで真上
+                    </button>
+                    <button class="control-btn" id="viewSideBtn" onclick="sideView()" title="側面から見る">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+                        <line x1="12" y1="3" x2="12" y2="21"></line>
+                        <polyline points="17 8 21 12 17 16"></polyline>
+                      </svg>
+                      側面
+                    </button>
+                    <button class="control-btn" id="viewBackBtn" onclick="backView()" title="背面から見る">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <polyline points="15 18 9 12 15 6"></polyline>
+                        <line x1="9" y1="12" x2="21" y2="12"></line>
+                        <line x1="3" y1="6" x2="3" y2="18"></line>
+                      </svg>
+                      背面
+                    </button>
+                  </div>
                 </div>
-                <div class="control-btn-grid">
-                  <button class="control-btn" id="viewFrontBtn" onclick="resetView()" title="正面から見る (R)">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                      <polyline points="9 22 9 12 15 12 15 22"></polyline>
-                    </svg>
-                    正面
-                  </button>
-                  <button class="control-btn" id="viewTopBtn" onclick="topView()" title="真上から見る (T)">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                      <circle cx="12" cy="12" r="9"></circle>
-                      <line x1="12" y1="3" x2="12" y2="8"></line>
-                      <polyline points="9 6 12 3 15 6"></polyline>
-                    </svg>
-                    真上
-                  </button>
-                  <button class="control-btn" id="viewSideBtn" onclick="sideView()" title="側面から見る">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                      <rect x="3" y="3" width="18" height="18" rx="2"></rect>
-                      <line x1="12" y1="3" x2="12" y2="21"></line>
-                      <polyline points="17 8 21 12 17 16"></polyline>
-                    </svg>
-                    側面
-                  </button>
-                  <button class="control-btn" id="viewBackBtn" onclick="backView()" title="背面から見る">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                      <polyline points="15 18 9 12 15 6"></polyline>
-                      <line x1="9" y1="12" x2="21" y2="12"></line>
-                      <line x1="3" y1="6" x2="3" y2="18"></line>
-                    </svg>
-                    背面
-                  </button>
-                </div>
-              </div>
 
-              <div class="panel-section">
-                <div class="panel-section-title">
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"
-                    ></path>
-                  </svg>
-                  2D/3D
-                </div>
-                <div class="control-btn-grid">
-                  <button
-                    class="control-btn"
-                    onclick="set2DView('top')"
-                    id="view2dTopBtn"
-                  >
+                <div class="panel-section">
+                  <div class="panel-section-title">
                     <svg
-                      width="14"
-                      height="14"
+                      width="12"
+                      height="12"
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
                       stroke-width="2"
-                      aria-hidden="true"
-                    >
-                      <rect x="3" y="3" width="18" height="18" rx="2"></rect>
-                    </svg>
-                    2D上面
-                  </button>
-                  <button
-                    class="control-btn"
-                    onclick="set2DView('front')"
-                    id="view2dFrontBtn"
-                  >
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      aria-hidden="true"
-                    >
-                      <rect x="3" y="3" width="18" height="18" rx="2"></rect>
-                    </svg>
-                    2D正面
-                  </button>
-                  <button
-                    class="control-btn"
-                    onclick="set2DView('right')"
-                    id="view2dRightBtn"
-                  >
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      aria-hidden="true"
-                    >
-                      <rect x="3" y="3" width="18" height="18" rx="2"></rect>
-                    </svg>
-                    2D右側
-                  </button>
-                  <button
-                    class="control-btn"
-                    onclick="exit2DView()"
-                    id="view2dExitBtn"
-                  >
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
                       aria-hidden="true"
                     >
                       <path
                         d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"
                       ></path>
                     </svg>
-                    3D戻る
-                  </button>
-                </div>
-                <div class="section-width-control">
-                  <div class="section-width-label">
-                    <label for="sectionWidthRange">断面幅</label>
-                    <span class="slice-value" id="sectionWidthValue">5.0m相当</span>
+                    2Dビュー
                   </div>
-                  <input
-                    type="range"
-                    id="sectionWidthRange"
-                    min="1"
-                    max="50"
-                    step="1"
-                    value="5"
-                    oninput="updateSectionWidthControl(this.value)"
-                  />
-                  <label class="section-ground-filter">
+                  <div class="control-btn-grid">
+                    <button
+                      class="control-btn"
+                      onclick="set2DView('top')"
+                      id="view2dTopBtn"
+                    >
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+                      </svg>
+                      2D上面
+                    </button>
+                    <button
+                      class="control-btn"
+                      onclick="set2DView('front')"
+                      id="view2dFrontBtn"
+                    >
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+                      </svg>
+                      2D正面
+                    </button>
+                    <button
+                      class="control-btn"
+                      onclick="set2DView('right')"
+                      id="view2dRightBtn"
+                    >
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+                      </svg>
+                      2D右側
+                    </button>
+                    <button
+                      class="control-btn"
+                      onclick="exit2DView()"
+                      id="view2dExitBtn"
+                    >
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"
+                        ></path>
+                      </svg>
+                      3D戻る
+                    </button>
+                  </div>
+                  <div class="section-width-control" hidden>
+                    <div class="section-width-label">
+                      <label for="sectionWidthRange">断面幅</label>
+                      <span class="slice-value" id="sectionWidthValue">5.0m相当</span>
+                    </div>
                     <input
-                      type="checkbox"
-                      id="sectionGroundOnly"
-                      onchange="update2DSectionDiagnostics()"
+                      type="range"
+                      id="sectionWidthRange"
+                      min="1"
+                      max="50"
+                      step="1"
+                      value="5"
+                      oninput="updateSectionWidthControl(this.value)"
                     />
-                    groundのみ
-                  </label>
-                  <div id="sectionDiagnosticsStatus">
-                    2D表示時に幅内の表示点数を確認できます
+                    <label class="section-ground-filter">
+                      <input
+                        type="checkbox"
+                        id="sectionGroundOnly"
+                        onchange="update2DSectionDiagnostics()"
+                      />
+                      groundのみ
+                    </label>
+                    <div id="sectionDiagnosticsStatus">
+                      2D表示時に幅内の表示点数を確認できます
+                    </div>
                   </div>
                 </div>
               </div>
+            </details>
 
-              <div class="panel-section">
-                <div class="panel-section-title">
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"></path>
-                  </svg>
-                  表示モード
-                </div>
+            <details class="panel-card tool-section" id="colorModeSection">
+              <summary class="panel-card__header" id="colorModeToggle"><span>表示モード</span><span class="tool-section-status" id="colorModeStatus">標高</span></summary>
+              <div class="panel-card__body">
                 <div
                   class="control-btn-grid"
                   style="grid-template-columns: 1fr 1fr"
@@ -5270,7 +5086,7 @@
                   <button
                     class="control-btn mode-btn active"
                     onclick="window.setColorMode('height')"
-                    id="heightBtn"
+                    id="heightBtn" aria-pressed="true"
                   >
                     <svg
                       width="14"
@@ -5288,7 +5104,7 @@
                   <button
                     class="control-btn mode-btn"
                     onclick="window.setColorMode('classification')"
-                    id="classificationBtn"
+                    id="classificationBtn" aria-pressed="false"
                   >
                     <svg
                       width="14"
@@ -5352,29 +5168,11 @@
                   </div>
                 </div>
               </div>
+            </details>
 
-              <div class="panel-section measurement-section">
-                <div class="panel-section-title">
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M3 18h18"></path>
-                    <path d="M5 18V6"></path>
-                    <path d="M19 18V6"></path>
-                    <path d="M5 8h14"></path>
-                    <path d="m7 6-2 2 2 2"></path>
-                    <path d="m17 6 2 2-2 2"></path>
-                  </svg>
-                  距離計測
-                </div>
+            <details class="panel-card tool-section measurement-section" id="measurementSection">
+              <summary class="panel-card__header" id="measurementDisclosure"><span>距離計測</span><span class="tool-section-status" id="measurementSidebarStatus"></span></summary>
+              <div class="panel-card__body">
                 <button
                   class="control-btn slice-btn measurement-btn"
                   id="measurementToggleBtn"
@@ -5401,26 +5199,26 @@
                     <button
                       class="control-btn measurement-mode-btn active"
                       id="measurementModeDistance"
-                      onclick="setMeasurementMode('distance')"
+                      onclick="requestMeasurementMode('distance')"
                     >
                       距離
                     </button>
                     <button
                       class="control-btn measurement-mode-btn"
                       id="measurementModePolyline"
-                      onclick="setMeasurementMode('polyline')"
+                      onclick="requestMeasurementMode('polyline')"
                     >
                       折れ線
                     </button>
                     <button
                       class="control-btn measurement-mode-btn"
                       id="measurementModeAreaXY"
-                      onclick="setMeasurementMode('areaXY')"
+                      onclick="requestMeasurementMode('areaXY')"
                     >
                       面積
                     </button>
                   </div>
-                  <div class="measurement-status" id="measurementStatus">
+                  <div class="measurement-status" id="measurementStatus" role="status">
                     1点目を選択
                   </div>
                   <div class="measurement-actions measurement-actions--wide" id="measurementDraftActions">
@@ -5456,185 +5254,184 @@
                   </div>
                 </div>
               </div>
+            </details>
 
-              <div class="panel-section slice-section">
-                <div class="panel-section-title">
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M12 2v20M2 12h20"></path>
-                  </svg>
-                  スライス表示
+            <details class="panel-card tool-section slice-section" id="slicingSection">
+              <summary class="panel-card__header" id="sliceToggle"><span>スライス表示</span><span class="tool-section-status" id="sliceSidebarStatus"></span></summary>
+              <div class="panel-card__body slice-panel" id="sliceControlPanel">
+                <fieldset class="slice-axes" id="sliceAxes" aria-label="切断軸">
+                  <div class="slice-row">
+                      <label style="display: block; margin-bottom: 5px;">
+                          <input type="checkbox" id="sliceXCheck" onchange="updateSlicing()" style="margin-right: 8px;"> X軸で切断（左右方向）
+                      </label>
+                      <div class="slice-range-container">
+                          <span class="slice-range-label">最小</span>
+                          <input type="range" id="sliceXRange" aria-label="X軸の切断位置" oninput="updateSlicePosition('X', this.value)" disabled min="-100" max="100" value="0">
+                          <span class="slice-range-label">最大</span>
+                      </div>
+                      <span id="sliceXValue" class="slice-value">0%</span>
+                      <label class="slice-side"><input type="checkbox" id="sliceXReverse" onchange="updateSlicing()" disabled> 反対側を表示</label>
+                  </div>
+                  <div class="slice-row">
+                      <label style="display: block; margin-bottom: 5px;">
+                          <input type="checkbox" id="sliceYCheck" onchange="updateSlicing()" style="margin-right: 8px;"> Y軸で切断（高さ方向）
+                      </label>
+                      <div class="slice-range-container">
+                          <span class="slice-range-label">最小</span>
+                          <input type="range" id="sliceYRange" aria-label="Y軸の切断位置" oninput="updateSlicePosition('Y', this.value)" disabled min="-100" max="100" value="0">
+                          <span class="slice-range-label">最大</span>
+                      </div>
+                      <span id="sliceYValue" class="slice-value">0%</span>
+                      <label class="slice-side"><input type="checkbox" id="sliceYReverse" onchange="updateSlicing()" disabled> 反対側を表示</label>
+                  </div>
+                  <div class="slice-row">
+                      <label style="display: block; margin-bottom: 5px;">
+                          <input type="checkbox" id="sliceZCheck" onchange="updateSlicing()" style="margin-right: 8px;"> Z軸で切断（前後方向）
+                      </label>
+                      <div class="slice-range-container">
+                          <span class="slice-range-label">最小</span>
+                          <input type="range" id="sliceZRange" aria-label="Z軸の切断位置" oninput="updateSlicePosition('Z', this.value)" disabled min="-100" max="100" value="0">
+                          <span class="slice-range-label">最大</span>
+                      </div>
+                      <span id="sliceZValue" class="slice-value">0%</span>
+                      <label class="slice-side"><input type="checkbox" id="sliceZReverse" onchange="updateSlicing()" disabled> 反対側を表示</label>
+                  </div>
+                </fieldset>
+                <p class="slice-control-note">チェックした軸で片側を非表示にします。元の点群は変更されません。</p>
+                  <button class="slice-view-btn" onclick="show2DSliceView()" disabled>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                          <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+                          <path d="M3 9h18M9 21V9"></path>
+                      </svg>
+                      <span>2D断面ビューを開く</span>
+                  </button>
+                <div class="slice-actions">
+                  <button class="control-btn" id="sliceApplyButton" type="button" onclick="toggleSliceApplication()" disabled>スライスを一時解除</button>
+                  <button class="control-btn slice-reset-btn" type="button" onclick="resetSlicing()">スライス設定を初期化</button>
                 </div>
-                <button class="control-btn slice-btn" id="sliceToggle" aria-expanded="false" aria-controls="sliceControlPanel" onclick="toggleSlicing()">
-                  <svg
-                    width="18"
-                    height="18"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    aria-hidden="true"
-                  >
-                    <path d="M12 2v20M2 12h20"></path>
-                    <circle cx="12" cy="12" r="3"></circle>
-                  </svg>
-                  <span>スライス設定を開く</span>
-                </button>
               </div>
+            </details>
 
-              <details class="panel-section advanced-settings">
-                <summary class="panel-section-title">
+            <details class="panel-card tool-section advanced-settings" id="advancedSettingsSection">
+              <summary class="panel-card__header" id="advancedSettingsToggle"><span>詳細設定</span></summary>
+              <div class="panel-card__body">
+                <button
+                  class="control-btn"
+                  onclick="autoClassify()"
+                  style="width: 100%"
+                >
                   <svg
-                    width="12"
-                    height="12"
+                    width="14"
+                    height="14"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
                     stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
                     aria-hidden="true"
                   >
-                    <circle cx="12" cy="12" r="3"></circle>
                     <path
-                      d="M12 1v6m0 6v6m5.2-13.2l-4.2 4.2m0 6l4.2 4.2M23 12h-6m-6 0H1m18.2 5.2l-4.2-4.2m0-6l4.2-4.2"
+                      d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
                     ></path>
                   </svg>
-                  詳細設定
-                  <svg
-                    class="chevron-icon"
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                  >
-                    <path d="M9 5l7 7-7 7"></path>
-                  </svg>
-                </summary>
-                <div style="margin-top: 8px">
+                  自動分類
+                </button>
+                <div style="font-size:11px; color:var(--ec-muted); margin-top:4px;">地面・植生・建物を高さから自動判別</div>
+
+                <div style="margin-top: 10px">
                   <button
                     class="control-btn"
-                    onclick="autoClassify()"
-                    style="width: 100%"
-                  >
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      aria-hidden="true"
-                    >
-                      <path
-                        d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
-                      ></path>
-                    </svg>
-                    自動分類
-                  </button>
-                  <div style="font-size:11px; color:var(--ec-muted); margin-top:4px;">地面・植生・建物を高さから自動判別</div>
-
-                  <div style="margin-top: 10px">
-                    <button
-                      class="control-btn"
-                      id="cadModeBtn"
-                      onclick="toggleCADMode()"
-                      style="
-                        background: var(--ec-hover);
-                        position: relative;
-                      "
-                      title="CAD系のZ-up座標に切替（Z=高さ）。Three.js標準のY-upと見た目が変わります。"
-                    >
-                      CADモード: <span id="cadModeStatus">OFF</span>
-                      <div
-                        style="
-                          position: absolute;
-                          bottom: -22px;
-                          left: 50%;
-                          transform: translateX(-50%);
-                          font-size: 10px;
-                          color: var(--ec-accent);
-                          white-space: nowrap;
-                        "
-                      >
-                        Z軸を高さ方向に
-                      </div>
-                    </button>
-                  </div>
-
-                  <!-- 座標系インジケーター -->
-                  <div
-                    id="coordinateIndicator"
+                    id="cadModeBtn"
+                    onclick="toggleCADMode()"
                     style="
-                      margin-top: 15px;
-                      padding: 10px;
-                      background: var(--ec-inset);
-                      border-radius: 8px;
-                      border: 1px solid var(--ec-border);
+                      background: var(--ec-hover);
+                      position: relative;
+                    "
+                    title="CAD系のZ-up座標に切替（Z=高さ）。Three.js標準のY-upと見た目が変わります。"
+                  >
+                    CADモード: <span id="cadModeStatus">OFF</span>
+                    <div
+                      style="
+                        position: absolute;
+                        bottom: -22px;
+                        left: 50%;
+                        transform: translateX(-50%);
+                        font-size: 10px;
+                        color: var(--ec-accent);
+                        white-space: nowrap;
+                      "
+                    >
+                      Z軸を高さ方向に
+                    </div>
+                  </button>
+                </div>
+
+                <!-- 座標系インジケーター -->
+                <div
+                  id="coordinateIndicator"
+                  style="
+                    margin-top: 15px;
+                    padding: 10px;
+                    background: var(--ec-inset);
+                    border-radius: 8px;
+                    border: 1px solid var(--ec-border);
+                  "
+                >
+                  <div
+                    style="
+                      color: var(--ec-accent);
+                      font-size: 12px;
+                      margin-bottom: 5px;
                     "
                   >
-                    <div
-                      style="
-                        color: var(--ec-accent);
-                        font-size: 12px;
-                        margin-bottom: 5px;
-                      "
-                    >
-                      現在の座標系:
-                    </div>
-                    <div style="font-size: 11px; color: var(--ec-accent-light)">
-                      <span id="coordSystemDisplay">Y-up（Three.js標準）</span>
-                    </div>
-                    <div style="font-size: 10px; color: var(--ec-muted); margin-top: 5px">
-                      軸: <span style="color: var(--ec-axis-x)">X=横</span>
-                      <span id="yAxisLabel" style="color: var(--ec-axis-y)">Y=高さ</span>
-                      <span id="zAxisLabel" style="color: var(--ec-axis-z)">Z=奥行</span>
-                    </div>
+                    現在の座標系:
                   </div>
-
-                  <!-- 点サイズ制御 -->
-                  <div class="point-size-control">
-                    <div
-                      style="
-                        color: var(--ec-accent-light);
-                        font-size: 14px;
-                        margin-bottom: 10px;
-                      "
-                    >
-                      点サイズ調整
-                    </div>
-                    <input
-                      type="range"
-                      id="pointSizeSlider"
-                      class="point-size-slider"
-                      min="0.5"
-                      max="5.0"
-                      step="0.5"
-                      value="1.0"
-                      oninput="updatePointSize(this.value)"
-                    />
-                    <div
-                      style="
-                        text-align: center;
-                        color: var(--ec-accent);
-                        font-weight: bold;
-                        font-size: 14px;
-                      "
-                      id="pointSizeValue"
-                    >
-                      1.0 ピクセル
-                    </div>
+                  <div style="font-size: 11px; color: var(--ec-accent-light)">
+                    <span id="coordSystemDisplay">Y-up（Three.js標準）</span>
+                  </div>
+                  <div style="font-size: 10px; color: var(--ec-muted); margin-top: 5px">
+                    軸: <span style="color: var(--ec-axis-x)">X=横</span>
+                    <span id="yAxisLabel" style="color: var(--ec-axis-y)">Y=高さ</span>
+                    <span id="zAxisLabel" style="color: var(--ec-axis-z)">Z=奥行</span>
                   </div>
                 </div>
-              </details>
-            </div>
+
+                <!-- 点サイズ制御 -->
+                <div class="point-size-control">
+                  <label
+                    for="pointSizeSlider"
+                    style="
+                      display: block;
+                      color: var(--ec-accent-light);
+                      font-size: 14px;
+                      margin-bottom: 10px;
+                    "
+                  >
+                    点サイズ調整
+                  </label>
+                  <input
+                    type="range"
+                    id="pointSizeSlider"
+                    class="point-size-slider"
+                    min="0.5"
+                    max="5.0"
+                    step="0.5"
+                    value="1.0"
+                    oninput="updatePointSize(this.value)"
+                  />
+                  <div
+                    style="
+                      text-align: center;
+                      color: var(--ec-accent);
+                      font-weight: bold;
+                      font-size: 14px;
+                    "
+                    id="pointSizeValue"
+                  >
+                    1.0 ピクセル
+                  </div>
+                </div>
+              </div>
+            </details>
           </div>
 
           <!-- 統計パネル切り替えボタン -->
@@ -5682,7 +5479,24 @@
             </div>
             <div class="stats-grid panel-card__body">
               <div class="stats-tile">
-                <div class="stats-tile-title">ファイル / 品質</div>
+                <div class="stats-tile-title">点群概要</div>
+                <div class="stats-item">
+                  元データ点数:
+                  <span class="stats-value" id="originalPoints">-</span>
+                </div>
+                <div class="stats-item">
+                  表示中点数:
+                  <span class="stats-value" id="displayPoints">-</span>
+                </div>
+                <div class="stats-item">
+                  表示率: <span class="stats-value" id="displayRatio">-</span>
+                </div>
+                <div class="stats-item">
+                  単位: <span class="stats-value" id="crsUnits">不明</span>
+                </div>
+              </div>
+              <details class="stats-tile" id="statsLoadDetails">
+                <summary class="stats-tile-title">ファイル / 品質</summary>
                 <div class="stats-item">
                   ファイル名: <span class="stats-value" id="fileName" data-pcw-source-text>-</span>
                 </div>
@@ -5705,7 +5519,7 @@
                   ピークRAM推定:
                   <span class="stats-value" id="estimatedPeakMemory">-</span>
                 </div>
-              </div>
+              </details>
               <div class="stats-tile">
                 <div class="stats-tile-title">座標情報</div>
                 <div class="stats-item">
@@ -5725,9 +5539,6 @@
                 <div class="stats-item">
                   WKT / GeoTIFF:
                   <span class="stats-value" id="crsSources">不明</span>
-                </div>
-                <div class="stats-item">
-                  単位: <span class="stats-value" id="crsUnits">不明</span>
                 </div>
                 <div class="stats-item">
                   注意: <span class="stats-value" id="crsWarnings">不明</span>
@@ -5792,17 +5603,6 @@
               </div>
               <div class="stats-tile">
                 <div class="stats-tile-title">点群 / 分類</div>
-                <div class="stats-item">
-                  元データ点数:
-                  <span class="stats-value" id="originalPoints">-</span>
-                </div>
-                <div class="stats-item">
-                  表示中点数:
-                  <span class="stats-value" id="displayPoints">-</span>
-                </div>
-                <div class="stats-item">
-                  表示率: <span class="stats-value" id="displayRatio">-</span>
-                </div>
                 <div class="stats-item">
                   点密度: <span class="stats-value" id="pointDensity">-</span>
                 </div>
@@ -6061,6 +5861,216 @@
               </div>
             </div>
           </div>
+          <!-- 操作ガイド -->
+          <details class="panel-card guide-panel" id="guidePanel" style="overflow: hidden">
+            <summary
+              class="panel-card__header guide-header"
+              style="cursor: pointer"
+            >
+              <span style="display: flex; align-items: center; gap: 8px">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  style="color: var(--ec-accent)"
+                  aria-hidden="true"
+                >
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <path d="M12 16v-4"></path>
+                  <path d="M12 8h.01"></path>
+                </svg>
+                操作ガイド
+              </span>
+              <svg class="chevron-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M9 5l7 7-7 7"></path>
+              </svg>
+            </summary>
+            <div
+              class="panel-card__body"
+              style="color: var(--ec-muted); font-size: 13px; line-height: 1.6"
+            >
+              <div class="guide-section">
+                <div class="guide-section-title">
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M12 2a10 10 0 1 0 10 10H12V2z"></path>
+                    <path d="M12 2v10l8.66 5"></path>
+                  </svg>
+                  マウス操作
+                </div>
+                <div class="guide-item">
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"
+                    ></path>
+                  </svg>
+                  <div>
+                    <strong>見る角度を変える</strong>
+                    <span class="guide-desc">左ボタンを押しながら動かす</span>
+                  </div>
+                </div>
+                <div class="guide-item">
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <path d="m21 21-4.35-4.35"></path>
+                    <line x1="11" y1="8" x2="11" y2="14"></line>
+                    <line x1="8" y1="11" x2="14" y2="11"></line>
+                  </svg>
+                  <div>
+                    <strong>近づく・遠ざかる</strong>
+                    <span class="guide-desc">ホイールを回す</span>
+                  </div>
+                </div>
+                <div class="guide-item">
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20"
+                    ></path>
+                  </svg>
+                  <div>
+                    <strong>位置をずらす</strong>
+                    <span class="guide-desc">右ボタンを押しながら動かす</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="guide-section">
+                <div class="guide-section-title">
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <rect
+                      x="3"
+                      y="3"
+                      width="18"
+                      height="18"
+                      rx="2"
+                      ry="2"
+                    ></rect>
+                    <line x1="9" y1="9" x2="15" y2="9"></line>
+                    <line x1="9" y1="15" x2="15" y2="15"></line>
+                  </svg>
+                  ショートカットキー
+                </div>
+                <div class="guide-item">
+                  <kbd class="guide-key">R</kbd>
+                  <div>
+                    <strong>正面から見る</strong>
+                    <span class="guide-desc">視点をリセット</span>
+                  </div>
+                </div>
+                <div class="guide-item">
+                  <kbd class="guide-key">T</kbd>
+                  <div>
+                    <strong>真上から見る</strong>
+                    <span class="guide-desc">全体確認</span>
+                  </div>
+                </div>
+                <div class="guide-item">
+                  <kbd class="guide-key">I</kbd>
+                  <div>
+                    <strong>詳細データ</strong>
+                    <span class="guide-desc">表示/非表示</span>
+                  </div>
+                </div>
+                <div class="guide-item">
+                  <kbd class="guide-key">H</kbd>
+                  <div>
+                    <strong>ヘルプ表示</strong>
+                    <span class="guide-desc">詳しい操作説明</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="guide-section">
+                <div class="guide-section-title">
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path
+                      d="M12 1v6m0 6v6m5.2-13.2l-4.2 4.2m0 6l4.2 4.2M23 12h-6m-6 0H1m18.2 5.2l-4.2-4.2m0-6l4.2-4.2"
+                    ></path>
+                  </svg>
+                  表示の切り替え
+                </div>
+                <div class="guide-item">
+                  <kbd class="guide-key">1</kbd>
+                  <div>
+                    <strong>標高で色分け</strong>
+                    <span class="guide-desc">地形の高低がわかる</span>
+                  </div>
+                </div>
+                <div class="guide-item">
+                  <kbd class="guide-key">2</kbd>
+                  <div>
+                    <strong>種類で色分け</strong>
+                    <span class="guide-desc">地面・植生・水などがわかる</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </details>
         </div>
       </aside>
     </div>
@@ -10440,7 +10450,21 @@
         ["全体", "Fit"],
         ["1本指で回転 / 2本指で拡大・移動", "One finger to orbit / Two fingers to zoom and pan"],
         ["1本指で移動 / 2本指で拡大・移動", "One finger to pan / Two fingers to zoom and pan"],
-        ["上面に切替", "Show top view"],
+        ["2D上面に切替", "Show 2D top view"],
+        ["3D視点", "3D views"],
+        ["3Dで真上", "3D from above"],
+        ["2Dビュー", "2D views"],
+        ["標高", "Elevation"],
+        ["分類", "Classification"],
+        ["点群概要", "Point cloud overview"],
+        ["切断軸", "Slice axes"],
+        ["スライスを一時解除", "Pause slicing"],
+        ["スライスを再適用", "Resume slicing"],
+        ["スライス設定を初期化", "Reset slicing settings"],
+        ["一時解除中", "Paused"],
+        ["計測の種類を切り替えますか？", "Change measurement type?"],
+        ["選択中の点を取り消して切り替えます。保存済みの計測は残ります。", "Switching clears the draft points. Saved measurements are kept."],
+        ["選択点を取り消して切り替え", "Discard points and switch"],
         ["3Dに戻る", "Back to 3D"],
         ["ヘルプ: 3D / 上面", "Help: 3D / Top view"],
         ["上面に切り替えると、河道の曲がりと橋の位置を真上から確認できます。上面から3Dに切り替えると、元の視点に戻ります。", "Switch to the top view to see the river’s bend and the bridge’s position from above. Switch back to 3D to return to your previous view."],
@@ -10949,6 +10973,11 @@
       // Translate the UI at the DOM boundary. Data, diagnostics payloads,
       // point decoding and rendering coordinates keep their original values.
       const englishUiPatterns = [
+        [/^([XYZ])軸の切断位置$/, "$1 slice position"],
+        [/^切断中 · ([XYZ](?:・[XYZ])*)軸$/, (_, axes) => `Active · ${axes.replaceAll("・", ", ")}`],
+        [/^(距離|折れ線|面積|計測) · (計測中|\d+点選択中)$/, (_, mode, detail) =>
+          `${englishUiText.get(mode)} · ${detail === "計測中" ? "Measuring" : detail.replace(/点選択中$/, " points selected")}`],
+        [/^(\d+)件保存済み$/, "$1 saved"],
         [/^タイプ(\d+)$/, "Class $1"],
         [/^([\d,]+)個の点を自動分類します。処理には時間がかかる場合があります。続行しますか？$/,
           "Automatically classify $1 points? This may take some time."],
@@ -12444,7 +12473,8 @@
         if (isCADMode) window.toggleCADMode();
         window.resetSlicing();
         window.set2DView("top");
-        setMeasurementMode("distance");
+        measurementState.mode = "distance";
+        resetMeasurementDraft();
         measurementState.selectedPoints = pausedBridgePoints;
         pausedBridgePoints = [];
         renderMeasurementDraftHelper();
@@ -13729,13 +13759,27 @@
       }
 
       function setMeasurementMode(mode) {
-        if (!MEASUREMENT_MODES[mode]) return;
+        if (!MEASUREMENT_MODES[mode] || measurementState.mode === mode) return;
         measurementState.mode = mode;
         resetMeasurementDraft();
         updateMeasurementUi();
       }
 
       window.setMeasurementMode = setMeasurementMode;
+
+      function requestMeasurementMode(mode) {
+        if (measurementState.mode === mode) return;
+        if (!measurementState.selectedPoints.length) {
+          setMeasurementMode(mode);
+          return;
+        }
+        showConfirmDialog({
+          title: "計測の種類を切り替えますか？",
+          message: "選択中の点を取り消して切り替えます。保存済みの計測は残ります。",
+          confirmLabel: "選択点を取り消して切り替え",
+          onConfirm: () => setMeasurementMode(mode),
+        });
+      }
 
       function finalizeMeasurementDraft() {
         if (!canFinalizeMeasurementDraft()) {
@@ -13895,10 +13939,20 @@
               : MEASUREMENT_NOTE;
         }
 
+        const pointCount = measurementState.selectedPoints.length;
+        const modeLabel = MEASUREMENT_MODES[measurementState.mode]?.label || "計測";
+        const sidebarStatus = document.getElementById("measurementSidebarStatus");
+        if (sidebarStatus) {
+          const historyCount = measurementState.history.length;
+          if (pointCount) {
+            sidebarStatus.textContent = `${modeLabel} · ${pointCount}点選択中`;
+          } else if (measurementState.enabled) {
+            sidebarStatus.textContent = `${modeLabel} · 計測中`;
+          } else {
+            sidebarStatus.textContent = historyCount ? `${historyCount}件保存済み` : "";
+          }
+        }
         if (status) {
-          const pointCount = measurementState.selectedPoints.length;
-          const modeLabel =
-            MEASUREMENT_MODES[measurementState.mode]?.label || "計測";
           if (pointCount > 0) {
             if (measurementState.mode === "distance") {
               status.textContent = "2点目を選択";
@@ -14446,6 +14500,7 @@
           }
 
           // Clear scene data
+          window.resetSlicing();
           clearPointCloud();
           clearMeasurement({ disable: true });
 
@@ -14467,11 +14522,10 @@
           const legendPanel = document.getElementById("legendPanel");
           if (legendPanel) legendPanel.style.display = "none";
 
-          const slicePanel = document.getElementById("sliceControlPanel");
-          if (slicePanel && slicePanel.parentElement) {
-            slicePanel.parentElement.removeChild(slicePanel);
-            setSliceControlsVisible(false);
-          }
+          document.querySelectorAll("#controls .tool-section, #guidePanel, #statsLoadDetails").forEach(panel => {
+            panel.open = false;
+          });
+          document.getElementById("rightPanel").scrollTop = 0;
 
           const sliceModal = document.getElementById("slice2DModal");
           if (sliceModal && sliceModal.parentElement) {
@@ -18067,20 +18121,23 @@
         const mobileTouchHint = document.getElementById("mobileTouchHint");
         const isTopView = is2DMode && current2DView === "top";
         if (mobileViewToggle) {
-          mobileViewToggle.textContent = isTopView ? "3D" : "上面";
-          mobileViewToggle.setAttribute("aria-label", isTopView ? "3Dに戻る" : "上面に切替");
+          mobileViewToggle.textContent = isTopView ? "3D" : "2D上面";
+          mobileViewToggle.setAttribute("aria-label", isTopView ? "3Dに戻る" : "2D上面に切替");
         }
         if (mobileTouchHint) {
           mobileTouchHint.textContent = is2DMode
             ? "1本指で移動 / 2本指で拡大・移動"
             : "1本指で回転 / 2本指で拡大・移動";
         }
-        if (viewerView) {
-          const viewLabels = { top: "2D上面", front: "2D正面", right: "2D右側" };
-          viewerView.textContent = is2DMode ? viewLabels[current2DView] : "3D";
-        }
+        const viewLabels = { top: "2D上面", front: "2D正面", right: "2D右側" };
+        const currentViewLabel = is2DMode ? viewLabels[current2DView] : "3D";
+        if (viewerView) viewerView.textContent = currentViewLabel;
+        const viewStatus = document.getElementById("viewControlsStatus");
+        if (viewStatus) viewStatus.textContent = currentViewLabel;
+        const sectionWidth = document.querySelector(".section-width-control");
+        if (sectionWidth) sectionWidth.hidden = !is2DMode;
         if (sampleViewToggle) {
-          sampleViewToggle.textContent = isTopView ? "3Dに戻る" : "上面に切替";
+          sampleViewToggle.textContent = isTopView ? "3Dに戻る" : "2D上面に切替";
         }
 
         if (topBtn) topBtn.classList.remove("active");
@@ -18235,7 +18292,9 @@
             if (mobileViewerMedia?.matches) {
               document.getElementById("mobileToolsToggle").focus({ preventScroll: true });
             } else {
-              focusPrimaryAction("controls", "button, input, select");
+              const entry = isRiverDemo() ? document.querySelector('[data-sample-step="section"]')
+                : document.getElementById("viewControlsToggle");
+              entry?.focus({ preventScroll: true });
             }
           });
 
@@ -18441,17 +18500,13 @@
           }
         }
 
-        // ボタン状態更新
-        document.querySelectorAll(".control-btn").forEach((btn) => {
-          btn.classList.remove("active");
+        const colorStatus = document.getElementById("colorModeStatus");
+        if (colorStatus) colorStatus.textContent = mode === "classification" ? "分類" : "標高";
+        document.querySelectorAll("#colorModeSection .mode-btn").forEach(button => {
+          const selected = button.id === mode + "Btn";
+          button.classList.toggle("active", selected);
+          button.setAttribute("aria-pressed", String(selected));
         });
-        const targetBtn = document.getElementById(mode + "Btn");
-        if (targetBtn) {
-          targetBtn.classList.add("active");
-          console.log(`ボタン ${mode}Btn を active に設定`);
-        } else {
-          console.warn(`ボタン ${mode}Btn が見つかりません`);
-        }
 
         const colors = pointCloud.geometry.attributes.color.array;
         const positionsData = pointCloud.geometry.attributes.position.array;
@@ -19059,111 +19114,55 @@
         zPosition: 0,
       };
 
-      function setSliceControlsVisible(visible) {
-        const panel = document.getElementById("sliceControlPanel");
-        if (panel) panel.hidden = !visible;
-        const toggle = document.getElementById("sliceToggle");
-        if (!toggle) return;
-        toggle.setAttribute("aria-expanded", String(visible));
-        toggle.querySelector("span").textContent = visible ? "スライスを解除" : "スライス設定を開く";
+      const sliceAxes = ["X", "Y", "Z"];
+      let slicePaused = false;
+
+      function getSelectedSliceAxes() {
+        return sliceAxes.filter(axis => document.getElementById(`slice${axis}Check`)?.checked);
       }
 
       window.toggleSlicing = function () {
-        const existingPanel = document.getElementById("sliceControlPanel");
-        if (existingPanel) {
-          if (!existingPanel.hidden) {
-            window.resetSlicing();
-            setSliceControlsVisible(false);
-          } else {
-            setSliceControlsVisible(true);
-          }
-          return;
-        }
-
-        // スライスパネルを動的に作成
-        const slicePanel = document.createElement("div");
-        slicePanel.id = "sliceControlPanel";
-        slicePanel.className = "slice-panel";
-        slicePanel.innerHTML = `
-                <div class="panel-card__body">
-                    <div class="slice-row">
-                        <label style="display: block; margin-bottom: 5px;">
-                            <input type="checkbox" id="sliceXCheck" style="margin-right: 8px;"> X軸で切断（左右方向）
-                        </label>
-                        <div class="slice-range-container">
-                            <span class="slice-range-label">最小</span>
-                            <input type="range" id="sliceXRange" min="-100" max="100" value="0">
-                            <span class="slice-range-label">最大</span>
-                        </div>
-                        <span id="sliceXValue" class="slice-value">0%</span>
-                        <label class="slice-side"><input type="checkbox" id="sliceXReverse" disabled> 反対側を表示</label>
-                    </div>
-                    <div class="slice-row">
-                        <label style="display: block; margin-bottom: 5px;">
-                            <input type="checkbox" id="sliceYCheck" style="margin-right: 8px;"> Y軸で切断（高さ方向）
-                        </label>
-                        <div class="slice-range-container">
-                            <span class="slice-range-label">最小</span>
-                            <input type="range" id="sliceYRange" min="-100" max="100" value="0">
-                            <span class="slice-range-label">最大</span>
-                        </div>
-                        <span id="sliceYValue" class="slice-value">0%</span>
-                        <label class="slice-side"><input type="checkbox" id="sliceYReverse" disabled> 反対側を表示</label>
-                    </div>
-                    <div class="slice-row">
-                        <label style="display: block; margin-bottom: 5px;">
-                            <input type="checkbox" id="sliceZCheck" style="margin-right: 8px;"> Z軸で切断（前後方向）
-                        </label>
-                        <div class="slice-range-container">
-                            <span class="slice-range-label">最小</span>
-                            <input type="range" id="sliceZRange" min="-100" max="100" value="0">
-                            <span class="slice-range-label">最大</span>
-                        </div>
-                        <span id="sliceZValue" class="slice-value">0%</span>
-                        <label class="slice-side"><input type="checkbox" id="sliceZReverse" disabled> 反対側を表示</label>
-                    </div>
-                    <p class="slice-control-note">チェックした軸で片側を非表示にします。元の点群は変更されません。</p>
-                    <button class="slice-view-btn" onclick="show2DSliceView()">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                            <rect x="3" y="3" width="18" height="18" rx="2"></rect>
-                            <path d="M3 9h18M9 21V9"></path>
-                        </svg>
-                        <span>2D断面ビューを開く</span>
-                    </button>
-                    <button class="control-btn slice-reset-btn" onclick="resetSlicing()">切断をすべて解除</button>
-                </div>
-            `;
-        document.querySelector(".slice-section").appendChild(slicePanel);
-        setSliceControlsVisible(true);
-
-        ["X", "Y", "Z"].forEach((axis) => {
-          const check = document.getElementById(`slice${axis}Check`);
-          const reverse = document.getElementById(`slice${axis}Reverse`);
-          check.addEventListener("change", updateSlicing);
-          reverse.addEventListener("change", updateSlicing);
-          document
-            .getElementById(`slice${axis}Range`)
-            .addEventListener("input", function () {
-              document.getElementById(`slice${axis}Value`).textContent =
-                this.value + "%";
-              updateSlicing();
-            });
-        });
-        updateSlicing();
+        const section = document.getElementById("slicingSection");
+        if (section) section.open = !section.open;
       };
 
+      function toggleSliceApplication() {
+        if (!getSelectedSliceAxes().length) return;
+        slicePaused = !slicePaused;
+        updateSlicing();
+      }
+
+      function updateSlicePosition(axis, value) {
+        document.getElementById(`slice${axis}Value`).textContent = value + "%";
+        updateSlicing();
+      }
+
       function updateSlicing() {
-        for (const axis of ["X", "Y", "Z"]) {
-          const enabled = !!document.getElementById(`slice${axis}Check`)?.checked;
+        const selectedAxes = getSelectedSliceAxes();
+        const appliedAxes = slicePaused ? [] : selectedAxes;
+        const fieldset = document.getElementById("sliceAxes");
+        if (fieldset) fieldset.disabled = slicePaused;
+        const apply = document.getElementById("sliceApplyButton");
+        if (apply) {
+          apply.disabled = !selectedAxes.length;
+          apply.textContent = slicePaused ? "スライスを再適用" : "スライスを一時解除";
+        }
+        const status = document.getElementById("sliceSidebarStatus");
+        if (status) {
+          status.textContent = slicePaused ? "一時解除中"
+            : appliedAxes.length ? `切断中 · ${appliedAxes.join("・")}軸` : "";
+        }
+        const openView = document.querySelector("#sliceControlPanel .slice-view-btn");
+        if (openView) openView.disabled = !appliedAxes.length;
+
+        for (const axis of sliceAxes) {
+          const enabled = selectedAxes.includes(axis);
           for (const suffix of ["Range", "Reverse"]) {
             const input = document.getElementById(`slice${axis}${suffix}`);
             if (input) input.disabled = !enabled;
           }
         }
-        if (!pointCloud || !pointCloud.geometry.boundingBox) {
-          console.warn("点群データまたはバウンディングボックスが存在しません");
-          return;
-        }
+        if (!scene || !pointCloud?.geometry.boundingBox) return;
 
         const box = pointCloud.geometry.boundingBox;
         const size = box.getSize(new THREE.Vector3());
@@ -19180,7 +19179,7 @@
           });
 
         // スライス平面のビジュアルヘルパーを追加
-        if (document.getElementById("sliceXCheck")?.checked) {
+        if (appliedAxes.includes("X")) {
           const sliderValue = parseFloat(
             document.getElementById("sliceXRange").value,
           );
@@ -19228,7 +19227,7 @@
           // デバッグ用：位置情報をコンソールに出力（コメントアウトしてメモリ節約）
           // console.log(`X軸スライス: スライダー値=${sliderValue}%, 実際の位置=${(center.x + pos).toFixed(2)}, 平面constant=${plane.constant.toFixed(2)}`);
         }
-        if (document.getElementById("sliceYCheck")?.checked) {
+        if (appliedAxes.includes("Y")) {
           const sliderValue = parseFloat(
             document.getElementById("sliceYRange").value,
           );
@@ -19274,7 +19273,7 @@
 
           // console.log(`Y軸スライス: スライダー値=${sliderValue}%, 実際の位置=${(center.y + pos).toFixed(2)}, 平面constant=${plane.constant.toFixed(2)}`);
         }
-        if (document.getElementById("sliceZCheck")?.checked) {
+        if (appliedAxes.includes("Z")) {
           const sliderValue = parseFloat(
             document.getElementById("sliceZRange").value,
           );
@@ -19319,9 +19318,6 @@
 
           // console.log(`Z軸スライス: スライダー値=${sliderValue}%, 実際の位置=${(center.z + pos).toFixed(2)}, 平面constant=${plane.constant.toFixed(2)}`);
         }
-
-        const openView = document.querySelector("#sliceControlPanel .slice-view-btn");
-        if (openView) openView.disabled = !planes.length;
 
         // PointsMaterialにクリッピングプレーンを適用
         if (pointCloud.material) {
@@ -19637,7 +19633,8 @@
       }
 
       window.resetSlicing = function () {
-        ["X", "Y", "Z"].forEach((axis) => {
+        slicePaused = false;
+        sliceAxes.forEach((axis) => {
           const checkbox = document.getElementById(`slice${axis}Check`);
           const range = document.getElementById(`slice${axis}Range`);
           const value = document.getElementById(`slice${axis}Value`);
@@ -19661,17 +19658,10 @@
         }
 
         // アクティブなスライスを確認
-        const activeSlices = [];
-        ["X", "Y", "Z"].forEach((axis) => {
-          const checkbox = document.getElementById(`slice${axis}Check`);
-          if (checkbox && checkbox.checked) {
-            const range = document.getElementById(`slice${axis}Range`);
-            activeSlices.push({
-              axis: axis,
-              position: parseFloat(range.value) / 100,
-            });
-          }
-        });
+        const activeSlices = (slicePaused ? [] : getSelectedSliceAxes()).map(axis => ({
+          axis,
+          position: Number(document.getElementById(`slice${axis}Range`).value) / 100,
+        }));
 
         if (activeSlices.length === 0) {
           showToast("スライスを有効にしてください（X・Y・Z軸のチェックボックスをオン）", "warning");
@@ -22017,23 +22007,6 @@
         updateRuntimeStatusPanel();
         updateLastFileInfo();
         setViewerVisibility(false);
-
-        // デスクトップの操作ガイドは初回のみ自動展開
-        try {
-          const guidePanel = document.getElementById("guidePanel");
-          if (guidePanel && !mobileViewerMedia?.matches) {
-            const guideClosed = localStorage.getItem("guidePanelClosed");
-            if (!guideClosed) {
-              guidePanel.open = true;
-              guidePanel.addEventListener("toggle", function onToggle() {
-                if (!guidePanel.open) {
-                  localStorage.setItem("guidePanelClosed", "1");
-                }
-                guidePanel.removeEventListener("toggle", onToggle);
-              }, { once: true });
-            }
-          }
-        } catch (e) { /* localStorage 利用不可の場合は無視 */ }
 
         // ボタン状態のデバッグ（遅延実行）
         setTimeout(() => {

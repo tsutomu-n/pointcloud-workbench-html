@@ -101,6 +101,18 @@ try {
   assert.equal(await otherTab.locator("html").getAttribute("data-theme"), "dark");
   await otherTab.close();
   assert.equal(await page.evaluate(() => statsData.displayPoints), 23746);
+  for (const id of ["viewControlsSection", "colorModeSection", "measurementSection", "slicingSection", "guidePanel"]) {
+    assert.equal(await page.locator("#" + id).getAttribute("open"), null, id);
+  }
+  assert.match(await page.locator("#colorModeToggle").innerText(), /Color mode\s+Classification/);
+  assert.equal(await page.locator(".section-width-control").isVisible(), false);
+  await page.locator("#colorModeToggle").press("Enter");
+  await page.getByRole("button", { name: "Color by elevation", exact: true }).click();
+  assert.equal(await page.locator("#colorModeStatus").innerText(), "Elevation");
+  assert.notEqual(await page.locator("#colorModeSection").getAttribute("open"), null);
+  await page.getByRole("button", { name: "Color by classification", exact: true }).click();
+  assert.equal(await page.locator("#colorModeStatus").innerText(), "Classification");
+  await page.locator("#colorModeToggle").press("Space");
   const orbitCanvas = await page.locator("#container canvas").boundingBox();
   const orbitX = orbitCanvas.x + orbitCanvas.width / 2;
   const orbitY = orbitCanvas.y + orbitCanvas.height / 2;
@@ -157,6 +169,11 @@ try {
   const sampleStats = page.getByRole("button", { name: "Statistics", exact: true });
   assert.equal(await sampleStats.count(), 1);
   await sampleStats.click();
+  const statsOverview = page.locator("#statsPanel .stats-grid > :first-child");
+  assert.match(await statsOverview.innerText(), /Source point count:.*23,746/s);
+  assert.match(await statsOverview.innerText(), /Display ratio:/);
+  assert.equal(await statsOverview.locator("#crsUnits").count(), 1);
+  assert.equal(await page.locator("#loadStrategy").isVisible(), false);
   assert.match(await page.locator("#statsPanel").innerText(), /Potential density gaps/);
   assert.doesNotMatch(await page.locator("#statsPanel").innerText(), /欠測候補/);
   const statsClose = page.locator("#statsPanel").getByRole("button", { name: "Close", exact: true });
@@ -208,6 +225,7 @@ try {
   assert.match(await bridgeResult.innerText(), /Added to this session's history/);
   await bridgeResult.getByRole("button", { name: "Copy CSV", exact: true }).click();
   await page.waitForFunction(async () => (await navigator.clipboard.readText()).includes("60.000"));
+  await page.locator("#measurementDisclosure").click();
   assert.match(await page.locator("#measurementSummary").innerText(), /60\.000/);
   await page.locator('button[onclick="copyMeasurementResult()"]').click();
   await page.waitForFunction(async () => (await navigator.clipboard.readText()).includes("Distance: 60.000 m equivalent"));
@@ -220,11 +238,22 @@ try {
     }
   });
   assert.match(await page.locator("#measurementStatus").innerText(), /3 points selected/);
+  await page.locator("#measurementModeAreaXY").click();
+  assert.equal(await page.evaluate(() => measurementState.selectedPoints.length), 3);
+  await page.locator("#measurementDisclosure").click();
+  assert.match(await page.locator("#measurementDisclosure").innerText(), /Area.*3 points selected/);
+  await page.locator("#measurementDisclosure").click();
+  await page.locator("#measurementModePolyline").click();
+  const changeMode = page.getByRole("alertdialog", { name: "Change measurement type?", exact: true });
+  await changeMode.getByRole("button", { name: "Cancel", exact: true }).click();
+  assert.equal(await page.evaluate(() => measurementState.selectedPoints.length), 3);
   assert.doesNotMatch(await page.locator("#measurementHistoryList").innerText(), /[\u3040-\u30ff\u4e00-\u9fff]/);
   await page.locator("#measurementHistoryList .measurement-history-item").first().hover();
   assert.match(await page.getByRole("tooltip").locator(".measurement-tooltip-title").innerText(), /m equivalent/);
   const historyCount = await page.evaluate(() => measurementState.history.length);
-  await page.getByRole("button", { name: "Clear draft points", exact: true }).click();
+  await page.locator("#measurementModePolyline").click();
+  await changeMode.getByRole("button", { name: "Discard points and switch", exact: true }).click();
+  await page.waitForFunction(() => measurementState.mode === "polyline");
   assert.equal(await page.evaluate(() => measurementState.selectedPoints.length), 0);
   assert.equal(await page.evaluate(() => measurementState.history.length), historyCount);
   await page.locator("#measurementHistoryList .measurement-history-distance").first().click();
@@ -236,7 +265,8 @@ try {
   await page.locator("#measurementHistoryList").getByRole("button", { name: "Delete", exact: true }).first().click();
   assert.equal(await bridgeResult.isVisible(), false);
   assert.equal(await page.evaluate(() => measurementState.history.length), historyCount - 1);
-  await page.getByRole("button", { name: "Open slicing controls", exact: true }).click();
+  const sliceDisclosure = page.locator("#sliceToggle");
+  await sliceDisclosure.click();
   const slicing = page.locator("#sliceControlPanel");
   assert.equal(await slicing.evaluate(node => !!node.closest(".slice-section")), true);
   await slicing.locator("#sliceZCheck").check();
@@ -261,8 +291,21 @@ try {
   }), true);
   await slicing.getByRole("checkbox", { name: "Show the opposite side", exact: true }).last().check();
   assert.equal(await page.evaluate(() => pointCloud.material.clippingPlanes[0].normal.z), -originalPlane);
-  await page.getByRole("button", { name: "Disable slicing", exact: true }).click();
+  await slicing.locator("#sliceZRange").fill("25");
+  await sliceDisclosure.click();
+  assert.match(await sliceDisclosure.innerText(), /Active · Z/);
+  assert.equal(await slicing.isVisible(), false);
+  assert.equal(await page.evaluate(() => pointCloud.material.clippingPlanes.length), 1);
+  await sliceDisclosure.click();
+  await slicing.getByRole("button", { name: "Pause slicing", exact: true }).click();
   assert.equal(await page.evaluate(() => pointCloud.material.clippingPlanes.length), 0);
+  await slicing.getByRole("button", { name: "Resume slicing", exact: true }).click();
+  assert.equal(await slicing.locator("#sliceZRange").inputValue(), "25");
+  assert.equal(await page.evaluate(() => pointCloud.material.clippingPlanes[0].normal.z), -originalPlane);
+  await slicing.getByRole("button", { name: "Reset slicing settings", exact: true }).click();
+  assert.equal(await slicing.locator("#sliceZRange").inputValue(), "0");
+  assert.equal(await page.evaluate(() => pointCloud.material.clippingPlanes.length), 0);
+  await sliceDisclosure.click();
   await page.getByRole("button", { name: "Explore density", exact: true }).click();
   await page.waitForFunction(() => densityOverlayState.enabled);
   assert.match(await page.locator("#sampleGapResult").innerText(), /0 points.*37\.5 m².*0 points\/m²/s);
@@ -498,7 +541,10 @@ try {
     clearDraftMeasurement();
   });
   await viewToggle.tap();
-  assert.equal(await touchPage.getByRole("button", { name: "Show top view", exact: true }).count(), 1);
+  assert.equal(await touchPage.getByRole("button", { name: "Show 2D top view", exact: true }).count(), 1);
+  const viewControlsToggle = touchPage.locator("#viewControlsToggle");
+  await viewControlsToggle.tap();
+  assert.equal(await touchPage.locator(".section-width-control").isVisible(), false);
   await touchPage.locator("#view2dFrontBtn").tap();
   assert.equal(await touchPage.evaluate(() => current2DView), "front");
   await touchPage.getByRole("button", { name: "Back to 3D", exact: true }).tap();
@@ -514,6 +560,7 @@ try {
   await mobileHelpDialog.getByRole("button", { name: "閉じる", exact: true }).tap();
   await mobileHelpDialog.waitFor({ state: "hidden" });
   await touchPage.locator("#languageSelector").selectOption("en");
+  await viewToggle.tap();
   const sectionLayout = await touchPage.locator(".section-width-control").evaluate(element => {
     const box = element.getBoundingClientRect();
     const hint = element.querySelector("#sectionDiagnosticsStatus").getBoundingClientRect();
@@ -522,6 +569,9 @@ try {
     return { width: box.width, hintWidth: hint.width, afterSlider: ground.top >= slider.bottom };
   });
   assert.ok(sectionLayout.width > 200 && sectionLayout.hintWidth === sectionLayout.width && sectionLayout.afterSlider);
+  await viewToggle.tap();
+  assert.equal(await touchPage.locator(".section-width-control").isVisible(), false);
+  await viewControlsToggle.tap();
   await touchPage.locator("#languageSelector").selectOption("ja");
 
   for (const width of [390, 320]) {
@@ -629,6 +679,7 @@ try {
     statsData.classificationCounts = { 1: statsData.displayPoints };
     return counts;
   });
+  await touchPage.locator("#colorModeToggle").tap();
   await touchPage.getByRole("button", { name: "Color by classification", exact: true }).tap();
   const classificationWarning = touchPage.locator("#classificationWarningModal");
   await classificationWarning.waitFor();
