@@ -413,12 +413,13 @@ try {
   await moveFingers(touchPage, cdp, center, [[[0, 0]], [[40, 0]], [[0, 0]]]);
   assert.equal(await touchPage.evaluate(() => measurementState.selectedPoints.length), 0);
   await touchPage.getByRole("button", { name: "全体表示", exact: true }).tap();
-  const tapPoint = await touchPage.evaluate(() => {
+  const measurementScreenPoint = () => touchPage.evaluate(() => {
     const bounds = renderer.domElement.getBoundingClientRect();
     camera.updateMatrixWorld();
     const point = sourceToDisplayPoint({ x: 0, y: 0, z: 9 }).project(camera);
     return { x: bounds.left + (point.x + 1) * bounds.width / 2, y: bounds.top + (1 - point.y) * bounds.height / 2 };
   });
+  const tapPoint = await measurementScreenPoint();
   await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ ...tapPoint, id: 0 }] });
   await cdp.send("Input.dispatchTouchEvent", { type: "touchCancel", touchPoints: [] });
   assert.equal(await touchPage.evaluate(() => measurementState.pointerDown), null);
@@ -442,7 +443,40 @@ try {
   await toolsToggle.tap();
   const mobileMode = touchPage.getByText("サンプルモード · 河川と橋", { exact: true });
   await mobileMode.waitFor();
-  assert.ok((await mobileMode.boundingBox()).y < 844);
+  assert.equal(await touchPage.locator("#view2dTopBtn").isVisible(), false);
+  await viewToggle.tap();
+  await touchPage.evaluate(() => window.toggleMeasurementMode());
+  const modelTouch = { ...(await measurementScreenPoint()), id: 0 };
+  const mobileHeading = await mobileMode.boundingBox();
+  assert.ok(mobileHeading.y < 844);
+  const panelTouch = { x: mobileHeading.x + mobileHeading.width / 2, y: mobileHeading.y + mobileHeading.height / 2, id: 1 };
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [modelTouch] });
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [modelTouch, panelTouch] });
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  assert.equal(await touchPage.evaluate(() => measurementState.selectedPoints.length), 0, "Touches on the model and tools together must not add a point");
+  const measurementStatus = touchPage.locator("#measurementStatus");
+  assert.equal(await measurementStatus.textContent(), "距離: 1点目を選択");
+  await touchPage.locator("#languageSelector").selectOption("en");
+  assert.equal(await measurementStatus.textContent(), "Distance: Select the first point");
+  assert.equal(await touchPage.getByRole("button", { name: "Back to 3D", exact: true }).count(), 1);
+  await touchPage.touchscreen.tap(modelTouch.x, modelTouch.y);
+  assert.equal(await touchPage.evaluate(() => measurementState.selectedPoints.length), 1);
+  assert.equal(await measurementStatus.textContent(), "Select the second point");
+  await touchPage.evaluate(() => {
+    window.toggleMeasurementMode();
+    clearDraftMeasurement();
+  });
+  await viewToggle.tap();
+  assert.equal(await touchPage.getByRole("button", { name: "Show top view", exact: true }).count(), 1);
+  await touchPage.locator("#view2dFrontBtn").tap();
+  assert.equal(await touchPage.evaluate(() => current2DView), "front");
+  await touchPage.getByRole("button", { name: "Back to 3D", exact: true }).tap();
+  assert.equal(await touchPage.evaluate(() => is2DMode), false);
+  await touchPage.locator("#languageSelector").selectOption("ja");
+  await touchPage.getByRole("button", { name: "ヘルプ: 3D / 上面", exact: true }).tap();
+  const viewHelpDialog = touchPage.getByRole("dialog", { name: "3D / 上面", exact: true });
+  await viewHelpDialog.getByRole("button", { name: "閉じる", exact: true }).tap();
+  await viewHelpDialog.waitFor({ state: "hidden" });
   const mobileHelp = touchPage.getByRole("button", { name: "ヘルプ: 橋の断面", exact: true });
   await mobileHelp.tap();
   const mobileHelpDialog = touchPage.getByRole("dialog", { name: "橋の断面", exact: true });

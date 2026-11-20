@@ -2101,6 +2101,7 @@
         cursor: pointer;
       }
       .sample-help-button svg { width: 20px; height: 20px; }
+      .sample-view-help-label { display: none; }
       .sample-help-button:hover { background: var(--ec-hover); }
       .sample-help-button:focus-visible { outline: 2px solid var(--ec-focus); outline-offset: -3px; }
       #sampleHelpDialog {
@@ -4278,6 +4279,25 @@
         #bridgeGuideDistance button {
           min-height: 44px;
         }
+        #sampleViewToggle,
+        #view2dTopBtn,
+        .control-btn-grid:not(:has(#view2dFrontBtn.active, #view2dRightBtn.active)) > #view2dExitBtn {
+          display: none;
+        }
+        .sample-feature > .sample-view-help {
+          grid-column: 1 / -1;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 6px;
+          width: 100%;
+          padding: 6px 8px;
+          border-inline-start: 1px solid var(--ec-border);
+          border-radius: 6px;
+          font-size: .82rem;
+          text-align: start;
+        }
+        .sample-view-help-label { display: inline; }
         @media (any-pointer: coarse) {
           #mobileTouchHint {
             display: block;
@@ -4730,7 +4750,8 @@
             <div class="river-demo-actions">
               <div class="sample-feature">
                 <button id="sampleViewToggle" type="button" class="ec-button ec-button--secondary" onclick="toggleTopView()">上面に切替</button>
-                <button class="sample-help-button" type="button" data-sample-help="view" aria-label="ヘルプ: 3D / 上面" aria-haspopup="dialog" onclick="showSampleFeatureHelp('view', this)">
+                <button class="sample-help-button sample-view-help" type="button" data-sample-help="view" aria-labelledby="sampleViewHelpName" aria-haspopup="dialog" onclick="showSampleFeatureHelp('view', this)">
+                  <span id="sampleViewHelpName" class="sample-view-help-label">ヘルプ: 3D / 上面</span>
                   <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sampleHelpIcon"/></svg>
                 </button>
               </div>
@@ -5397,7 +5418,7 @@
                     </button>
                   </div>
                   <div class="measurement-status" id="measurementStatus">
-                    1点目をクリック
+                    1点目を選択
                   </div>
                   <div class="measurement-actions measurement-actions--wide" id="measurementDraftActions">
                     <button class="control-btn" id="measurementFinalizeBtn" onclick="finalizeMeasurementDraft()">計測を保存</button>
@@ -10419,7 +10440,7 @@
         ["上面に切替", "Show top view"],
         ["3Dに戻る", "Back to 3D"],
         ["ヘルプ: 3D / 上面", "Help: 3D / Top view"],
-        ["上面に切り替えると、河道の曲がりと橋の位置を真上から確認できます。もう一度押すと3Dに戻ります。", "Switch to a top view to see the river’s bend and the bridge’s position. Press the same control again to return to 3D."],
+        ["上面に切り替えると、河道の曲がりと橋の位置を真上から確認できます。上面から3Dに切り替えると、元の視点に戻ります。", "Switch to the top view to see the river’s bend and the bridge’s position from above. Switch back to 3D to return to your previous view."],
         ["ヘルプ: 統計情報", "Help: Statistics"],
         ["読み込んだ点数と表示中の点数、分類の内訳、診断結果を確認できます。間引きがある場合は、元の点数と表示中の点数が異なります。", "See the source and displayed point counts, classification breakdown, and diagnostics. When the cloud is sampled, the displayed count is lower than the source count."],
         ["ヘルプ: 橋の断面", "Help: Bridge cross-section"],
@@ -10619,8 +10640,9 @@
         ["折れ線", "Polyline"],
         ["面積", "Area"],
         ["計測", "Measurement"],
-        ["1点目をクリック", "Click the first point"],
-        ["2点目をクリック", "Click the second point"],
+        ["1点目を選択", "Select the first point"],
+        ["2点目を選択", "Select the second point"],
+        ["点を選択できませんでした。点群の近くを選んでください。", "No point was selected. Select a spot near the point cloud."],
         ["確定", "Finish"],
         ["1点戻す", "Undo last point"],
         ["CSVコピー", "Copy CSV"],
@@ -10990,8 +11012,8 @@
         [/^約\s*(\S.*)$/, (_, detail) => `Approx. ${translateAppUi(detail)}`],
         [/^([\d,.]+)点\/m²$/, "$1 points/m²"],
         [/^([\d,]+)種類$/, "$1 classes"],
-        [/^(距離|折れ線|面積|計測): 1点目をクリック$/, (_, mode) =>
-          `${englishUiText.get(mode)}: Click the first point`],
+        [/^(距離|折れ線|面積|計測): (1点目を選択)$/, (_, mode, step) =>
+          `${englishUiText.get(mode)}: ${englishUiText.get(step)}`],
         [/^(距離|折れ線|面積): (\d+)点選択中。「計測を保存」またはEnterで保存$/, (_, mode, count) =>
           `${englishUiText.get(mode)}: ${count} points selected. Use Save measurement or Enter.`],
         [/^(距離|折れ線|面積): (\d+)点選択中。点を追加してください$/, (_, mode, count) =>
@@ -12247,7 +12269,7 @@
       }
 
       const sampleFeatureHelp = {
-        view: { title: "3D / 上面", description: "上面に切り替えると、河道の曲がりと橋の位置を真上から確認できます。もう一度押すと3Dに戻ります。" },
+        view: { title: "3D / 上面", description: "上面に切り替えると、河道の曲がりと橋の位置を真上から確認できます。上面から3Dに切り替えると、元の視点に戻ります。" },
         statistics: { title: "統計情報", description: "読み込んだ点数と表示中の点数、分類の内訳、診断結果を確認できます。間引きがある場合は、元の点数と表示中の点数が異なります。" },
         section: { title: "橋の断面", description: "橋の中央を通る断面が開きます。上面図の帯が切断位置を示し、A・Bが両方の図で対応します。厚さを変えると帯と断面が更新されます。" },
         measure: { title: "橋の計測", description: "上面図で橋の両端 A・B を選ぶと、水平距離が計測履歴に保存されます。このサンプルの両端間は60 mです。" },
@@ -13864,7 +13886,7 @@
             MEASUREMENT_MODES[measurementState.mode]?.label || "計測";
           if (pointCount > 0) {
             if (measurementState.mode === "distance") {
-              status.textContent = "2点目をクリック";
+              status.textContent = "2点目を選択";
             } else if (canFinalizeMeasurementDraft()) {
               status.textContent =
                 `${modeLabel}: ${pointCount}点選択中。「計測を保存」またはEnterで保存`;
@@ -13874,10 +13896,10 @@
             }
           } else if (measurementState.lastResult) {
             status.textContent = measurementState.enabled
-              ? `${modeLabel}: 1点目をクリック`
+              ? `${modeLabel}: 1点目を選択`
               : "計測完了";
           } else {
-            status.textContent = `${modeLabel}: 1点目をクリック`;
+            status.textContent = `${modeLabel}: 1点目を選択`;
           }
         }
 
@@ -14141,6 +14163,12 @@
         updateMeasurementUi();
       }
 
+      function cancelMeasurementTapOnAdditionalTouch(event) {
+        if (event.pointerType === "touch" && !event.isPrimary && measurementState.pointerDown?.pointerType === "touch") {
+          measurementState.pointerDown = null;
+        }
+      }
+
       function bindMeasurementPointerHandlers() {
         if (!renderer || !renderer.domElement || measurementPointerHandlerBound) {
           return;
@@ -14157,15 +14185,14 @@
           if (isSamePointer(event)) measurementState.pointerDown = null;
         }
 
+        // The second contact can land on a control outside the canvas.
+        document.addEventListener("pointerdown", cancelMeasurementTapOnAdditionalTouch, true);
         canvas.addEventListener("pointerdown", (event) => {
           if (!measurementState.enabled) return;
-          if (event.pointerType === "touch" && event.isPrimary === false) {
-            measurementState.pointerDown = null;
-            return;
-          }
           if (event.button !== 0 || event.isPrimary === false) return;
           measurementState.pointerDown = {
             id: event.pointerId,
+            pointerType: event.pointerType,
             x: event.clientX,
             y: event.clientY,
           };
@@ -14187,7 +14214,7 @@
           const point = pickMeasurementPoint(event);
           if (!point) {
             showToast(
-              "点を選択できませんでした。点群の近くをクリックしてください",
+              "点を選択できませんでした。点群の近くを選んでください。",
               "warning",
             );
             return;
@@ -14730,6 +14757,7 @@
           }
         }
         renderer = null;
+        document.removeEventListener("pointerdown", cancelMeasurementTapOnAdditionalTouch, true);
         measurementState.pointerDown = null;
         measurementPointerHandlerBound = false;
 
