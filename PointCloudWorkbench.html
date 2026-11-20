@@ -1814,13 +1814,69 @@
           transform: scale(1.2);
         }
       }
+      #slice2DModal {
+        width: min(96vw, 1120px);
+        max-width: 96vw;
+        max-height: 94dvh;
+        margin: auto;
+        padding: 0;
+        color: var(--ec-text);
+        background: var(--ec-bg);
+        border: 1px solid var(--ec-border);
+        border-radius: 8px;
+      }
+      #slice2DModal::backdrop { background: #020617cc; }
+      .slice-dialog-header {
+        position: sticky; top: 0; z-index: 1;
+        display: flex; justify-content: space-between; align-items: center; gap: 8px;
+        padding: 10px 12px; background: var(--ec-bg);
+        border-bottom: 1px solid var(--ec-border);
+      }
+      .slice-dialog-header h2 { margin: 0; font-size: 1.05rem; }
+      .slice-dialog-body {
+        display: flex; align-items: flex-start; justify-content: center;
+        flex-wrap: wrap; gap: 12px; padding: 12px;
+      }
+      .slice-dialog-plots {
+        flex: 1 1 480px; min-width: 0; display: flex; flex-wrap: wrap;
+        justify-content: center; gap: 8px;
+      }
+      .slice-dialog-plots > div { min-width: 0; max-width: 100%; box-sizing: border-box; }
+      .slice-dialog-plots canvas { display: block; margin: auto; }
+      .bridge-slice-map {
+        margin: 0; text-align: center; max-width: 100%; flex: 0 1 240px;
+      }
+      .bridge-slice-map canvas { display: block; width: 100%; height: auto; margin-top: 8px; }
+      .slice-dialog-controls {
+        display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+        padding: 12px; border-top: 1px solid var(--ec-border);
+      }
+      .slice-dialog-control { min-width: 0; max-width: 100%; }
+      .slice-dialog-slider { display: flex; align-items: center; gap: 4px; }
+      .slice-dialog-slider input { min-width: 0; flex: 1; }
+      .slice-dialog-controls input[type="range"] { max-width: 100%; }
+      .slice-dialog-controls button, .slice-dialog-header button {
+        min-height: 36px;
+      }
+      #sampleDensityGuide .density-overlay-legend { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 8px; }
+      .density-overlay-legend .density-empty[hidden] { display: none; }
+      .density-overlay-legend .density-empty::before { background: transparent; border: 1px solid currentColor; }
+      @media (max-width: 540px) {
+        .slice-dialog-body { flex-direction: column; align-items: stretch; }
+        .bridge-slice-map { flex: auto; width: min(100%, 170px); align-self: center; }
+        .slice-dialog-plots { flex: auto; }
+      }
       .river-demo-entry { margin-bottom: 1rem; }
       .river-demo-entry p, .river-demo-mode p { margin: .5rem 0; color: var(--ec-muted); }
       .river-demo-mode { padding: 12px; }
       .river-demo-mode h2 { font-size: 1rem; margin: 0; }
       .river-demo-actions { display: flex; flex-wrap: wrap; gap: 6px; }
       .river-demo-actions button { padding: 6px 10px; }
-      [data-sample-step][data-complete]::after { content: " ✓"; }
+      [data-sample-step][data-complete]::after {
+        content: ""; display: inline-block; width: .35em; height: .65em;
+        margin-inline-start: .6em; border: solid currentColor; border-width: 0 2px 2px 0;
+        transform: rotate(45deg);
+      }
       #bridgeEndMarkers button {
         position: fixed; z-index: 40; transform: translate(-50%, -50%);
         width: 36px; height: 36px; border-radius: 50%;
@@ -4082,13 +4138,40 @@
               <button class="ec-button ec-button--secondary" onclick="if (!statsVisible) toggleStatsPanel(); document.getElementById('statsPanel').scrollIntoView({block:'nearest'})">統計情報</button>
             </div>
             <div id="sampleGuide">
-              <p>橋の断面から始めるか、試したい操作を選んでください。</p>
+              <p>橋面と水面の高さはどう違うでしょう？ 断面を開いて確かめましょう。</p>
               <div class="river-demo-actions">
-                <button class="ec-button ec-button--primary" data-sample-step="section" onclick="openBridgeSection()">橋の断面を見る</button>
+                <button class="ec-button ec-button--primary" data-sample-step="section" onclick="openBridgeSection()">橋を横切る断面を見る</button>
                 <button class="ec-button ec-button--secondary" data-sample-step="measure" onclick="startBridgeMeasurement()">橋の両端を測る</button>
                 <button class="ec-button ec-button--secondary" data-sample-step="density" onclick="exploreSampleDensity()">密度を見る</button>
               </div>
-              <p id="bridgeGuideHint" hidden>橋の両端 A と B を選択してください。</p>
+              <div id="bridgeGuideHint" hidden>
+                <p>橋の両端 A と B を選択してください。</p>
+                <div id="bridgeGuideChoices" class="river-demo-actions">
+                  <button class="ec-button ec-button--secondary" onclick="selectBridgeEnd(0)">A を選ぶ</button>
+                  <button class="ec-button ec-button--secondary" onclick="selectBridgeEnd(1)">B を選ぶ</button>
+                </div>
+              </div>
+              <p id="bridgeGuideDistance" role="status" tabindex="-1" hidden>
+                <span>橋の水平距離</span> <output id="bridgeGuideDistanceValue"></output> m
+              </p>
+              <div id="sampleDensityGuide" hidden>
+                <p>凡例の色は表示点の密度です。輪郭は0点のセルを示します。</p>
+                <div class="density-overlay-legend" aria-label="密度ヒートマップ凡例">
+                  <span class="density-empty" id="sampleGapLegend" hidden>0点（輪郭）</span>
+                  <span class="density-low">低密度</span>
+                  <span class="density-mid">中密度</span>
+                  <span class="density-high">高密度</span>
+                  <span class="density-spike">密度スパイク</span>
+                </div>
+                <button class="ec-button ec-button--secondary" onclick="inspectSampleGap()">0点のセルを調べる</button>
+                <div id="sampleGapResult" role="status" hidden>
+                  <p id="sampleGapNotDetected" hidden>現在の表示点では、対応する空セルが検出されていません。</p>
+                  <div id="sampleGapDetails" hidden>
+                    <p>このサンプルは右岸の点を意図的に除いています。</p>
+                    <p><output></output> <span>点</span> · <output></output> m² · <output></output> <span>点/m²</span></p>
+                  </div>
+                </div>
+              </div>
             </div>
             <button id="hideSampleGuide" class="link-btn" onclick="setSampleGuideVisible(false)">サンプルガイドを閉じる</button>
             <button id="showSampleGuide" class="link-btn" onclick="setSampleGuideVisible(true)" hidden>サンプルガイドを表示</button>
@@ -8750,6 +8833,7 @@
 
       window.setDensityOverlayEnabled = function (enabled) {
         densityOverlayState.enabled = enabled === true;
+        if (!densityOverlayState.enabled) clearSampleGapInspection();
         const updated = updateDensityOverlay(statsData.diagnosticsReport);
         if (densityOverlayState.enabled && !updated) {
           showToast("密度ヒートマップ overlay は点群読込後に利用できます", "warning");
@@ -9752,6 +9836,30 @@
       }
 
       const englishUiText = new Map([
+        ["橋面と水面の高さはどう違うでしょう？ 断面を開いて確かめましょう。", "How high is the bridge deck above the water? Open a cross-section to see."],
+        ["橋を横切る断面を見る", "See the bridge cross-section"],
+        ["橋を横切る断面", "Cross-section through the bridge"],
+        ["上面図の切断帯 · Y = 0 m", "Slice band in plan view · Y = 0 m"],
+        ["橋の位置と切断帯", "Bridge location and slice band"],
+        ["高さ（m）", "Elevation (m)"],
+        ["断面内の表示点:", "Displayed points in slice:"],
+        ["橋面と水面の高さ: 9 m / 0 m", "Sample elevations: bridge deck 9 m, water 0 m"],
+        ["橋面・水面・両岸の断面", "Cross-section of the bridge deck, water and banks"],
+        ["断面に沿った距離（m）", "Distance along the section (m)"],
+        ["断面を狭くする", "Narrow slice"],
+        ["断面を広くする", "Widen slice"],
+        ["A を選ぶ", "Select A"],
+        ["B を選ぶ", "Select B"],
+        ["橋の水平距離", "Horizontal bridge distance"],
+        ["凡例の色は表示点の密度です。輪郭は0点のセルを示します。", "Color shows displayed-point density. The outline marks a cell with zero points."],
+        ["0点のセルを調べる", "Inspect the empty cell"],
+        ["現在の表示点では、対応する空セルが検出されていません。", "No matching empty cell was detected in the displayed points."],
+        ["このサンプルは右岸の点を意図的に除いています。", "Points on the right bank were intentionally removed in this sample."],
+        ["点/m²", "points/m²"],
+        ["0点（輪郭）", "Zero points (outline)"],
+        ["低密度", "Low density"],
+        ["中密度", "Medium density"],
+        ["高密度", "High density"],
         ["河川サンプルを試す", "Try the river sample"],
         ["ファイル不要。河川・堤防・橋の点群で断面と計測を試せます。", "No file needed. Explore a river, levees, and a bridge with slicing and measurement tools."],
         ["サンプルモード · 河川と橋", "Sample mode · River and bridge"],
@@ -11498,6 +11606,7 @@
       const bridgeEnds = [-30, 30];
       let sampleFetchController = null;
       let bridgeGuideActive = false;
+      let sampleGapOutline = null;
 
       function demoAssetUrl(path) {
         return location.pathname.startsWith("/app/") ? path.slice(1) : path;
@@ -11527,6 +11636,8 @@
         mode.hidden = false;
         document.getElementById("guidePanel").open = false;
         setSampleGuideVisible(true);
+        document.getElementById("bridgeGuideDistance").hidden = true;
+        document.getElementById("sampleDensityGuide").hidden = true;
         mode.querySelectorAll("[data-sample-step]").forEach(button => button.removeAttribute("data-complete"));
         window.setColorMode("classification");
         const target = controls.target.clone();
@@ -11558,13 +11669,19 @@
 
       function openBridgeSection() {
         endBridgeGuide();
+        clearSampleGapInspection();
+        document.getElementById("sampleDensityGuide").hidden = true;
         if (isCADMode) window.toggleCADMode();
         window.resetSlicing();
-        create2DSliceModal([{ axis: "Z", position: 0 }], 5);
+        const coordinate = sourceToDisplayPoint({ x: 0, y: 0, z: 0 }).z;
+        create2DSliceModal([{ axis: "Z", position: 0, coordinate }], { bridge: true, initialThickness: 5 });
         markSampleStep("section");
       }
 
       function startBridgeMeasurement() {
+        clearSampleGapInspection();
+        document.getElementById("sampleDensityGuide").hidden = true;
+        document.getElementById("bridgeGuideDistance").hidden = true;
         if (isCADMode) window.toggleCADMode();
         window.resetSlicing();
         window.set2DView("top");
@@ -11605,18 +11722,79 @@
           if (measurementState.selectedPoints.some(point => point.index === index)) return;
           const source = getSourcePointAtIndex(index);
           handleMeasurementPoint({ index, source, display: sourceToDisplayPoint(source) });
-          if (!bridgeGuideActive) document.getElementById("measurementSummary").focus({ preventScroll: true });
+          if (!bridgeGuideActive) document.getElementById("bridgeGuideDistance").focus({ preventScroll: true });
+          else document.querySelectorAll("#bridgeGuideChoices button")[1 - end].focus({ preventScroll: true });
           return;
         }
       }
 
       function exploreSampleDensity() {
         endBridgeGuide();
+        if (isCADMode) window.toggleCADMode();
         window.resetSlicing();
         window.set2DView("top");
-        if (!statsVisible) window.toggleStatsPanel();
-        if (window.setDensityOverlayEnabled(true)) markSampleStep("density");
-        document.getElementById("densityHeatmapCanvas").scrollIntoView({ block: "nearest" });
+        window.setDensityOverlayEnabled(true);
+        document.getElementById("sampleDensityGuide").hidden = false;
+        inspectSampleGap();
+      }
+
+      function getSampleGapCell() {
+        return statsData.diagnosticsReport?.densityGrid?.emptyInteriorCells?.find(cell =>
+          cell.minX <= 48 && cell.maxX > 48 && cell.minY <= 36 && cell.maxY > 36,
+        );
+      }
+
+      function clearSampleGapInspection() {
+        if (sampleGapOutline) {
+          sampleGapOutline.parent?.remove(sampleGapOutline);
+          disposeObject3D(sampleGapOutline);
+          sampleGapOutline = null;
+        }
+        const legend = document.getElementById("sampleGapLegend");
+        if (legend) legend.hidden = true;
+        const result = document.getElementById("sampleGapResult");
+        if (result) {
+          result.hidden = true;
+          delete result.dataset.cell;
+        }
+      }
+
+      function inspectSampleGap() {
+        if (!isRiverDemo() || !pointCloud) return;
+        if (isCADMode) window.toggleCADMode();
+        if (!is2DMode || current2DView !== "top") window.set2DView("top");
+        if (!densityOverlayState.enabled) window.setDensityOverlayEnabled(true);
+        clearSampleGapInspection();
+        const result = document.getElementById("sampleGapResult");
+        result.hidden = false;
+        const cell = getSampleGapCell();
+        const noGap = document.getElementById("sampleGapNotDetected");
+        const details = document.getElementById("sampleGapDetails");
+        noGap.hidden = !!cell;
+        details.hidden = !cell;
+        if (!cell) return;
+
+        document.getElementById("sampleGapLegend").hidden = false;
+        result.dataset.cell = `${cell.row}:${cell.column}`;
+        const area = (cell.maxX - cell.minX) * (cell.maxY - cell.minY);
+        const values = result.querySelectorAll("output");
+        values[0].textContent = String(cell.count);
+        values[1].textContent = area.toFixed(1);
+        values[2].textContent = String(cell.density);
+        const height = statsData.header.minZ + 0.4;
+        const corners = [
+          [cell.minX, cell.minY],
+          [cell.maxX, cell.minY],
+          [cell.maxX, cell.maxY],
+          [cell.minX, cell.maxY],
+        ].map(([x, y]) => sourceToDisplayPoint({ x, y, z: height }));
+        sampleGapOutline = new THREE.LineLoop(
+          new THREE.BufferGeometry().setFromPoints(corners),
+          new THREE.LineBasicMaterial({ color: 0xfff0a8, depthTest: false }),
+        );
+        sampleGapOutline.renderOrder = 5;
+        scene.add(sampleGapOutline);
+        markSampleStep("density");
       }
 
       function showSampleLoadError(message) {
@@ -13142,8 +13320,16 @@
           modeConfig?.autoFinalizePointCount &&
           measurementState.selectedPoints.length === modeConfig.autoFinalizePointCount
         ) {
-          addMeasurementRecord(measurementState.selectedPoints, measurementState.mode);
-          if (bridgeGuideActive) markSampleStep("measure");
+          const selected = measurementState.selectedPoints;
+          const record = addMeasurementRecord(selected, measurementState.mode);
+          if (bridgeGuideActive && record && bridgeEnds.every(x => selected.some(({ source }) =>
+            source.x === x && source.y === 0 && source.z === 9,
+          ))) {
+            markSampleStep("measure");
+            document.getElementById("bridgeGuideDistanceValue").textContent =
+              record.metrics.horizontalDistance.toFixed(3);
+            document.getElementById("bridgeGuideDistance").hidden = false;
+          }
           endBridgeGuide();
           resetMeasurementDraft();
         }
@@ -13334,6 +13520,7 @@
 
       function clearPointCloud() {
         endBridgeGuide();
+        clearSampleGapInspection();
         const demoMode = document.getElementById("riverDemoMode");
         if (demoMode && !demoMode.hidden) {
           demoMode.hidden = true;
@@ -18588,305 +18775,156 @@
         create2DSliceModal(activeSlices);
       };
 
-      function create2DSliceModal(activeSlices, initialThickness = null) {
-        // 既存のモーダルを削除
-        const existing = document.getElementById("slice2DModal");
-        if (existing) existing.remove();
-
-        // 点群のサイズに基づいて適切な厚さを計算
-        const box = pointCloud.geometry.boundingBox;
-        const size = box.getSize(new THREE.Vector3());
+      function create2DSliceModal(activeSlices, options = {}) {
+        const { bridge = false, initialThickness = null } = options;
+        document.getElementById("slice2DModal")?.close();
+        const opener = document.activeElement;
+        const size = pointCloud.geometry.boundingBox.getSize(new THREE.Vector3());
         const avgSize = (size.x + size.y + size.z) / 3;
-        const autoThickness = initialThickness ?? Math.max(avgSize * 0.05, 5); // 平均サイズの5%または最小5
-        const maxThickness = avgSize * 0.3; // 最大は30%
-
-        // モーダルコンテナを作成
-        const modal = document.createElement("div");
+        const initial = initialThickness ?? Math.max(avgSize * 0.05, 5);
+        const maxThickness = Math.max(initial, avgSize * 0.3);
+        const defaultThickness = initial.toFixed(1);
+        const modal = document.createElement("dialog");
         modal.id = "slice2DModal";
-        modal.style.cssText = `
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0, 0, 0, 0.9);
-                z-index: 2000;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-            `;
+        modal.setAttribute("aria-labelledby", "sliceDialogTitle");
+        modal.innerHTML = `
+          <header class="slice-dialog-header">
+            <h2 id="sliceDialogTitle">${bridge ? "橋を横切る断面" : "2D断面ビュー"}</h2>
+            <button class="ec-button ec-button--secondary" data-close autofocus>閉じる</button>
+          </header>
+          <div class="slice-dialog-body">
+            ${bridge ? `
+              <figure class="bridge-slice-map">
+                <figcaption>上面図の切断帯 · Y = 0 m</figcaption>
+                <canvas id="bridgeSliceMap" width="240" height="260" role="img" aria-label="橋の位置と切断帯"></canvas>
+                <p><span>断面内の表示点:</span> <output id="bridgeSlicePointCount"></output></p>
+              </figure>` : ""}
+            <div class="slice-dialog-plots"></div>
+          </div>
+          <footer class="slice-dialog-controls">
+            <div class="slice-dialog-control">
+              <label for="sliceThickness">スライス厚さ:</label>
+              <output id="thicknessValue" for="sliceThickness">${defaultThickness}</output>
+              ${bridge ? "m" : ""}
+              <div class="slice-dialog-slider">
+                <button class="ec-button ec-button--secondary" data-thickness-step="-1" aria-label="断面を狭くする">−</button>
+                <input type="range" id="sliceThickness" min="0.1" max="${maxThickness.toFixed(1)}" value="${defaultThickness}" step="0.1">
+                <button class="ec-button ec-button--secondary" data-thickness-step="1" aria-label="断面を広くする">+</button>
+              </div>
+            </div>
+            <div class="slice-dialog-control">
+              <label for="slice2DPointSize">点サイズ:</label>
+              <input type="range" id="slice2DPointSize" min="0.1" max="4" value="2" step="0.1">
+              <output id="pointSizeValue2D" for="slice2DPointSize">2.0</output> px
+            </div>
+            <button id="autoThicknessBtn" class="ec-button ec-button--secondary">自動調整</button>
+            <button class="ec-button ec-button--primary" data-export>画像保存</button>
+          </footer>`;
 
-        // タイトルバー
-        const titleBar = document.createElement("div");
-        titleBar.style.cssText = `
-                position: absolute;
-                top: 0;
-                left: 0;
-                right: 0;
-                height: 48px;
-                background: rgba(15, 23, 42, 0.6);
-                color: #ffffff;
-                font-size: 14px;
-                font-weight: 500;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-                z-index: 2002;
-            `;
-        titleBar.textContent = "2D断面ビュー";
-        modal.appendChild(titleBar);
-
-        // キャンバスコンテナ
-        const canvasContainer = document.createElement("div");
-        canvasContainer.style.cssText = `
-                display: flex;
-                gap: 15px;
-                flex-wrap: wrap;
-                justify-content: center;
-                align-items: center;
-                width: 98%;
-                height: calc(100% - 108px);
-                overflow: auto;
-                margin-top: 48px;
-                margin-bottom: 60px;
-            `;
-        modal.appendChild(canvasContainer);
-
-        // 各スライスに対してキャンバスを作成
-        activeSlices.forEach((slice) => {
-          const sliceCanvas = createSliceCanvas(slice);
-          canvasContainer.appendChild(sliceCanvas);
+        const plots = modal.querySelector(".slice-dialog-plots");
+        const canvases = activeSlices.map((slice) => {
+          const plot = createSliceCanvas(slice, activeSlices.length, bridge);
+          plots.appendChild(plot);
+          return plot.querySelector("canvas");
         });
+        const map = modal.querySelector("#bridgeSliceMap");
+        const thicknessSlider = modal.querySelector("#sliceThickness");
+        const pointSizeSlider = modal.querySelector("#slice2DPointSize");
+        const closeButton = modal.querySelector("[data-close]");
 
-        // コントロールボタン
-        const controls = document.createElement("div");
-        controls.style.cssText = `
-                position: absolute;
-                bottom: 0;
-                left: 0;
-                right: 0;
-                height: 60px;
-                background: rgba(15, 23, 42, 0.6);
-                border-top: 1px solid rgba(255, 255, 255, 0.08);
-                display: flex;
-                gap: 12px;
-                align-items: center;
-                justify-content: center;
-                padding: 0 16px;
-                z-index: 2001;
-            `;
+        function redraw() {
+          const thickness = Number(thicknessSlider.value);
+          const pointSize = Number(pointSizeSlider.value);
+          modal.querySelector("#thicknessValue").textContent = thickness.toFixed(1);
+          modal.querySelector("#pointSizeValue2D").textContent = pointSize.toFixed(1);
+          canvases.forEach((canvas, index) =>
+            drawSliceProjection(canvas, activeSlices[index], thickness, !bridge, pointSize, bridge),
+          );
+          if (map) {
+            drawBridgeSliceMap(map, thickness);
+            modal.querySelector("#bridgeSlicePointCount").textContent = countPointsInSlice(activeSlices[0], thickness).toLocaleString();
+          }
+        }
 
-        // スライス厚さ調整
-        const thicknessControl = document.createElement("div");
-        thicknessControl.style.cssText =
-          "display: flex; align-items: center; gap: 8px; color: #ffffff; background: rgba(15, 23, 42, 0.8); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.08); font-size: 13px;";
-        thicknessControl.innerHTML = `
-                <label>スライス厚さ:</label>
-                <input type="range" id="sliceThickness" min="${(autoThickness * 0.1).toFixed(1)}" max="${maxThickness.toFixed(1)}" value="${autoThickness.toFixed(1)}" step="${(autoThickness * 0.05).toFixed(1)}" style="width: 150px;">
-                <span id="thicknessValue">${autoThickness.toFixed(1)}</span>
-                <button id="autoThicknessBtn" style="padding: 6px 12px; background: rgba(2, 132, 199, 0.15); color: #ffffff; border: 1px solid #0284c7; border-radius: 6px; cursor: pointer; margin-left: 8px; font-size: 13px; font-weight: 500; transition: all 0.2s ease;">自動調整</button>
-            `;
-        controls.appendChild(thicknessControl);
-
-        // 点サイズ調整
-        const pointSizeControl = document.createElement("div");
-        pointSizeControl.style.cssText =
-          "display: flex; align-items: center; gap: 8px; color: #ffffff; background: rgba(15, 23, 42, 0.8); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.08); font-size: 13px;";
-        pointSizeControl.innerHTML = `
-                <label>点サイズ:</label>
-                <input type="range" id="slice2DPointSize" min="0.1" max="4" value="2" step="0.1" style="width: 100px;">
-                <span id="pointSizeValue2D">2.0</span>px
-            `;
-        controls.appendChild(pointSizeControl);
-
-        // エクスポートボタン
-        const exportBtn = document.createElement("button");
-        exportBtn.textContent = "画像保存";
-        exportBtn.style.cssText = `
-                padding: 8px 16px;
-                background: rgba(2, 132, 199, 0.15);
-                color: #ffffff;
-                border: 1px solid #0284c7;
-                border-radius: 6px;
-                cursor: pointer;
-                font-size: 13px;
-                font-weight: 500;
-                transition: all 0.2s ease;
-            `;
-        exportBtn.onmouseenter = () => {
-          exportBtn.style.background = "rgba(2, 132, 199, 0.25)";
-          exportBtn.style.transform = "translateY(-1px)";
-        };
-        exportBtn.onmouseleave = () => {
-          exportBtn.style.background = "rgba(2, 132, 199, 0.15)";
-          exportBtn.style.transform = "translateY(0)";
-        };
-        exportBtn.onclick = () => {
-          activeSlices.forEach((slice, index) => {
-            const canvas =
-              canvasContainer.children[index].querySelector("canvas");
-            if (canvas) {
-              const link = document.createElement("a");
-              link.download = `slice_${slice.axis}_${(slice.position * 100).toFixed(0)}percent.png`;
-              link.href = canvas.toDataURL();
-              link.click();
-            }
+        thicknessSlider.addEventListener("input", redraw);
+        pointSizeSlider.addEventListener("input", redraw);
+        for (const button of modal.querySelectorAll("[data-thickness-step]")) {
+          button.addEventListener("click", () => {
+            const value = Number(thicknessSlider.value) + Number(button.dataset.thicknessStep) * 0.5;
+            thicknessSlider.value = String(value);
+            redraw();
           });
-        };
-        controls.appendChild(exportBtn);
-
-        // 閉じるボタン
-        const closeBtn = document.createElement("button");
-        closeBtn.textContent = "閉じる";
-        closeBtn.style.cssText = `
-                padding: 8px 16px;
-                background: rgba(15, 23, 42, 0.7);
-                color: #ffffff;
-                border: 1px solid rgba(255, 255, 255, 0.08);
-                border-radius: 6px;
-                cursor: pointer;
-                font-size: 13px;
-                font-weight: 500;
-                transition: all 0.2s ease;
-            `;
-        closeBtn.onmouseenter = () => {
-          closeBtn.style.borderColor = "#0284c7";
-          closeBtn.style.color = "#0284c7";
-        };
-        closeBtn.onmouseleave = () => {
-          closeBtn.style.borderColor = "rgba(255, 255, 255, 0.08)";
-          closeBtn.style.color = "#ffffff";
-        };
-        closeBtn.onclick = () => modal.remove();
-        controls.appendChild(closeBtn);
-
-        modal.appendChild(controls);
-
-        // スライス厚さ変更イベント
-        const thicknessSlider =
-          thicknessControl.querySelector("#sliceThickness");
-        const thicknessValue =
-          thicknessControl.querySelector("#thicknessValue");
-        const pointSizeSlider =
-          pointSizeControl.querySelector("#slice2DPointSize");
-        const pointSizeValue =
-          pointSizeControl.querySelector("#pointSizeValue2D");
-
-        thicknessSlider.addEventListener("input", function () {
-          thicknessValue.textContent = parseFloat(this.value).toFixed(1);
-          // 全てのキャンバスを再描画
-          activeSlices.forEach((slice, index) => {
-            const canvas =
-              canvasContainer.children[index].querySelector("canvas");
-            if (canvas) {
-              const pointSize = parseFloat(pointSizeSlider.value);
-              drawSliceProjection(
-                canvas,
-                slice,
-                parseFloat(this.value),
-                true,
-                pointSize,
-              );
-            }
+        }
+        modal.querySelector("#autoThicknessBtn").addEventListener("click", () => {
+          const candidates = [0.02, 0.05, 0.1, 0.15, 0.2, 0.25].map(ratio => avgSize * ratio);
+          const thickness = candidates.find(candidate =>
+            activeSlices.every(slice => countPointsInSlice(slice, candidate) > 100),
+          );
+          thicknessSlider.value = (thickness ?? initial).toFixed(1);
+          redraw();
+        });
+        modal.querySelector("[data-export]").addEventListener("click", () => {
+          canvases.forEach((canvas, index) => {
+            const slice = activeSlices[index];
+            const link = document.createElement("a");
+            link.download = bridge ? "bridge-cross-section.png" :
+              `slice_${slice.axis}_${(slice.position * 100).toFixed(0)}percent.png`;
+            link.href = canvas.toDataURL();
+            link.click();
           });
         });
 
-        // 点サイズ変更イベント
-        pointSizeSlider.addEventListener("input", function () {
-          pointSizeValue.textContent = parseFloat(this.value).toFixed(1);
-          // 全てのキャンバスを再描画
-          activeSlices.forEach((slice, index) => {
-            const canvas =
-              canvasContainer.children[index].querySelector("canvas");
-            if (canvas) {
-              const thickness = parseFloat(thicknessSlider.value);
-              drawSliceProjection(
-                canvas,
-                slice,
-                thickness,
-                true,
-                parseFloat(this.value),
-              );
-            }
-          });
+        closeButton.addEventListener("click", () => modal.close());
+        modal.addEventListener("keydown", event => event.stopPropagation());
+        modal.addEventListener("close", () => {
+          modal.remove();
+          if (opener?.isConnected) opener.focus({ preventScroll: true });
         });
-
-        // 自動調整ボタンのイベント
-        const autoBtn = thicknessControl.querySelector("#autoThicknessBtn");
-        autoBtn.addEventListener("click", function () {
-          // 各スライスで最適な厚さを見つける
-          let optimalThickness = autoThickness;
-          let maxPointsFound = 0;
-
-          // テスト用の厚さ候補
-          const testThicknesses = [
-            avgSize * 0.02,
-            avgSize * 0.05,
-            avgSize * 0.1,
-            avgSize * 0.15,
-            avgSize * 0.2,
-            avgSize * 0.25,
-          ];
-
-          activeSlices.forEach((slice) => {
-            testThicknesses.forEach((testThickness) => {
-              const pointCount = countPointsInSlice(slice, testThickness);
-              if (
-                pointCount > 100 &&
-                pointCount > maxPointsFound * 0.5 &&
-                testThickness < optimalThickness
-              ) {
-                optimalThickness = testThickness;
-                maxPointsFound = Math.max(maxPointsFound, pointCount);
-              }
-            });
-          });
-
-          // 見つかった最適な厚さを適用
-          thicknessSlider.value = optimalThickness.toFixed(1);
-          thicknessValue.textContent = optimalThickness.toFixed(1);
-
-          // 再描画
-          activeSlices.forEach((slice, index) => {
-            const canvas =
-              canvasContainer.children[index].querySelector("canvas");
-            if (canvas) {
-              const pointSize = parseFloat(pointSizeSlider.value);
-              drawSliceProjection(
-                canvas,
-                slice,
-                optimalThickness,
-                false,
-                pointSize,
-              );
-            }
-          });
-        });
-
         document.body.appendChild(modal);
-
-        // 初期描画（自動計算された厚さを使用）
-        setTimeout(() => {
-          activeSlices.forEach((slice, index) => {
-            const canvas =
-              canvasContainer.children[index].querySelector("canvas");
-            if (canvas) {
-              drawSliceProjection(canvas, slice, autoThickness, true, 2.0); // 初期点サイズ2.0
-            }
-          });
-        }, 100);
+        modal.showModal();
+        closeButton.focus();
+        redraw();
       }
 
-      function createSliceCanvas(slice) {
-        // アクティブなスライス数に応じてサイズを調整
-        const activeSlicesCount =
-          document.querySelectorAll(
-            '#sliceControlPanel input[type="checkbox"]:checked',
-          ).length || 1;
+      function drawBridgeSliceMap(canvas, thickness) {
+        const points = pointCloud.userData.sourcePositions;
+        const { minX, maxX, minY, maxY } = statsData.header;
+        const ctx = canvas.getContext("2d");
+        const padding = 16;
+        const scale = Math.min((canvas.width - 2 * padding) / (maxX - minX),
+          (canvas.height - 2 * padding) / (maxY - minY));
+        const mapX = x => canvas.width / 2 + (x - (minX + maxX) / 2) * scale;
+        const mapY = y => canvas.height / 2 - (y - (minY + maxY) / 2) * scale;
+        ctx.fillStyle = "#142131";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#8597aa";
+        for (let i = 0; i < points.length; i += 3) {
+          ctx.fillRect(mapX(points[i]), mapY(points[i + 1]), 1, 1);
+        }
+        const top = mapY(thickness / 2);
+        ctx.fillStyle = "#f5b94250";
+        ctx.fillRect(mapX(minX), top, (maxX - minX) * scale, thickness * scale);
+        ctx.strokeStyle = "#f5b942";
+        ctx.strokeRect(mapX(minX), top, (maxX - minX) * scale, thickness * scale);
+        drawBridgeReferenceLabels(ctx, mapX, mapY(0), false);
+        canvas.dataset.thickness = String(thickness);
+      }
 
-        // 画面サイズを考慮してキャンバスサイズを計算
+      function drawBridgeReferenceLabels(ctx, projectX, y, lightBackground) {
+        ctx.save();
+        ctx.font = "bold 16px system-ui";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "bottom";
+        ctx.fillStyle = lightBackground ? "#6b3b00" : "#fff1c9";
+        bridgeEnds.forEach((x, index) => {
+          const px = projectX(x);
+          ctx.fillRect(px - 1, y - 6, 2, 9);
+          ctx.fillText(index === 0 ? "A" : "B", px, y - 8);
+        });
+        ctx.restore();
+      }
+
+      function createSliceCanvas(slice, activeSlicesCount, bridge) {
         const screenWidth = window.innerWidth;
         const screenHeight = window.innerHeight;
         let canvasSize;
@@ -18933,13 +18971,13 @@
           Y: "XZ平面 (Y軸スライス)",
           Z: "XY平面 (Z軸スライス)",
         };
-        label.textContent = `${axisLabels[slice.axis]} @ ${(slice.position * 100).toFixed(0)}%`;
+        label.textContent = bridge ? "高さ（m）" : `${axisLabels[slice.axis]} @ ${(slice.position * 100).toFixed(0)}%`;
         container.appendChild(label);
 
         // キャンバス
         const canvas = document.createElement("canvas");
         canvas.width = canvasSize;
-        canvas.height = canvasSize;
+        canvas.height = bridge ? Math.round(canvasSize * 0.58) : canvasSize;
         canvas.style.cssText = `
                 border: 2px solid #ddd;
                 cursor: crosshair;
@@ -18947,6 +18985,19 @@
                 height: auto;
             `;
         container.appendChild(canvas);
+        if (bridge) {
+          canvas.setAttribute("role", "img");
+          canvas.setAttribute("aria-label", "橋面・水面・両岸の断面");
+          const axis = document.createElement("div");
+          axis.style.cssText = "text-align:center;color:#333";
+          axis.textContent = "断面に沿った距離（m）";
+          container.appendChild(axis);
+          const elevations = document.createElement("p");
+          elevations.style.cssText = "margin:6px 0 0;text-align:center;color:#333;font-size:.8rem";
+          elevations.textContent = "橋面と水面の高さ: 9 m / 0 m";
+          container.appendChild(elevations);
+          return container;
+        }
 
         // マウス座標表示
         const coordDisplay = document.createElement("div");
@@ -18971,19 +19022,20 @@
       }
 
       // スライス内の点数をカウントする関数
+      function resolveSlicePosition(slice, box) {
+        if (Number.isFinite(slice.coordinate)) return slice.coordinate;
+        const axis = slice.axis.toLowerCase();
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+        return center[axis] + slice.position * size[axis] / 2;
+      }
+
       function countPointsInSlice(slice, thickness) {
         if (!pointCloud || !pointCloud.geometry) return 0;
 
         const positions = pointCloud.geometry.attributes.position.array;
         const box = pointCloud.geometry.boundingBox;
-        const size = box.getSize(new THREE.Vector3());
-        const center = box.getCenter(new THREE.Vector3());
-
-        const slicePos = {
-          X: center.x + (slice.position * size.x) / 2,
-          Y: center.y + (slice.position * size.y) / 2,
-          Z: center.z + (slice.position * size.z) / 2,
-        }[slice.axis];
+        const slicePos = resolveSlicePosition(slice, box);
 
         let count = 0;
         for (let i = 0; i < positions.length; i += 3) {
@@ -19006,6 +19058,7 @@
         thickness,
         autoRetry = true,
         customPointSize = null,
+        bridge = false,
       ) {
         const ctx = canvas.getContext("2d");
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -19016,14 +19069,7 @@
         const colors = pointCloud.geometry.attributes.color.array;
         const box = pointCloud.geometry.boundingBox;
         const size = box.getSize(new THREE.Vector3());
-        const center = box.getCenter(new THREE.Vector3());
-
-        // スライス位置を計算
-        const slicePos = {
-          X: center.x + (slice.position * size.x) / 2,
-          Y: center.y + (slice.position * size.y) / 2,
-          Z: center.z + (slice.position * size.z) / 2,
-        }[slice.axis];
+        const slicePos = resolveSlicePosition(slice, box);
 
         // 投影された点を収集
         const projectedPoints = [];
@@ -19172,12 +19218,34 @@
           ctx.fill();
         });
 
+        if (bridge) {
+          const xAt = x => x * scale + offsetX;
+          const zAt = z => -(z - statsData.header.minZ) * scale + offsetY;
+          const axisY = zAt(statsData.header.minZ) + 18;
+          ctx.save();
+          ctx.fillStyle = "#333";
+          ctx.font = "14px system-ui";
+          ctx.textAlign = "center";
+          for (let step = 0; step <= 4; step++) {
+            const distance = step * (maxX - minX) / 4;
+            ctx.fillText(String(Math.round(distance)), xAt(minX + distance), axisY);
+          }
+          ctx.textAlign = "left";
+          for (const z of [0, 9]) {
+            ctx.fillText(String(z), 4, zAt(z));
+          }
+          ctx.restore();
+          drawBridgeReferenceLabels(ctx, xAt, zAt(9), true);
+        }
+
         // 統計情報を表示
         ctx.fillStyle = "#333";
         ctx.font = `${Math.max(12, canvas.width / 50)}px Arial`;
         ctx.textAlign = "left";
-        ctx.fillText(appUiText(`点数: ${projectedPoints.length}`), 15, 25);
-        ctx.fillText(appUiText(`スケール: ${scale.toFixed(2)}x`), 15, 45);
+        if (!bridge) {
+          ctx.fillText(appUiText(`点数: ${projectedPoints.length}`), 15, 25);
+          ctx.fillText(appUiText(`スケール: ${scale.toFixed(2)}x`), 15, 45);
+        }
 
         // スケールバーを表示
         const scaleBarLength = 100;
