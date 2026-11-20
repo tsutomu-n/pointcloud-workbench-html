@@ -1,6 +1,6 @@
 # PointCloudWorkbench 運用手順書
 
-timestamp="2026-11-20(金)_23:01 JST"
+timestamp="2026-11-20(金)_23:13 JST"
 
 ## 1. 目的
 - 対象: `PointCloudWorkbench.html` の日常運用を担当する利用者、運用担当、検証担当
@@ -104,7 +104,7 @@ timestamp="2026-11-20(金)_23:01 JST"
 - 2D切替: 2D上面/2D正面/2D右側/3D戻る
   - スマートフォンで上面と3Dを切り替えるには、モデル右上の「上面」または「3D」を押す。2D正面と2D右側はツール欄から選ぶ
 - スライス表示: 断面確認、2Dスライス表示
-- 自動分類: 高さ情報から分類を再生成
+- 自動分類: 詳細設定から開き、確認画面で分類を開始する。高さ情報から分類を再生成し、完了通知に地面・植生・建物の点数が表示される。英語表示では「Auto-classify」から操作できる。
 - CRS 診断: LAS/LAZ の header / VLR / EVLR に含まれる WKT、GeoTIFF、EPSG 候補を統計パネルで確認
 - 取得品質: LAS/LAZ の point format と sampled return / scan-angle / GPS-time coverage を手動診断 JSON で確認
 - 地表候補: class 2 ground または p05 推定による表示点ベースの参考地表を統計パネルで確認

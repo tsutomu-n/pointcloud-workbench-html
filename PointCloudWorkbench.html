@@ -10658,6 +10658,8 @@
         ["高さ方向の断面を切り取って内部構造を確認できます", "Use a slice to inspect the interior of the point cloud."],
         ["詳細設定", "Advanced settings"],
         ["自動分類", "Auto-classify"],
+        ["分類開始", "Start classification"],
+        ["分類完了—「種類で色分け」ボタンで色切替できます", "Classification complete. Select Color by classification to view the results."],
         ["地面・植生・建物を高さから自動判別", "Estimate ground, vegetation, and buildings by height"],
         ["CADモード:", "CAD mode:"],
         ["Z軸を高さ方向に", "Use Z as the up axis"],
@@ -10942,6 +10944,10 @@
       // Translate the UI at the DOM boundary. Data, diagnostics payloads,
       // point decoding and rendering coordinates keep their original values.
       const englishUiPatterns = [
+        [/^([\d,]+)個の点を自動分類します。処理には時間がかかる場合があります。続行しますか？$/,
+          "Automatically classify $1 points? This may take some time."],
+        [/^自動分類完了（([\d.]+)秒）— 地面:([\d,]+) 植生:([\d,]+) 建物:([\d,]+)点$/,
+          "Auto-classification complete ($1 s) — Ground: $2 · Vegetation: $3 · Buildings: $4"],
         [/^計測履歴 #(\d+) を選択$/, "Select measurement #$1"],
         [/^点([12]) 元LAS座標: (.+)$/, "Point $1 source LAS coordinates: $2"],
         [/^点データ解析: (.+)$/, "Decoding points: $1"],
@@ -20303,7 +20309,11 @@
           `未分類: ${classified.unclassified.toLocaleString()}点 (${((classified.unclassified / total) * 100).toFixed(1)}%)`;
 
         // 自動分類完了トースト（簡潔版）
-        showToast(`自動分類完了（${elapsedTime}秒）— 地面:${classified.ground.toLocaleString()} 植生:${(classified.lowVeg+classified.midVeg+classified.highVeg).toLocaleString()} 建物:${classified.building.toLocaleString()}点`, 'success');
+        const locale = document.documentElement.lang;
+        const ground = classified.ground.toLocaleString(locale);
+        const vegetation = (classified.lowVeg + classified.midVeg + classified.highVeg).toLocaleString(locale);
+        const buildings = classified.building.toLocaleString(locale);
+        showToast(`自動分類完了（${elapsedTime}秒）— 地面:${ground} 植生:${vegetation} 建物:${buildings}点`, "success");
         console.log("自動分類完了詳細:", resultMessage);
 
         console.log("自動分類完了:", classified);
@@ -20390,7 +20400,7 @@
         const pointCount = pointCloud.geometry.attributes.position.count;
         showConfirmDialog({
           title: '自動分類',
-          message: `${pointCount.toLocaleString()}個の点を自動分類します。処理には時間がかかる場合があります。続行しますか？`,
+          message: `${pointCount.toLocaleString(document.documentElement.lang)}個の点を自動分類します。処理には時間がかかる場合があります。続行しますか？`,
           confirmLabel: '分類開始',
           cancelLabel: 'キャンセル',
           danger: false,

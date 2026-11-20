@@ -618,6 +618,23 @@ try {
   assert.equal(await touchPage.locator("#thicknessValue").innerText(), "0.1");
   await touchPage.getByRole("dialog", { name: "2D断面ビュー" })
     .getByRole("button", { name: "閉じる", exact: true }).tap();
+  if (await toolsToggle.getAttribute("aria-expanded") === "false") await toolsToggle.tap();
+  const advancedSettings = touchPage.locator(".advanced-settings");
+  if (await advancedSettings.getAttribute("open") === null) await advancedSettings.locator("summary").tap();
+  const languageSelector = touchPage.locator("#languageSelector");
+  await languageSelector.selectOption("en");
+  const autoClassify = touchPage.getByRole("button", { name: "Auto-classify", exact: true });
+  const classificationDialog = touchPage.getByRole("alertdialog", { name: "Auto-classify", exact: true });
+  await autoClassify.tap();
+  assert.match(await classificationDialog.innerText(), /Automatically classify 4,096 points/);
+  await classificationDialog.getByRole("button", { name: "Cancel", exact: true }).tap();
+  assert.equal(await touchPage.evaluate(() => statsData.classificationSource), "file");
+  await autoClassify.tap();
+  await classificationDialog.getByRole("button", { name: "Start classification", exact: true }).tap();
+  const classificationResult = touchPage.getByText(/^Auto-classification complete/);
+  await classificationResult.waitFor();
+  assert.match(await classificationResult.innerText(), /Ground: .*Vegetation: .*Buildings:/);
+  assert.equal(await touchPage.evaluate(() => statsData.classificationSource), "auto");
   const unsupported = await browser.newPage({
     userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1",
   });
