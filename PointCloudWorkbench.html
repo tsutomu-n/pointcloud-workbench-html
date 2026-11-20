@@ -14790,12 +14790,14 @@
 
           const nextControls = new OrbitControlsClass(nextCamera, domElement);
           nextControls.enableDamping = true;
-          nextControls.dampingFactor = 0.05;
+          nextControls.dampingFactor = 0.22;
           nextControls.minDistance = 10;
           nextControls.maxDistance = 5000;
           nextControls.enableRotate = true;
           nextControls.enableZoom = true;
           nextControls.enablePan = true;
+          nextControls.rotateSpeed = 0.45;
+          nextControls.zoomSpeed = 0.6;
           nextControls.panSpeed = 0.1;
           nextControls.screenSpacePanning = false;
 

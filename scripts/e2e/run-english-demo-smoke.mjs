@@ -101,6 +101,23 @@ try {
   assert.equal(await otherTab.locator("html").getAttribute("data-theme"), "dark");
   await otherTab.close();
   assert.equal(await page.evaluate(() => statsData.displayPoints), 23746);
+  const orbitCanvas = await page.locator("#container canvas").boundingBox();
+  const orbitX = orbitCanvas.x + orbitCanvas.width / 2;
+  const orbitY = orbitCanvas.y + orbitCanvas.height / 2;
+  const orbitAngle = () => page.evaluate(() => {
+    for (let frame = 0; frame < 60; frame++) controls.update();
+    const offset = camera.position.clone().sub(controls.target);
+    return Math.atan2(offset.x, offset.z);
+  });
+  const angleBeforeDrag = await orbitAngle();
+  await page.mouse.move(orbitX, orbitY);
+  await page.mouse.down();
+  await page.mouse.move(orbitX + orbitCanvas.height / 10, orbitY, { steps: 5 });
+  await page.mouse.up();
+  const orbitDelta = (await orbitAngle()) - angleBeforeDrag;
+  const orbitDegrees = Math.abs(Math.atan2(Math.sin(orbitDelta), Math.cos(orbitDelta))) * 180 / Math.PI;
+  assert.ok(orbitDegrees >= 12 && orbitDegrees <= 20, `A short mouse drag rotated ${orbitDegrees}°`);
+
   assert.equal(await page.locator("#qualitySelectPanel").isVisible(), false);
   const sampleHelp = page.locator("#riverDemoMode button[data-sample-help]");
   assert.equal(await sampleHelp.count(), 5);
