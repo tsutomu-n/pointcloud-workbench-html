@@ -1,6 +1,6 @@
 # PointCloudWorkbench
 
-timestamp="2026-11-20(金)_17:14 JST"
+timestamp="2026-11-20(金)_17:22 JST"
 
 Browser-native LAS/LAZ point cloud workbench delivered as a single HTML file.
 
@@ -46,7 +46,7 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 
 1. Open the English demo in Chrome or Edge.
 2. The 23,746-point synthetic river sample opens directly. From the normal app entry, select **Try the river sample**.
-3. Use the sample guide to open **See the bridge cross-section**, select endpoints A and B with **Measure bridge**, or inspect the outlined zero-point cell in **Explore density**. The cross-section links the cut on the plan view to its elevation plot. Select the question mark next to a tool to open its help.
+3. In **See the bridge cross-section**, change the thickness to update the band in plan view and the slice point count. In **Measure bridge**, select A and B to save the horizontal distance to the measurement history. If you switch to density or 3D mid-measurement, select **Resume bridge measurement** to continue from your selected point. **Explore density** outlines the zero-point cell on the right bank and shows its count and area. Select the question mark next to a tool for help.
 4. Select **Open your own file** to return to file selection.
 
 The bundled LAS uses local metre coordinates with no geographic location. Regenerate it with `node scripts/generate-river-demo.mjs`.

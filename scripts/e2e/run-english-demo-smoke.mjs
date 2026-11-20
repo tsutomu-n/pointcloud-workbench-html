@@ -86,6 +86,7 @@ try {
   const section = page.getByRole("dialog", { name: "Cross-section through the bridge" });
   await section.waitFor();
   assert.equal(await section.locator("#sliceThickness").inputValue(), "5");
+  assert.match(await section.locator("#bridgeSliceThicknessHint").innerText(), /band.*point count/);
   assert.equal(await section.locator("#bridgeSliceMap").getAttribute("data-thickness"), "5");
   assert.equal(await section.getByRole("button", { name: "Close", exact: true }).evaluate(button => button === document.activeElement), true);
   await section.getByRole("button", { name: "Widen slice" }).click();
@@ -114,14 +115,17 @@ try {
   });
   assert.equal(await page.locator("#bridgeGuideDistance").isVisible(), false);
   assert.equal(await page.locator('[data-sample-step="measure"]').getAttribute("data-complete"), null);
+  assert.equal(await page.evaluate(() => measurementState.selectedPoints.length), 0);
   await page.getByRole("button", { name: "Measure bridge", exact: true }).click();
   for (const name of ["Select A", "Select B"]) {
     await page.getByRole("button", { name, exact: true }).click();
   }
   assert.match(await page.locator("#bridgeGuideDistance").innerText(), /60\.000 m/);
+  assert.match(await page.locator("#bridgeGuideDistance").innerText(), /Saved to measurement history/);
   assert.match(await page.locator("#measurementSummary").innerText(), /60\.000/);
   await page.locator('button[onclick="copyMeasurementResult()"]').click();
   await page.waitForFunction(async () => (await navigator.clipboard.readText()).includes("Distance: 60.000 m equivalent"));
+  await page.getByRole("button", { name: "Start measuring", exact: true }).click();
   await page.evaluate(() => {
     setMeasurementMode("areaXY");
     for (const index of [0, 1, 121]) {
@@ -172,7 +176,6 @@ try {
   assert.equal(await page.evaluate(() => pointCloud.material.clippingPlanes.length), 0);
   await page.getByRole("button", { name: "Explore density", exact: true }).click();
   await page.waitForFunction(() => densityOverlayState.enabled);
-  await page.getByRole("button", { name: "Inspect the empty cell" }).click();
   assert.match(await page.locator("#sampleGapResult").innerText(), /0 points.*37\.5 m².*0 points\/m²/s);
   assert.equal(await page.evaluate(() => {
     const cell = statsData.diagnosticsReport.densityGrid.emptyInteriorCells[0];
@@ -189,16 +192,54 @@ try {
       });
   }), true);
   const savedMeasurements = await page.evaluate(() => measurementState.history.length);
-  await page.getByRole("button", { name: "Measure bridge", exact: true }).click();
+  const measureBridge = page.getByRole("button", { name: "Measure bridge", exact: true });
+  await measureBridge.click();
   assert.equal(await page.evaluate(() => densityOverlayState.enabled), false);
+  const endMarker = page.getByRole("button", { name: "Bridge end A", exact: true });
+  const markerLeft = await endMarker.evaluate(button => button.style.left);
+  const originalZoom = await page.evaluate(() => {
+    const previous = camera.zoom;
+    camera.zoom *= 1.2;
+    camera.updateProjectionMatrix();
+    return previous;
+  });
+  await page.waitForFunction(left => document.querySelector("#bridgeEndMarkers button").style.left !== left, markerLeft);
+  await page.evaluate(zoom => {
+    camera.zoom = zoom;
+    camera.updateProjectionMatrix();
+  }, originalZoom);
   await page.getByRole("button", { name: "Select A", exact: true }).click();
+  await measureBridge.click();
+  assert.equal(await page.getByRole("button", { name: "Select B", exact: true }).evaluate(button => button === document.activeElement), true);
+  await page.getByRole("button", { name: "Help: Measure the bridge", exact: true }).click();
+  await page.keyboard.press("Escape");
+  assert.equal(await page.evaluate(() => measurementState.selectedPoints.length), 1);
   await sectionTrigger.click();
   await section.getByRole("button", { name: "Close", exact: true }).click();
+  assert.equal(await page.evaluate(() => measurementState.selectedPoints.length), 1);
+  assert.equal(await page.evaluate(() => measurementState.enabled), true);
+  await page.getByRole("button", { name: "Explore density", exact: true }).click();
+  const resumeBridge = page.getByRole("button", { name: "Resume bridge measurement", exact: true });
+  await resumeBridge.waitFor();
+  assert.equal(await page.evaluate(() => measurementState.enabled), false);
+  await resumeBridge.click();
+  assert.equal(await page.evaluate(() => measurementState.selectedPoints.length), 1);
+  assert.equal(await page.evaluate(() => densityOverlayState.enabled), false);
+  await page.getByRole("button", { name: "3D / Top view", exact: true }).click();
+  await resumeBridge.waitFor();
+  await resumeBridge.click();
+  assert.equal(await page.evaluate(() => measurementState.selectedPoints.length), 1);
+  await page.getByRole("button", { name: "Hide sample guide", exact: true }).press("Enter");
+  const showGuide = page.getByRole("button", { name: "Show sample guide", exact: true });
+  assert.equal(await showGuide.evaluate(button => document.activeElement === button), true);
+  assert.match(await page.locator("#bridgeGuideProgress").innerText(), /1 \/ 2/);
+  await page.getByRole("button", { name: "Clear bridge points", exact: true }).click();
+  assert.match(await page.locator("#bridgeGuideProgress").innerText(), /0 \/ 2/);
+  await page.getByRole("button", { name: "Select B", exact: true }).click();
+  await page.getByRole("button", { name: "Cancel bridge measurement", exact: true }).click();
   assert.equal(await page.evaluate(() => measurementState.selectedPoints.length), 0);
   assert.equal(await page.evaluate(() => measurementState.enabled), false);
   assert.equal(await page.evaluate(() => measurementState.history.length), savedMeasurements);
-  await page.getByRole("button", { name: "Hide sample guide", exact: true }).press("Enter");
-  const showGuide = page.getByRole("button", { name: "Show sample guide", exact: true });
   assert.equal(await showGuide.evaluate(button => document.activeElement === button), true);
   await showGuide.press("Enter");
   assert.equal(await page.getByRole("button", { name: "Hide sample guide", exact: true })
@@ -282,6 +323,17 @@ try {
     await close.tap();
     await dialog.waitFor({ state: "hidden" });
   }
+  await touchPage.setViewportSize({ width: 320, height: 720 });
+  await touchPage.getByRole("button", { name: "橋の両端を測る", exact: true }).tap();
+  const bridgeChoicesFit = await touchPage.locator("#bridgeGuideChoices").evaluate(choices => {
+    const bounds = choices.getBoundingClientRect();
+    const panel = document.getElementById("rightPanel").getBoundingClientRect();
+    return bounds.top >= Math.max(0, panel.top) && bounds.bottom <= Math.min(innerHeight, panel.bottom);
+  });
+  assert.ok(bridgeChoicesFit);
+  await touchPage.getByRole("button", { name: "A を選ぶ", exact: true }).tap();
+  await touchPage.getByRole("button", { name: "B を選ぶ", exact: true }).tap();
+  assert.match(await touchPage.locator("#bridgeGuideDistance").innerText(), /60\.000 m/);
   await touchPage.setViewportSize({ width: 390, height: 844 });
   await touchPage.getByRole("button", { name: "自分のファイルを開く", exact: true }).click();
   await touchPage.getByRole("alertdialog").getByRole("button", { name: "戻る", exact: true }).click();

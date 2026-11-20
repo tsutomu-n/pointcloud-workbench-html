@@ -1873,6 +1873,10 @@
       .river-demo-mode h2 { font-size: 1rem; margin: 0; }
       .river-demo-actions { display: flex; flex-wrap: wrap; gap: 6px; }
       .river-demo-actions button { padding: 6px 10px; }
+      #bridgeGuideHint, #bridgeGuidePaused { margin-block: 12px; }
+      #bridgeGuidePaused[hidden] { display: none; }
+      #bridgeGuideHint .river-demo-actions + .river-demo-actions { margin-top: 6px; }
+      .bridge-slice-thickness-hint { flex-basis: 100%; margin: 0; color: var(--ec-muted); }
       .sample-help-symbol { position: absolute; pointer-events: none; }
       .sample-feature {
         display: grid;
@@ -1931,6 +1935,7 @@
         border: 2px solid var(--ec-accent); background: var(--ec-bg);
         color: var(--ec-text); font-weight: bold; cursor: pointer;
       }
+      #bridgeEndMarkers button:disabled { opacity: .65; cursor: default; }
       @media (max-width: 500px) {
         .ec-topbar__brand, .ec-topbar__back { white-space: nowrap; }
         .ec-topbar__back > span { display: none; }
@@ -4309,8 +4314,8 @@
           </div>
         </div>
         <div id="bridgeEndMarkers" hidden>
-          <button type="button" aria-label="橋の端 A" onclick="selectBridgeEnd(0)">A</button>
-          <button type="button" aria-label="橋の端 B" onclick="selectBridgeEnd(1)">B</button>
+          <button type="button" data-bridge-end="0" aria-label="橋の端 A" onclick="selectBridgeEnd(0)">A</button>
+          <button type="button" data-bridge-end="1" aria-label="橋の端 B" onclick="selectBridgeEnd(1)">B</button>
         </div>
       </main>
       <aside class="ec-right is-hidden" id="rightPanel">
@@ -4359,37 +4364,45 @@
                   </button>
                 </div>
               </div>
-              <div id="bridgeGuideHint" hidden>
-                <p>橋の両端 A と B を選択してください。</p>
-                <div id="bridgeGuideChoices" class="river-demo-actions">
-                  <button class="ec-button ec-button--secondary" onclick="selectBridgeEnd(0)">A を選ぶ</button>
-                  <button class="ec-button ec-button--secondary" onclick="selectBridgeEnd(1)">B を選ぶ</button>
-                </div>
+            </div>
+            <div id="bridgeGuideHint" hidden>
+              <p id="bridgeGuideProgress" role="status"><span id="bridgeGuideNext"></span> · <span id="bridgeGuidePointCount"></span> / 2</p>
+              <div id="bridgeGuideChoices" class="river-demo-actions">
+                <button type="button" data-bridge-end="0" class="ec-button ec-button--secondary" onclick="selectBridgeEnd(0)">A を選ぶ</button>
+                <button type="button" data-bridge-end="1" class="ec-button ec-button--secondary" onclick="selectBridgeEnd(1)">B を選ぶ</button>
               </div>
-              <p id="bridgeGuideDistance" role="status" tabindex="-1" hidden>
-                <span>橋の水平距離</span> <output id="bridgeGuideDistanceValue"></output> m
-              </p>
-              <div id="sampleDensityGuide" hidden>
-                <p>凡例の色は表示点の密度です。輪郭は0点のセルを示します。</p>
-                <div class="density-overlay-legend" aria-label="密度ヒートマップ凡例">
-                  <span class="density-empty" id="sampleGapLegend" hidden>0点（輪郭）</span>
-                  <span class="density-low">低密度</span>
-                  <span class="density-mid">中密度</span>
-                  <span class="density-high">高密度</span>
-                  <span class="density-spike">密度スパイク</span>
-                </div>
-                <button class="ec-button ec-button--secondary" onclick="inspectSampleGap()">0点のセルを調べる</button>
-                <div id="sampleGapResult" role="status" hidden>
-                  <p id="sampleGapNotDetected" hidden>現在の表示点では、対応する空セルが検出されていません。</p>
-                  <div id="sampleGapDetails" hidden>
-                    <p>このサンプルは右岸の点を意図的に除いています。</p>
-                    <p><output></output> <span>点</span> · <output></output> m² · <output></output> <span>点/m²</span></p>
-                  </div>
+              <div class="river-demo-actions">
+                <button id="bridgeGuideClear" type="button" class="ec-button ec-button--secondary" onclick="clearBridgeGuidePoints()">橋の選択点を消す</button>
+                <button type="button" class="ec-button ec-button--secondary" onclick="cancelBridgeMeasurement()">橋の計測をやめる</button>
+              </div>
+            </div>
+            <div id="bridgeGuidePaused" class="river-demo-actions" hidden>
+              <button id="bridgeGuideResume" type="button" class="ec-button ec-button--secondary" onclick="startBridgeMeasurement()">橋の計測を再開</button>
+              <button type="button" class="ec-button ec-button--secondary" onclick="cancelBridgeMeasurement()">橋の計測をやめる</button>
+            </div>
+            <div id="bridgeGuideDistance" role="status" tabindex="-1" hidden>
+              <p><span>橋の水平距離</span> <output id="bridgeGuideDistanceValue"></output> m</p>
+              <p>計測履歴に保存しました。</p>
+            </div>
+            <div id="sampleDensityGuide" hidden>
+              <p>凡例の色は表示点の密度です。輪郭は0点のセルを示します。</p>
+              <div class="density-overlay-legend" aria-label="密度ヒートマップ凡例">
+                <span class="density-empty" id="sampleGapLegend" hidden>0点（輪郭）</span>
+                <span class="density-low">低密度</span>
+                <span class="density-mid">中密度</span>
+                <span class="density-high">高密度</span>
+                <span class="density-spike">密度スパイク</span>
+              </div>
+              <div id="sampleGapResult" role="status" tabindex="-1" hidden>
+                <p id="sampleGapNotDetected" hidden>現在の表示点では、対応する空セルが検出されていません。</p>
+                <div id="sampleGapDetails" hidden>
+                  <p>このサンプルは右岸の点を意図的に除いています。</p>
+                  <p><output></output> <span>点</span> · <output></output> m² · <output></output> <span>点/m²</span></p>
                 </div>
               </div>
             </div>
-            <button id="hideSampleGuide" class="link-btn" onclick="setSampleGuideVisible(false, true)">サンプルガイドを閉じる</button>
-            <button id="showSampleGuide" class="link-btn" onclick="setSampleGuideVisible(true, true)" hidden>サンプルガイドを表示</button>
+            <button id="hideSampleGuide" type="button" class="link-btn" aria-controls="sampleGuide" aria-expanded="true" onclick="setSampleGuideVisible(false, true)">サンプルガイドを閉じる</button>
+            <button id="showSampleGuide" type="button" class="link-btn" aria-controls="sampleGuide" aria-expanded="false" onclick="setSampleGuideVisible(true, true)" hidden>サンプルガイドを表示</button>
             <button class="link-btn" onclick="goHome()">自分のファイルを開く</button>
           </section>
           <!-- 操作ガイド（上部に配置） -->
@@ -9042,7 +9055,10 @@
 
       window.setDensityOverlayEnabled = function (enabled) {
         densityOverlayState.enabled = enabled === true;
-        if (!densityOverlayState.enabled) clearSampleGapInspection();
+        if (!densityOverlayState.enabled) {
+          document.getElementById("sampleDensityGuide").hidden = true;
+          clearSampleGapInspection();
+        }
         const updated = updateDensityOverlay(statsData.diagnosticsReport);
         if (densityOverlayState.enabled && !updated) {
           showToast("密度ヒートマップ overlay は点群読込後に利用できます", "warning");
@@ -10056,7 +10072,7 @@
         ["橋の計測", "Measure the bridge"],
         ["上面図で橋の両端 A・B を選ぶと、水平距離が計測履歴に保存されます。このサンプルの両端間は60 mです。", "Select the bridge endpoints A and B in the top view. The horizontal distance is saved in the measurement history. The endpoints in this sample are 60 m apart."],
         ["ヘルプ: 密度を見る", "Help: Explore density"],
-        ["色は表示点の密度を示します。右岸の輪郭は0点のセルです。「0点のセルを調べる」で点数と面積を確認できます。", "Colors show displayed-point density. The outline on the right bank marks a cell with zero points. Use Inspect the empty cell to see its point count and area."],
+        ["「密度を見る」を押すと、右岸の0点のセルが輪郭で示され、点数と面積が表示されます。色は表示点の密度を示します。", "Explore density outlines the zero-point cell on the right bank and shows its point count and area. Colors show displayed-point density."],
         ["計測を保存", "Save measurement"],
         ["選択した点を取り消す", "Clear draft points"],
         ["保存済みの結果", "Saved result"],
@@ -10082,11 +10098,17 @@
         ["断面に沿った距離（m）", "Distance along the section (m)"],
         ["断面を狭くする", "Narrow slice"],
         ["断面を広くする", "Widen slice"],
+        ["厚さを変えると、上面図の切断帯の幅と、断面に含まれる点数が変わります。", "Change the thickness to adjust the band in plan view and see how the slice point count changes."],
         ["A を選ぶ", "Select A"],
         ["B を選ぶ", "Select B"],
+        ["次に A を選んでください。", "Select A next."],
+        ["次に B を選んでください。", "Select B next."],
+        ["橋の選択点を消す", "Clear bridge points"],
+        ["橋の計測をやめる", "Cancel bridge measurement"],
+        ["橋の計測を再開", "Resume bridge measurement"],
         ["橋の水平距離", "Horizontal bridge distance"],
+        ["計測履歴に保存しました。", "Saved to measurement history."],
         ["凡例の色は表示点の密度です。輪郭は0点のセルを示します。", "Color shows displayed-point density. The outline marks a cell with zero points."],
-        ["0点のセルを調べる", "Inspect the empty cell"],
         ["現在の表示点では、対応する空セルが検出されていません。", "No matching empty cell was detected in the displayed points."],
         ["このサンプルは右岸の点を意図的に除いています。", "Points on the right bank were intentionally removed in this sample."],
         ["点/m²", "points/m²"],
@@ -11844,6 +11866,7 @@
       const bridgeEnds = [-30, 30];
       let sampleFetchController = null;
       let bridgeGuideActive = false;
+      let pausedBridgePoints = [];
       let sampleGapOutline = null;
 
       function demoAssetUrl(path) {
@@ -11868,7 +11891,7 @@
         statistics: { title: "統計情報", description: "読み込んだ点数と表示中の点数、分類の内訳、診断結果を確認できます。間引きがある場合は、元の点数と表示中の点数が異なります。" },
         section: { title: "橋の断面", description: "橋の中央を通る断面が開きます。上面図の帯が切断位置を示し、A・Bが両方の図で対応します。厚さを変えると帯と断面が更新されます。" },
         measure: { title: "橋の計測", description: "上面図で橋の両端 A・B を選ぶと、水平距離が計測履歴に保存されます。このサンプルの両端間は60 mです。" },
-        density: { title: "密度を見る", description: "色は表示点の密度を示します。右岸の輪郭は0点のセルです。「0点のセルを調べる」で点数と面積を確認できます。" },
+        density: { title: "密度を見る", description: "「密度を見る」を押すと、右岸の0点のセルが輪郭で示され、点数と面積が表示されます。色は表示点の密度を示します。" },
       };
 
       function showSampleFeatureHelp(key, trigger) {
@@ -11903,7 +11926,7 @@
         document.getElementById("sampleGuide").hidden = !visible;
         hide.hidden = !visible;
         show.hidden = visible;
-        if (moveFocus) (visible ? hide : show).focus({ preventScroll: true });
+        if (moveFocus) (visible ? hide : show).focus();
       }
 
       function showRiverDemoMode() {
@@ -11934,6 +11957,49 @@
         bridgeGuideActive = false;
         document.getElementById("bridgeGuideHint")?.setAttribute("hidden", "");
         document.getElementById("bridgeEndMarkers")?.setAttribute("hidden", "");
+        document.getElementById("bridgeGuidePaused").hidden = !pausedBridgePoints.length;
+      }
+
+      function bridgeEndIndex({ source }) {
+        return source.y === 0 && source.z === 9 ? bridgeEnds.indexOf(source.x) : -1;
+      }
+
+      function updateBridgeGuideProgress() {
+        const points = measurementState.selectedPoints;
+        const selected = points.map(bridgeEndIndex);
+        document.getElementById("bridgeGuideNext").textContent = points.length === 0
+          ? "橋の両端 A と B を選択してください。"
+          : selected.includes(0) ? "次に B を選んでください。" : "次に A を選んでください。";
+        document.getElementById("bridgeGuidePointCount").textContent = String(points.length);
+        document.getElementById("bridgeGuideClear").disabled = points.length === 0;
+        document.querySelectorAll("[data-bridge-end]").forEach(button => {
+          button.disabled = selected.includes(Number(button.dataset.bridgeEnd));
+        });
+      }
+
+      function focusBridgeGuide() {
+        const guide = document.getElementById("bridgeGuideHint");
+        guide.scrollIntoView({ block: "nearest" });
+        guide.querySelector("#bridgeGuideChoices button:not(:disabled)")?.focus({ preventScroll: true });
+      }
+
+      function clearBridgeGuidePoints() {
+        resetMeasurementDraft();
+        updateMeasurementUi();
+        focusBridgeGuide();
+      }
+
+      function cancelBridgeMeasurement() {
+        pausedBridgePoints = [];
+        const wasActive = bridgeGuideActive;
+        endBridgeGuide();
+        if (wasActive) {
+          measurementState.enabled = false;
+          resetMeasurementDraft();
+          updateMeasurementUi();
+        }
+        const guide = document.getElementById("sampleGuide");
+        (guide.hidden ? document.getElementById("showSampleGuide") : guide.querySelector('[data-sample-step="measure"]')).focus();
       }
 
       function markSampleStep(step) {
@@ -11943,51 +12009,58 @@
       }
 
       function leaveSampleDensityGuide() {
-        const guide = document.getElementById("sampleDensityGuide");
-        if (guide.hidden) return;
-        guide.hidden = true;
-        window.setDensityOverlayEnabled(false);
+        if (!document.getElementById("sampleDensityGuide").hidden) {
+          window.setDensityOverlayEnabled(false);
+        }
       }
 
-      function leaveSampleMeasurement() {
-        endBridgeGuide();
+      function pauseBridgeMeasurement() {
         if (!measurementState.enabled) return;
+        if (bridgeGuideActive) {
+          pausedBridgePoints = measurementState.selectedPoints;
+          resetMeasurementDraft();
+          endBridgeGuide();
+        }
         measurementState.enabled = false;
-        resetMeasurementDraft();
+        measurementState.pointerDown = null;
         updateMeasurementUi();
       }
 
       function openBridgeSection() {
-        leaveSampleMeasurement();
         leaveSampleDensityGuide();
-        if (isCADMode) window.toggleCADMode();
-        window.resetSlicing();
         const coordinate = sourceToDisplayPoint({ x: 0, y: 0, z: 0 }).z;
         create2DSliceModal([{ axis: "Z", position: 0, coordinate }], { bridge: true, initialThickness: 5 });
         markSampleStep("section");
       }
 
       function startBridgeMeasurement() {
+        if (bridgeGuideActive) {
+          focusBridgeGuide();
+          return;
+        }
         leaveSampleDensityGuide();
         document.getElementById("bridgeGuideDistance").hidden = true;
         if (isCADMode) window.toggleCADMode();
         window.resetSlicing();
         window.set2DView("top");
         setMeasurementMode("distance");
-        resetMeasurementDraft();
+        measurementState.selectedPoints = pausedBridgePoints;
+        pausedBridgePoints = [];
+        renderMeasurementDraftHelper();
         measurementState.enabled = true;
         bridgeGuideActive = true;
+        document.getElementById("bridgeGuidePaused").hidden = true;
         document.getElementById("bridgeGuideHint").hidden = false;
         updateMeasurementUi();
         document.getElementById("bridgeEndMarkers").hidden = false;
         updateBridgeEndMarkers();
+        focusBridgeGuide();
       }
 
       function updateBridgeEndMarkers() {
         if (!bridgeGuideActive) return;
-        if (!is2DMode || current2DView !== "top" || !measurementState.enabled ||
-            measurementState.mode !== "distance" || isCADMode) {
-          endBridgeGuide();
+        if (!is2DMode || current2DView !== "top" || isCADMode) {
+          pauseBridgeMeasurement();
           return;
         }
         const rect = renderer.domElement.getBoundingClientRect();
@@ -12017,20 +12090,20 @@
             return;
           }
           handleMeasurementPoint({ index, source, display });
-          if (!bridgeGuideActive) document.getElementById("bridgeGuideDistance").focus({ preventScroll: true });
-          else document.querySelectorAll("#bridgeGuideChoices button")[1 - end].focus({ preventScroll: true });
+          if (bridgeGuideActive) focusBridgeGuide();
           return;
         }
       }
 
       function exploreSampleDensity() {
-        leaveSampleMeasurement();
+        pauseBridgeMeasurement();
         if (isCADMode) window.toggleCADMode();
         window.resetSlicing();
         window.set2DView("top");
         window.setDensityOverlayEnabled(true);
         document.getElementById("sampleDensityGuide").hidden = false;
         inspectSampleGap();
+        document.getElementById("sampleGapResult").focus();
       }
 
       function getSampleGapCell() {
@@ -13356,6 +13429,10 @@
       }
 
       function updateMeasurementUi() {
+        if (bridgeGuideActive) {
+          if (measurementState.enabled && measurementState.mode === "distance") updateBridgeGuideProgress();
+          else endBridgeGuide();
+        }
         const toggleBtn = document.getElementById("measurementToggleBtn");
         const panel = document.getElementById("measurementPanel");
         const status = document.getElementById("measurementStatus");
@@ -13662,6 +13739,10 @@
       }
 
       function handleMeasurementPoint(point) {
+        if (bridgeGuideActive) {
+          const end = bridgeEndIndex(point);
+          if (end === -1 || measurementState.selectedPoints.some(selected => bridgeEndIndex(selected) === end)) return;
+        }
         measurementState.selectedPoints.push(point);
         renderMeasurementDraftHelper();
 
@@ -13672,15 +13753,15 @@
         ) {
           const selected = measurementState.selectedPoints;
           const record = addMeasurementRecord(selected, measurementState.mode);
-          if (bridgeGuideActive && record && bridgeEnds.every(x => selected.some(({ source }) =>
-            source.x === x && source.y === 0 && source.z === 9,
-          ))) {
+          if (bridgeGuideActive && record) {
             markSampleStep("measure");
             document.getElementById("bridgeGuideDistanceValue").textContent =
               record.metrics.horizontalDistance.toFixed(3);
             document.getElementById("bridgeGuideDistance").hidden = false;
+            measurementState.enabled = false;
+            endBridgeGuide();
+            document.getElementById("bridgeGuideDistance").focus();
           }
-          endBridgeGuide();
           resetMeasurementDraft();
         }
 
@@ -13869,6 +13950,7 @@
       };
 
       function clearPointCloud() {
+        pausedBridgePoints = [];
         endBridgeGuide();
         clearSampleGapInspection();
         const demoMode = document.getElementById("riverDemoMode");
@@ -17510,6 +17592,7 @@
         apply2DView(view);
         update2DButtons();
         update2DSectionDiagnostics();
+        updateBridgeEndMarkers();
       };
 
       window.exit2DView = function () {
@@ -17526,6 +17609,7 @@
         }
         update2DButtons();
         update2DSectionDiagnostics();
+        updateBridgeEndMarkers();
       };
 
       function update2DButtons() {
@@ -19178,7 +19262,7 @@
               ${bridge ? "m" : ""}
               <div class="slice-dialog-slider">
                 <button class="ec-button ec-button--secondary" data-thickness-step="-1" aria-label="断面を狭くする">−</button>
-                <input type="range" id="sliceThickness" min="0.1" max="${maxThickness.toFixed(1)}" value="${defaultThickness}" step="0.1">
+                <input type="range" id="sliceThickness" min="0.1" max="${maxThickness.toFixed(1)}" value="${defaultThickness}" step="0.1"${bridge ? ' aria-describedby="bridgeSliceThicknessHint"' : ""}>
                 <button class="ec-button ec-button--secondary" data-thickness-step="1" aria-label="断面を広くする">+</button>
               </div>
             </div>
@@ -19189,6 +19273,7 @@
             </div>
             <button id="autoThicknessBtn" class="ec-button ec-button--secondary">自動調整</button>
             <button class="ec-button ec-button--primary" data-export>画像保存</button>
+            ${bridge ? '<p id="bridgeSliceThicknessHint" class="bridge-slice-thickness-hint">厚さを変えると、上面図の切断帯の幅と、断面に含まれる点数が変わります。</p>' : ""}
           </footer>`;
 
         const plots = modal.querySelector(".slice-dialog-plots");
@@ -19906,6 +19991,7 @@
           animationFrameCount++;
         }
 
+        updateBridgeEndMarkers();
         renderer.render(scene, camera);
       }
 
