@@ -22,6 +22,25 @@ const server = createServer(async (request, response) => {
   }
 });
 
+async function themeContrast(page, pairs) {
+  return page.evaluate(pairs => {
+    const style = getComputedStyle(document.documentElement);
+    const luminance = token => {
+      const hex = style.getPropertyValue(token).trim().slice(1);
+      const channels = [0, 2, 4].map(offset => {
+        const channel = parseInt(hex.slice(offset, offset + 2), 16) / 255;
+        return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+      });
+      return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+    };
+    return pairs.map(([a, b]) => {
+      const first = luminance(a);
+      const second = luminance(b);
+      return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
+    });
+  }, pairs);
+}
+
 async function moveFingers(page, cdp, center, frames) {
   for (const [index, frame] of frames.entries()) {
     const touchPoints = frame.map(([dx, dy], id) => ({ x: center.x + dx, y: center.y + dy, id }));
@@ -112,10 +131,22 @@ try {
   const appTheme = page.getByRole("button", { name: "Light theme", exact: true });
   assert.equal(await page.locator("html").getAttribute("data-theme"), "light");
   assert.equal(await appTheme.getAttribute("aria-pressed"), "true");
-  const lightBackground = await page.evaluate(() => scene.background.getHexString());
+  const contrastRatios = await themeContrast(page, [
+    ["--ec-muted", "--ec-surface"],
+    ["--ec-text", "--ec-canvas"],
+    ["--ec-accent-text", "--ec-accent"],
+    ["--ec-accent", "--ec-accent-bg"],
+  ]);
+  assert.ok(contrastRatios.every(ratio => ratio >= 4.5), contrastRatios.join(", "));
+  const { lightBackground, lightPointBrightness } = await page.evaluate(() => ({
+    lightBackground: scene.background.getHexString(),
+    lightPointBrightness: pointCloud.material.color.r,
+  }));
+  assert.ok(lightPointBrightness > 0 && lightPointBrightness < 1);
   await appTheme.press("Space");
   assert.equal(await page.locator("html").getAttribute("data-theme"), "dark");
   await page.waitForFunction(background => scene.background.getHexString() !== background, lightBackground);
+  assert.equal(await page.evaluate(() => pointCloud.material.color.r), 1);
   const otherTab = await context.newPage();
   await otherTab.addInitScript(() => {
     window.addEventListener("pageshow", event => {
@@ -128,6 +159,7 @@ try {
   await page.waitForFunction(background =>
     document.documentElement.dataset.theme === "light" && scene.background.getHexString() === background,
     lightBackground);
+  assert.equal(await page.evaluate(() => pointCloud.material.color.r), lightPointBrightness);
   await otherTab.getByRole("link", { name: "Open LAS / LAZ", exact: true }).click();
   await otherTab.getByRole("button", { name: "Light theme", exact: true }).press("Space");
   await otherTab.evaluate(() => history.back());

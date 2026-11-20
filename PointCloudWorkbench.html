@@ -1540,6 +1540,7 @@
       }
 
       .legend-color {
+        filter: brightness(var(--ec-point-brightness, 1));
         width: 16px;
         height: 16px;
         border-radius: 3px;
@@ -2214,37 +2215,38 @@
 
       :root[data-theme="light"] {
         color-scheme: light;
-        --ec-bg: #f3eee7;
-        --ec-surface: #fffaf4;
-        --ec-toolbar: #fbf6ee;
-        --ec-canvas: #ebe5dc;
-        --ec-inset: #f4eee7;
-        --ec-text: #29232b;
-        --ec-muted: #645a64;
-        --ec-border: #c8b9be;
-        --ec-hover: #ece2da;
-        --ec-accent: #81551e;
-        --ec-accent-hover: #684116;
-        --ec-accent-text: #fff9ef;
-        --ec-accent-bg: #eee0cc;
-        --ec-accent-glow: rgba(129, 85, 30, 0.17);
-        --ec-success: #3c5a23;
-        --ec-success-hover: #304c1a;
-        --ec-success-bg: #e4ebd9;
-        --ec-warning: #83471c;
-        --ec-warning-hover: #6f3913;
-        --ec-warning-bg: #f3e3d2;
-        --ec-error: #9f354d;
-        --ec-error-hover: #84293c;
-        --ec-error-bg: #f6dfe3;
-        --ec-info: #634582;
-        --ec-info-bg: #ece3f3;
-        --ec-axis-z: #2e6080;
-        --ec-shadow: 0 10px 30px rgba(58, 43, 48, 0.16);
-        --ec-backdrop: rgba(52, 43, 51, 0.46);
-        --ec-plot-grid: #b8aeb1;
-        --ec-plot-point: #706670;
-        --ec-select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='m1 1 5 5 5-5' fill='none' stroke='%23645a64' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+        --ec-bg: #e6e9e3;
+        --ec-surface: #f0f2ee;
+        --ec-toolbar: #ecefe9;
+        --ec-canvas: #d8ded7;
+        --ec-inset: #e9ede7;
+        --ec-text: #252b26;
+        --ec-muted: #515c54;
+        --ec-border: #b9c2b8;
+        --ec-hover: #dce4da;
+        --ec-accent: #69551e;
+        --ec-accent-hover: #544314;
+        --ec-accent-text: #f4f2e9;
+        --ec-accent-bg: #e9e3cf;
+        --ec-accent-glow: rgba(105, 85, 30, 0.18);
+        --ec-success: #3e5d35;
+        --ec-success-hover: #30492a;
+        --ec-success-bg: #e0eade;
+        --ec-warning: #804921;
+        --ec-warning-hover: #643719;
+        --ec-warning-bg: #efe3d5;
+        --ec-error: #8a394d;
+        --ec-error-hover: #6d2b3a;
+        --ec-error-bg: #eedfe3;
+        --ec-info: #59467b;
+        --ec-info-bg: #e7e2ee;
+        --ec-axis-z: #315b78;
+        --ec-shadow: 0 3px 12px rgba(38, 47, 40, 0.09);
+        --ec-backdrop: rgba(28, 37, 31, 0.48);
+        --ec-plot-grid: #89988d;
+        --ec-plot-point: #505f55;
+        --ec-point-brightness: 0.6;
+        --ec-select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='m1 1 5 5 5-5' fill='none' stroke='%23515c54' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
       }
 
       :root {
@@ -9891,6 +9893,10 @@
       function getThemeColor(token, fallback) {
         return window.getComputedStyle?.(document.documentElement)
           .getPropertyValue(token).trim() || fallback;
+      }
+
+      function getPointDisplayBrightness() {
+        return Number(getThemeColor("--ec-point-brightness", "1"));
       }
 
       function renderSectionProfile(canvas, profile) {
@@ -17740,7 +17746,9 @@
         }
 
         // 新しい点群作成（強化版設定）
+        const brightness = getPointDisplayBrightness();
         const material = new THREE.PointsMaterial({
+          color: new THREE.Color(brightness, brightness, brightness),
           size: pointSize, // UIの値をそのまま使用
           vertexColors: true,
           sizeAttenuation: false, // サイズを固定にして確実に見えるように
@@ -20187,6 +20195,7 @@
         }
 
         // 点を描画（深度でソート - 奥から手前へ）
+        const colorScale = getPointDisplayBrightness() * 255;
         projectedPoints.sort((a, b) => b.distance - a.distance);
 
         projectedPoints.forEach((p) => {
@@ -20202,7 +20211,7 @@
               ? customPointSize
               : Math.max(2, Math.min(4, canvas.width / 200));
 
-          ctx.fillStyle = `rgba(${Math.floor(p.r * 255)}, ${Math.floor(p.g * 255)}, ${Math.floor(p.b * 255)}, ${alpha})`;
+          ctx.fillStyle = `rgba(${Math.floor(p.r * colorScale)}, ${Math.floor(p.g * colorScale)}, ${Math.floor(p.b * colorScale)}, ${alpha})`;
           ctx.beginPath();
           ctx.arc(canvasX, canvasY, pointSize, 0, 2 * Math.PI);
           ctx.fill();
@@ -22099,6 +22108,8 @@
 
       document.addEventListener("pcw-theme-change", () => {
         scene?.background?.set?.(getThemeColor("--ec-canvas", "#211f23"));
+        const brightness = getPointDisplayBrightness();
+        pointCloud?.material?.color.setRGB(brightness, brightness, brightness);
         sampleGapOutline?.material.color.set(getThemeColor("--ec-accent", "#e2bc6d"));
         renderSectionProfile(
           document.getElementById("sectionProfileCanvas"),
