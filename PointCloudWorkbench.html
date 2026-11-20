@@ -79,6 +79,8 @@
     ></script>
     <script>
       // OrbitControls のインライン実装
+      const TAP_MAX_DRIFT = 4;
+
       THREE.OrbitControls = function (object, domElement) {
         this.object = object;
         this.domElement = domElement;
@@ -117,10 +119,6 @@
           ROTATE: 0,
           DOLLY: 1,
           PAN: 2,
-          TOUCH_ROTATE: 3,
-          TOUCH_PAN: 4,
-          TOUCH_DOLLY_PAN: 5,
-          TOUCH_DOLLY_ROTATE: 6,
         };
         var state = STATE.NONE;
 
@@ -145,6 +143,17 @@
         var dollyEnd = new THREE.Vector2();
         var dollyDelta = new THREE.Vector2();
 
+        const touchPointers = new Map();
+        const touchRay = new THREE.Raycaster();
+        const touchCursor = new THREE.Vector2();
+        const touchPlane = new THREE.Plane();
+        const touchNormal = new THREE.Vector3();
+        const previousAnchor = new THREE.Vector3();
+        const nextAnchor = new THREE.Vector3();
+        let previousTouch = null;
+        let touchDragging = false;
+        let touchStarted = false;
+
         this.update = (function () {
           var offset = new THREE.Vector3();
           var quat = new THREE.Quaternion().setFromUnitVectors(
@@ -155,13 +164,14 @@
           var lastPosition = new THREE.Vector3();
           var lastQuaternion = new THREE.Quaternion();
 
-          return function update() {
+          return function update(immediate = false) {
             var position = scope.object.position;
             offset.copy(position).sub(scope.target);
             offset.applyQuaternion(quat);
             spherical.setFromVector3(offset);
+            const damping = scope.enableDamping && !immediate;
 
-            if (scope.enableDamping) {
+            if (damping) {
               spherical.theta += sphericalDelta.theta * scope.dampingFactor;
               spherical.phi += sphericalDelta.phi * scope.dampingFactor;
             } else {
@@ -190,7 +200,7 @@
             position.copy(scope.target).add(offset);
             scope.object.lookAt(scope.target);
 
-            if (scope.enableDamping === true) {
+            if (damping) {
               sphericalDelta.theta *= 1 - scope.dampingFactor;
               sphericalDelta.phi *= 1 - scope.dampingFactor;
               panOffset.multiplyScalar(1 - scope.dampingFactor);
@@ -224,6 +234,12 @@
           );
           scope.domElement.removeEventListener("mousedown", onMouseDown, false);
           scope.domElement.removeEventListener("wheel", onMouseWheel, false);
+          scope.domElement.removeEventListener("pointerdown", onTouchDown);
+          scope.domElement.removeEventListener("pointermove", onTouchMove);
+          for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) {
+            scope.domElement.removeEventListener(type, onTouchEnd);
+          }
+          touchPointers.clear();
           document.removeEventListener("mousemove", onMouseMove, false);
           document.removeEventListener("mouseup", onMouseUp, false);
         };
@@ -471,6 +487,90 @@
           scope.dispatchEvent(endEvent);
         }
 
+        function getTouchFrame() {
+          if (!touchPointers.size || touchPointers.size > 2) return null;
+          const [first, second] = touchPointers.values();
+          if (!second) return first;
+          return {
+            x: (first.x + second.x) / 2,
+            y: (first.y + second.y) / 2,
+            span: Math.max(1, Math.hypot(first.x - second.x, first.y - second.y)),
+          };
+        }
+
+        function projectTouchToTargetPlane(point, output) {
+          const camera = scope.object;
+          const rect = scope.domElement.getBoundingClientRect();
+          if (!rect.width || !rect.height) return null;
+          touchCursor.set(
+            (point.x - rect.left) / rect.width * 2 - 1,
+            1 - (point.y - rect.top) / rect.height * 2,
+          );
+          camera.updateMatrixWorld();
+          touchPlane.setFromNormalAndCoplanarPoint(camera.getWorldDirection(touchNormal), scope.target);
+          touchRay.setFromCamera(touchCursor, camera);
+          return touchRay.ray.intersectPlane(touchPlane, output);
+        }
+
+        function moveTouchView(previous, current) {
+          // Keep the point between the fingers under the moving midpoint.
+          const anchor = scope.enablePan && projectTouchToTargetPlane(previous, previousAnchor);
+          if (scope.enableZoom && current.span && current.span !== previous.span) {
+            const factor = Math.pow(current.span / previous.span, scope.zoomSpeed);
+            dollyIn(1 / factor);
+            scope.update(true);
+          }
+          if (anchor && projectTouchToTargetPlane(current, nextAnchor)) {
+            const offset = anchor.sub(nextAnchor);
+            scope.object.position.add(offset);
+            scope.target.add(offset);
+            scope.update(true);
+          }
+        }
+
+        function onTouchDown(event) {
+          if (event.pointerType !== "touch" || !scope.enabled) return;
+          event.preventDefault();
+          scope.domElement.setPointerCapture(event.pointerId);
+          touchPointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+          previousTouch = getTouchFrame();
+          touchDragging = false;
+        }
+
+        function onTouchMove(event) {
+          if (!scope.enabled || !touchPointers.has(event.pointerId)) return;
+          touchPointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+          const current = getTouchFrame();
+          if (!current || !previousTouch) return;
+          const dx = current.x - previousTouch.x;
+          const dy = current.y - previousTouch.y;
+          if (!touchDragging && !current.span && Math.hypot(dx, dy) <= TAP_MAX_DRIFT) return;
+          touchDragging = true;
+          if (!touchStarted) {
+            touchStarted = true;
+            scope.dispatchEvent(startEvent);
+          }
+          if (current.span || !scope.enableRotate) {
+            moveTouchView(previousTouch, current);
+          } else {
+            const radiansPerPixel = 2 * Math.PI * scope.rotateSpeed / scope.domElement.clientHeight;
+            rotateLeft(dx * radiansPerPixel);
+            rotateUp(dy * radiansPerPixel);
+            scope.update(true);
+          }
+          previousTouch = current;
+        }
+
+        function onTouchEnd(event) {
+          if (!touchPointers.delete(event.pointerId)) return;
+          previousTouch = getTouchFrame();
+          touchDragging = false;
+          if (!touchPointers.size && touchStarted) {
+            touchStarted = false;
+            scope.dispatchEvent(endEvent);
+          }
+        }
+
         function onContextMenu(event) {
           if (scope.enabled === false) return;
           event.preventDefault();
@@ -479,6 +579,11 @@
         scope.domElement.addEventListener("contextmenu", onContextMenu, false);
         scope.domElement.addEventListener("mousedown", onMouseDown, false);
         scope.domElement.addEventListener("wheel", onMouseWheel, false);
+        scope.domElement.addEventListener("pointerdown", onTouchDown);
+        scope.domElement.addEventListener("pointermove", onTouchMove);
+        for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) {
+          scope.domElement.addEventListener(type, onTouchEnd);
+        }
 
         this.update();
       };
@@ -841,6 +946,7 @@
         display: block;
         width: 100%;
         height: 100%;
+        touch-action: none;
       }
 
       /* 共通パネルスタイル */
@@ -2324,6 +2430,11 @@
         border: 1px solid var(--ec-border);
         border-radius: 7px;
         background: var(--ec-bg);
+      }
+      .viewer-navigation-actions {
+        display: flex;
+        align-items: center;
+        gap: 4px;
       }
       .ec-shell.is-right-hidden .viewer-navigation { display: none; }
       #viewerView { padding-inline: 6px; color: var(--ec-muted); font-size: .82rem; }
@@ -4097,6 +4208,102 @@
         .theme-toggle { width: 36px; }
         .ec-topbar__select { font-size: 13px; padding-inline: 7px 20px; background-position: right 6px center; }
       }
+
+      .viewer-navigation .mobile-viewer-control,
+      .mobile-fit-label,
+      #mobileTouchHint,
+      #mobileBridgeShortcut {
+        display: none;
+      }
+
+      @media (max-width: 659px), (max-width: 1200px) and (max-height: 600px) and (pointer: coarse) {
+        .ec-shell {
+          height: 100dvh;
+        }
+        .ec-shell.is-mobile-tools-collapsed {
+          grid-template-rows: var(--ec-topbar-h) minmax(0, 1fr);
+          grid-template-areas:
+            "top"
+            "main";
+        }
+        .ec-shell.is-mobile-tools-collapsed .ec-right {
+          display: none;
+        }
+        .ec-right {
+          max-height: 45dvh;
+          padding: 8px;
+          overscroll-behavior: contain;
+        }
+        .viewer-navigation {
+          z-index: 45;
+          inset: 8px 8px auto auto;
+          max-width: calc(100% - 16px);
+          flex-direction: column;
+          align-items: flex-end;
+        }
+        .viewer-navigation-actions {
+          flex-wrap: wrap;
+          justify-content: flex-end;
+        }
+        .viewer-navigation .mobile-fit-label + svg {
+          display: none;
+        }
+        .viewer-navigation #viewerView { font-size: .72rem; padding-inline: 3px; }
+        .viewer-navigation button.ec-button {
+          min-width: 44px;
+          width: auto;
+          height: 44px;
+          padding-inline: 8px;
+          white-space: nowrap;
+        }
+        .viewer-navigation .mobile-viewer-control {
+          display: inline-flex;
+        }
+        .mobile-fit-label {
+          display: inline;
+        }
+        .ec-shell.is-mobile-tools-collapsed:not(.is-right-hidden) #mobileBridgeShortcut:not([hidden]) {
+          position: absolute;
+          z-index: 45;
+          inset: auto auto 8px 8px;
+          display: inline-flex;
+          min-height: 44px;
+        }
+        #bridgeEndMarkers button {
+          width: 44px;
+          height: 44px;
+        }
+        .river-demo-actions .ec-button,
+        .river-demo-actions .sample-help-button,
+        #bridgeGuideDistance button {
+          min-height: 44px;
+        }
+        @media (any-pointer: coarse) {
+          #mobileTouchHint {
+            display: block;
+            margin: 0;
+            padding: 3px 4px 1px;
+            color: var(--ec-muted);
+            font-size: .75rem;
+            text-align: end;
+          }
+        }
+      }
+
+      @media (min-width: 660px) and (max-width: 1200px) and (max-height: 600px) and (orientation: landscape) and (pointer: coarse) {
+        .ec-shell:not(.is-right-hidden, .is-mobile-tools-collapsed) {
+          grid-template-columns: minmax(0, 1fr) clamp(232px, 30vw, 280px);
+          grid-template-rows: var(--ec-topbar-h) minmax(0, 1fr);
+          grid-template-areas:
+            "top top"
+            "main right";
+        }
+        .ec-right {
+          max-height: none;
+          border-top: 0;
+          border-left: 1px solid var(--ec-border);
+        }
+      }
     </style>
   </head>
   <body>
@@ -4487,17 +4694,24 @@
           </div>
         </div>
         <div class="viewer-navigation" role="group" aria-label="表示操作">
-          <span id="viewerView">3D</span>
-          <button type="button" class="ec-button ec-button--secondary" aria-label="近づく" title="近づく" onclick="moveCloser()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M12 5v14"/></svg>
-          </button>
-          <button type="button" class="ec-button ec-button--secondary" aria-label="引く" title="引く" onclick="moveAway()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14"/></svg>
-          </button>
-          <button type="button" class="ec-button ec-button--secondary" aria-label="全体表示" title="全体表示" onclick="fitToView()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
-          </button>
+          <div class="viewer-navigation-actions">
+            <span id="viewerView" aria-live="polite">3D</span>
+            <button id="mobileViewToggle" class="ec-button ec-button--secondary mobile-viewer-control" type="button" aria-label="上面に切替" onclick="toggleTopView()">上面</button>
+            <button type="button" class="ec-button ec-button--secondary" aria-label="近づく" title="近づく" onclick="moveCloser()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M12 5v14"/></svg>
+            </button>
+            <button type="button" class="ec-button ec-button--secondary" aria-label="引く" title="引く" onclick="moveAway()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14"/></svg>
+            </button>
+            <button type="button" class="ec-button ec-button--secondary" aria-label="全体表示" title="全体表示" onclick="fitToView()">
+              <span class="mobile-fit-label">全体</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+            </button>
+            <button id="mobileToolsToggle" class="ec-button ec-button--secondary mobile-viewer-control" type="button" aria-expanded="false" aria-controls="rightPanel" onclick="setMobileToolsExpanded(this.getAttribute('aria-expanded') !== 'true')">ツール</button>
+          </div>
+          <p id="mobileTouchHint">1本指で回転 / 2本指で拡大・移動</p>
         </div>
+        <button id="mobileBridgeShortcut" type="button" class="ec-button ec-button--secondary" onclick="showMobileBridgeGuide()" hidden>橋の計測</button>
         <div id="bridgeEndMarkers" hidden>
           <button type="button" data-bridge-end="0" aria-label="橋の端 A" onclick="selectBridgeEnd(0)">A</button>
           <button type="button" data-bridge-end="1" aria-label="橋の端 B" onclick="selectBridgeEnd(1)">B</button>
@@ -4515,7 +4729,7 @@
             <p>合成データ · ローカル座標（m）</p>
             <div class="river-demo-actions">
               <div class="sample-feature">
-                <button id="sampleViewToggle" type="button" class="ec-button ec-button--secondary" onclick="if (is2DMode && current2DView === 'top') exit2DView(); else set2DView('top')">上面に切替</button>
+                <button id="sampleViewToggle" type="button" class="ec-button ec-button--secondary" onclick="toggleTopView()">上面に切替</button>
                 <button class="sample-help-button" type="button" data-sample-help="view" aria-label="ヘルプ: 3D / 上面" aria-haspopup="dialog" onclick="showSampleFeatureHelp('view', this)">
                   <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sampleHelpIcon"/></svg>
                 </button>
@@ -6873,6 +7087,7 @@
       let orthoCamera = null;
       let is2DMode = false;
       let current2DView = "top";
+      let perspectiveViewTarget = null;
       let pointCloud = null;
       let colorMode = "height";
       let currentVisualizationMode = "height";
@@ -10196,6 +10411,11 @@
         ["一部の新しいJavaScript機能がサポートされていません", "Some required JavaScript features are unavailable."],
         ["理解しました", "Dismiss"],
         ["表示操作", "View navigation"],
+        ["ツール", "Tools"],
+        ["上面", "Top"],
+        ["全体", "Fit"],
+        ["1本指で回転 / 2本指で拡大・移動", "One finger to orbit / Two fingers to zoom and pan"],
+        ["1本指で移動 / 2本指で拡大・移動", "One finger to pan / Two fingers to zoom and pan"],
         ["上面に切替", "Show top view"],
         ["3Dに戻る", "Back to 3D"],
         ["ヘルプ: 3D / 上面", "Help: 3D / Top view"],
@@ -12079,7 +12299,10 @@
         mode.querySelectorAll("[data-sample-step]").forEach(button => button.removeAttribute("data-complete"));
         window.setColorMode("classification");
         const target = controls.target.clone();
-        const distance = camera.position.distanceTo(target) * 1.2;
+        const distance = Math.max(
+          camera.position.distanceTo(target) * 1.2,
+          getPerspectiveFitDistance(pointCloud.geometry.boundingBox.getSize(new THREE.Vector3())),
+        );
         const direction = new THREE.Vector3(0.65, 1.05, 1).normalize();
         camera.position.copy(target).addScaledVector(direction, distance);
         controls.update();
@@ -12118,6 +12341,7 @@
       }
 
       function focusBridgeGuide() {
+        openMobileToolsIfCollapsed();
         const guide = document.getElementById("bridgeGuideHint");
         guide.scrollIntoView({ block: "nearest" });
         guide.querySelector("#bridgeGuideChoices button:not(:disabled)")?.focus({ preventScroll: true });
@@ -13908,6 +14132,7 @@
             bridgeResult.hidden = false;
             measurementState.enabled = false;
             endBridgeGuide();
+            openMobileToolsIfCollapsed();
             bridgeResult.focus();
           }
           resetMeasurementDraft();
@@ -13921,30 +14146,44 @@
           return;
         }
 
-        renderer.domElement.addEventListener("pointerdown", (event) => {
-          if (!measurementState.enabled) return;
-          if (event.button !== 0 || event.isPrimary === false) return;
-          measurementState.pointerDown = {
-            x: event.clientX,
-            y: event.clientY,
-            time: performance.now(),
-            button: event.button,
-          };
-        });
+        const canvas = renderer.domElement;
+        function isSamePointer(event) {
+          return measurementState.pointerDown?.id === event.pointerId;
+        }
+        function isWithinTapDistance(event, start) {
+          return Math.hypot(event.clientX - start.x, event.clientY - start.y) <= TAP_MAX_DRIFT;
+        }
+        function cancelTap(event) {
+          if (isSamePointer(event)) measurementState.pointerDown = null;
+        }
 
-        renderer.domElement.addEventListener("pointerup", (event) => {
-          if (!measurementState.enabled || !measurementState.pointerDown) return;
-          if (event.button !== 0 || event.isPrimary === false) {
+        canvas.addEventListener("pointerdown", (event) => {
+          if (!measurementState.enabled) return;
+          if (event.pointerType === "touch" && event.isPrimary === false) {
             measurementState.pointerDown = null;
             return;
           }
+          if (event.button !== 0 || event.isPrimary === false) return;
+          measurementState.pointerDown = {
+            id: event.pointerId,
+            x: event.clientX,
+            y: event.clientY,
+          };
+        });
+
+        canvas.addEventListener("pointermove", (event) => {
+          if (isSamePointer(event) && !isWithinTapDistance(event, measurementState.pointerDown)) {
+            measurementState.pointerDown = null;
+          }
+        });
+        canvas.addEventListener("pointercancel", cancelTap);
+        canvas.addEventListener("lostpointercapture", cancelTap);
+
+        canvas.addEventListener("pointerup", (event) => {
+          if (!measurementState.enabled || !isSamePointer(event)) return;
           const start = measurementState.pointerDown;
           measurementState.pointerDown = null;
-          const moved = Math.hypot(
-            event.clientX - start.x,
-            event.clientY - start.y,
-          );
-          if (moved > 4) return;
+          if (event.button !== 0 || !isWithinTapDistance(event, start)) return;
           const point = pickMeasurementPoint(event);
           if (!point) {
             showToast(
@@ -14491,6 +14730,7 @@
           }
         }
         renderer = null;
+        measurementState.pointerDown = null;
         measurementPointerHandlerBound = false;
 
         if (!preserveScene) {
@@ -17661,15 +17901,16 @@
         if (!box) return;
 
         const size = box.getSize(new THREE.Vector3());
-        const maxDim = Math.max(size.x, size.y, size.z);
-        const viewSize = Math.max(maxDim * 1.1, 10);
+        const modelWidth = current2DView === "right" ? size.z : size.x;
+        const modelHeight = current2DView === "top" ? size.z : size.y;
+        const viewSize = Math.max(modelHeight, modelWidth / aspect, 10) * 1.1;
 
         orthoCamera.left = (viewSize * aspect) / -2;
         orthoCamera.right = (viewSize * aspect) / 2;
         orthoCamera.top = viewSize / 2;
         orthoCamera.bottom = viewSize / -2;
         orthoCamera.near = 0.1;
-        orthoCamera.far = Math.max(viewSize * 10, 10000);
+        orthoCamera.far = Math.max(size.length() * 10, 10000);
         orthoCamera.updateProjectionMatrix();
       }
 
@@ -17725,6 +17966,7 @@
         camera = orthoCamera;
         if (controls) {
           controls.object = orthoCamera;
+          controls.target.copy(center);
           controls.enableRotate = false;
           controls.enablePan = true;
           controls.enableZoom = true;
@@ -17735,6 +17977,8 @@
       window.set2DView = function (view) {
         if (!pointCloud) return;
 
+        if (!is2DMode) perspectiveViewTarget = controls?.target.clone();
+        if (!is2DMode || current2DView !== view) orthoCamera.zoom = 1;
         is2DMode = true;
         current2DView = view;
         apply2DView(view);
@@ -17750,15 +17994,22 @@
         camera = perspectiveCamera;
         if (controls) {
           controls.object = perspectiveCamera;
+          if (perspectiveViewTarget) controls.target.copy(perspectiveViewTarget);
           controls.enableRotate = true;
           controls.enablePan = true;
           controls.enableZoom = true;
           controls.update();
         }
+        perspectiveViewTarget = null;
         update2DButtons();
         update2DSectionDiagnostics();
         updateBridgeEndMarkers();
       };
+
+      function toggleTopView() {
+        if (is2DMode && current2DView === "top") window.exit2DView();
+        else window.set2DView("top");
+      }
 
       function update2DButtons() {
         const topBtn = document.getElementById("view2dTopBtn");
@@ -17767,12 +18018,24 @@
         const exitBtn = document.getElementById("view2dExitBtn");
         const viewerView = document.getElementById("viewerView");
         const sampleViewToggle = document.getElementById("sampleViewToggle");
+        const mobileViewToggle = document.getElementById("mobileViewToggle");
+        const mobileTouchHint = document.getElementById("mobileTouchHint");
+        const isTopView = is2DMode && current2DView === "top";
+        if (mobileViewToggle) {
+          mobileViewToggle.textContent = isTopView ? "3D" : "上面";
+          mobileViewToggle.setAttribute("aria-label", isTopView ? "3Dに戻る" : "上面に切替");
+        }
+        if (mobileTouchHint) {
+          mobileTouchHint.textContent = is2DMode
+            ? "1本指で移動 / 2本指で拡大・移動"
+            : "1本指で回転 / 2本指で拡大・移動";
+        }
         if (viewerView) {
           const viewLabels = { top: "2D上面", front: "2D正面", right: "2D右側" };
           viewerView.textContent = is2DMode ? viewLabels[current2DView] : "3D";
         }
         if (sampleViewToggle) {
-          sampleViewToggle.textContent = is2DMode && current2DView === "top" ? "3Dに戻る" : "上面に切替";
+          sampleViewToggle.textContent = isTopView ? "3Dに戻る" : "上面に切替";
         }
 
         if (topBtn) topBtn.classList.remove("active");
@@ -17924,10 +18187,11 @@
             if (isLoadCancelledForSession(loadSessionId)) {
               return;
             }
-            focusPrimaryAction(
-              "controls",
-              "button, input, select",
-            );
+            if (mobileViewerMedia?.matches) {
+              document.getElementById("mobileToolsToggle").focus({ preventScroll: true });
+            } else {
+              focusPrimaryAction("controls", "button, input, select");
+            }
           });
 
           clearActiveLoadSession(loadSessionId);
@@ -18047,6 +18311,12 @@
       window.moveCloser = () => changeViewZoom(1.25);
       window.moveAway = () => changeViewZoom(0.8);
 
+      function getPerspectiveFitDistance(size) {
+        const verticalHalfFov = THREE.MathUtils.degToRad(camera.fov / 2);
+        const halfFov = Math.atan(Math.tan(verticalHalfFov) * Math.min(camera.aspect, 1));
+        return size.length() * 0.55 / Math.sin(halfFov);
+      }
+
       // 全体表示機能
       window.fitToView = function () {
         if (!pointCloud) return;
@@ -18062,15 +18332,12 @@
         const size = box.getSize(new THREE.Vector3());
         const maxDim = Math.max(size.x, size.y, size.z);
 
-        // モデル全体が見える距離を計算
-        const distance = maxDim * 1.5; // 1.5倍の距離で余裕を持たせる
-
-        // 斜め上からの視点で全体表示
-        camera.position.set(
-          center.x + distance * 0.7,
-          center.y + distance * 0.5,
-          center.z + distance * 0.7,
+        const viewDirection = new THREE.Vector3(0.7, 0.5, 0.7);
+        const distance = Math.max(
+          maxDim * 1.5 * viewDirection.length(),
+          getPerspectiveFitDistance(size),
         );
+        camera.position.copy(center).addScaledVector(viewDirection.normalize(), distance);
 
         if (controls) {
           controls.target.copy(center);
@@ -21177,14 +21444,60 @@
         }
       }
 
+      const mobileViewerMedia = window.matchMedia?.(
+        "(max-width: 659px), (max-width: 1200px) and (max-height: 600px) and (pointer: coarse)"
+      );
+      const mobileSidebarMedia = window.matchMedia?.(
+        "(min-width: 660px) and (max-width: 1200px) and (max-height: 600px) and (orientation: landscape) and (pointer: coarse)"
+      );
+      let mobileToolsPreference = null;
+
+      function setMobileToolsExpanded(expanded) {
+        mobileToolsPreference = expanded;
+        updateRightPanelVisibility();
+        resizeRendererToContainer();
+      }
+
+      function openMobileToolsIfCollapsed() {
+        const toggle = document.getElementById("mobileToolsToggle");
+        if (mobileViewerMedia?.matches && toggle?.getAttribute("aria-expanded") === "false") {
+          setMobileToolsExpanded(true);
+        }
+      }
+
+      function showMobileBridgeGuide() {
+        openMobileToolsIfCollapsed();
+        const result = document.getElementById("bridgeGuideDistance");
+        if (!result.hidden) {
+          result.focus();
+        } else {
+          startBridgeMeasurement();
+        }
+      }
+
+      mobileSidebarMedia?.addEventListener("change", () => {
+        updateRightPanelVisibility();
+        resizeRendererToContainer();
+      });
+
       function updateRightPanelVisibility() {
         const shell = document.querySelector(".ec-shell");
         const rightPanel = document.getElementById("rightPanel");
         if (!shell || !rightPanel) return;
 
         const showTools = workflowState.step === "complete";
+        if (!showTools) mobileToolsPreference = null;
+        const expanded = showTools && (mobileToolsPreference ?? Boolean(mobileSidebarMedia?.matches));
+        const toggle = document.getElementById("mobileToolsToggle");
+        if (showTools && !expanded && mobileViewerMedia?.matches && rightPanel.contains(document.activeElement)) {
+          toggle?.focus({ preventScroll: true });
+        }
         shell.classList.toggle("is-right-hidden", !showTools);
+        shell.classList.toggle("is-mobile-tools-collapsed", showTools && !expanded);
         rightPanel.classList.toggle("is-hidden", !showTools);
+        toggle?.setAttribute("aria-expanded", String(expanded));
+        const bridgeShortcut = document.getElementById("mobileBridgeShortcut");
+        if (bridgeShortcut) bridgeShortcut.hidden = !showTools || !isRiverDemo();
       }
 
       function updateStatsPanelLayout() {
@@ -21654,10 +21967,10 @@
         updateLastFileInfo();
         setViewerVisibility(false);
 
-        // 操作ガイド: 初回のみ自動展開
+        // デスクトップの操作ガイドは初回のみ自動展開
         try {
           const guidePanel = document.getElementById("guidePanel");
-          if (guidePanel) {
+          if (guidePanel && !mobileViewerMedia?.matches) {
             const guideClosed = localStorage.getItem("guidePanelClosed");
             if (!guideClosed) {
               guidePanel.open = true;

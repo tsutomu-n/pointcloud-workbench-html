@@ -4084,7 +4084,10 @@ test("initThreeJS replaces the previous renderer canvas and binds context listen
   expect(
     Object.keys(context.__renderers[1].domElement.__events).sort(),
   ).toEqual([
+    "lostpointercapture",
+    "pointercancel",
     "pointerdown",
+    "pointermove",
     "pointerup",
     "webglcontextlost",
     "webglcontextrestored",

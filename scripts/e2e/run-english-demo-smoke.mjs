@@ -21,6 +21,16 @@ const server = createServer(async (request, response) => {
     response.writeHead(404).end();
   }
 });
+
+async function moveFingers(page, cdp, center, frames) {
+  for (const [index, frame] of frames.entries()) {
+    const touchPoints = frame.map(([dx, dy], id) => ({ x: center.x + dx, y: center.y + dy, id }));
+    await cdp.send("Input.dispatchTouchEvent", { type: index ? "touchMove" : "touchStart", touchPoints });
+    await page.evaluate(() => new Promise(requestAnimationFrame));
+  }
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+}
+
 await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
 let browser;
 try {
@@ -337,6 +347,99 @@ try {
   assert.ok(box.y >= 0 && box.y + box.height <= 844);
   assert.equal(await touchPage.evaluate(() => document.documentElement.scrollWidth), 390);
   await entry.click();
+  await touchPage.waitForFunction(() => workflowState.step === "complete");
+  const touchCanvas = touchPage.locator("#container canvas");
+  const touchBox = await touchCanvas.boundingBox();
+  const center = { x: touchBox.x + touchBox.width / 2, y: touchBox.y + touchBox.height * 0.55 };
+  const cdp = await touchPage.context().newCDPSession(touchPage);
+  const position = () => touchPage.evaluate(() => camera.position.toArray());
+  const initialPosition = await position();
+  await moveFingers(touchPage, cdp, center, [[[0, 0]], [[40, 9]], [[76, 18]]]);
+  assert.notDeepEqual(await position(), initialPosition);
+  const cameraDistance = () => touchPage.evaluate(() => camera.position.distanceTo(controls.target));
+  const initialDistance = await cameraDistance();
+  const pinch = [[[-22, 0], [22, 0]], [[-34, 0], [34, 0]], [[-52, 0], [52, 0]]];
+  await moveFingers(touchPage, cdp, center, pinch);
+  assert.ok(await cameraDistance() < initialDistance);
+  assert.equal(await touchPage.evaluate(() => visualViewport.scale), 1);
+  const target = () => touchPage.evaluate(() => controls.target.toArray());
+  const beforeParallelMove = await target();
+  await moveFingers(touchPage, cdp, center, [[[-25, 0], [25, 0]], [[-10, 15], [40, 15]], [[0, 30], [50, 30]]]);
+  assert.notDeepEqual(await target(), beforeParallelMove);
+  const toolsToggle = touchPage.locator("#mobileToolsToggle");
+  assert.equal(await toolsToggle.getAttribute("aria-expanded"), "false");
+  assert.ok(touchBox.height >= 844 * 0.75);
+  await touchPage.getByRole("button", { name: "全体表示", exact: true }).tap();
+  const fitted3DPosition = await position();
+  const viewToggle = touchPage.locator("#mobileViewToggle");
+  await viewToggle.tap();
+  assert.equal(await touchPage.evaluate(() => current2DView), "top");
+  const beforeTopMove = await target();
+  await moveFingers(touchPage, cdp, center, [[[0, 0]], [[20, 12]], [[40, 25]]]);
+  assert.notDeepEqual(await target(), beforeTopMove);
+  await touchPage.getByRole("button", { name: "全体表示", exact: true }).tap();
+  assert.equal(await touchPage.evaluate(() => camera.zoom), 1);
+  assert.equal(await touchPage.evaluate(() => {
+    const { min, max } = pointCloud.geometry.boundingBox;
+    camera.updateMatrixWorld();
+    return [min.x, max.x].every(x => [min.z, max.z].every(z => {
+      const point = new THREE.Vector3(x, controls.target.y, z).project(camera);
+      return Math.abs(point.x) < 1 && Math.abs(point.y) < 1;
+    }));
+  }), true);
+
+  const anchor = { x: center.x - 45, y: center.y + 14 };
+  const anchorPoint = await touchPage.evaluate(({ x, y }) => {
+    const bounds = renderer.domElement.getBoundingClientRect();
+    const cursor = new THREE.Vector2((x - bounds.left) / bounds.width * 2 - 1, 1 - (y - bounds.top) / bounds.height * 2);
+    const ray = new THREE.Raycaster();
+    camera.updateMatrixWorld();
+    ray.setFromCamera(cursor, camera);
+    const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(camera.getWorldDirection(new THREE.Vector3()), controls.target);
+    return ray.ray.intersectPlane(plane, new THREE.Vector3()).toArray();
+  }, anchor);
+  await touchPage.evaluate(() => window.toggleMeasurementMode());
+  await moveFingers(touchPage, cdp, anchor, pinch);
+  assert.ok(await touchPage.evaluate(() => camera.zoom) > 1);
+  assert.equal(await touchPage.evaluate(() => visualViewport.scale), 1);
+  const projectedAnchor = await touchPage.evaluate(point => {
+    camera.updateMatrixWorld();
+    const projected = new THREE.Vector3(...point).project(camera);
+    const bounds = renderer.domElement.getBoundingClientRect();
+    return { x: bounds.left + (projected.x + 1) * bounds.width / 2, y: bounds.top + (1 - projected.y) * bounds.height / 2 };
+  }, anchorPoint);
+  assert.ok(Math.hypot(projectedAnchor.x - anchor.x, projectedAnchor.y - anchor.y) <= 2);
+  await touchPage.getByRole("button", { name: "全体表示", exact: true }).tap();
+  await moveFingers(touchPage, cdp, center, [[[0, 0]], [[40, 0]], [[0, 0]]]);
+  assert.equal(await touchPage.evaluate(() => measurementState.selectedPoints.length), 0);
+  await touchPage.getByRole("button", { name: "全体表示", exact: true }).tap();
+  const tapPoint = await touchPage.evaluate(() => {
+    const bounds = renderer.domElement.getBoundingClientRect();
+    camera.updateMatrixWorld();
+    const point = sourceToDisplayPoint({ x: 0, y: 0, z: 9 }).project(camera);
+    return { x: bounds.left + (point.x + 1) * bounds.width / 2, y: bounds.top + (1 - point.y) * bounds.height / 2 };
+  });
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ ...tapPoint, id: 0 }] });
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchCancel", touchPoints: [] });
+  assert.equal(await touchPage.evaluate(() => measurementState.pointerDown), null);
+  await touchPage.touchscreen.tap(tapPoint.x, tapPoint.y);
+  assert.equal(await touchPage.evaluate(() => measurementState.selectedPoints.length), 1);
+  await touchPage.evaluate(() => {
+    window.toggleMeasurementMode();
+    clearDraftMeasurement();
+  });
+  await viewToggle.tap();
+  const restored3DPosition = await position();
+  assert.ok(Math.hypot(...restored3DPosition.map((value, index) => value - fitted3DPosition[index])) < 0.01);
+  await touchPage.setViewportSize({ width: 844, height: 390 });
+  await touchPage.waitForFunction(() => {
+    const canvas = renderer.domElement.getBoundingClientRect();
+    const panel = document.getElementById("rightPanel").getBoundingClientRect();
+    return canvas.height >= 300 && panel.width > 0 && panel.left >= canvas.right - 1;
+  });
+  await touchPage.setViewportSize({ width: 390, height: 844 });
+  await touchPage.waitForFunction(() => document.getElementById("mobileToolsToggle").getAttribute("aria-expanded") === "false");
+  await toolsToggle.tap();
   const mobileMode = touchPage.getByText("サンプルモード · 河川と橋", { exact: true });
   await mobileMode.waitFor();
   assert.ok((await mobileMode.boundingBox()).y < 844);
@@ -410,6 +513,10 @@ try {
   });
   assert.ok(bridgeChoicesFit);
   await touchPage.getByRole("button", { name: "A を選ぶ", exact: true }).tap();
+  await toolsToggle.tap();
+  assert.equal(await toolsToggle.getAttribute("aria-expanded"), "false");
+  await touchPage.locator("#mobileBridgeShortcut").tap();
+  assert.match(await touchPage.locator("#bridgeGuideProgress").innerText(), /1 \/ 2/);
   await touchPage.getByRole("button", { name: "B を選ぶ", exact: true }).tap();
   assert.match(await touchPage.locator("#bridgeGuideDistance").innerText(), /60\.000 m/);
   await touchPage.setViewportSize({ width: 390, height: 844 });
