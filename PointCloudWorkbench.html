@@ -3733,6 +3733,19 @@
       .panel-section-title {
         font-size: clamp(0.75rem, 0.7rem + 0.25vw, 0.8125rem);
       }
+      .section-width-control { display: grid; gap: 8px; margin-top: 12px; }
+      .section-width-label, .section-ground-filter { display: flex; align-items: center; gap: 8px; }
+      .section-width-label { justify-content: space-between; }
+      .section-width-label .slice-value { margin: 0; white-space: nowrap; }
+      #sectionWidthRange { width: 100%; min-width: 0; margin: 0; }
+      #sectionDiagnosticsStatus { color: var(--ec-muted); font-size: var(--font-size-xs); overflow-wrap: normal; }
+      #dropZone { min-height: 0; padding: 18px; }
+      #runtimeStatusPanel .runtime-status__head { cursor: pointer; margin-bottom: 0; }
+      #runtimeStatusPanel[open] .runtime-status__head { margin-bottom: 8px; }
+      #runtimeStatusPanel summary::before { content: "▸"; }
+      #runtimeStatusPanel[open] summary::before { content: "▾"; }
+      .measurement-history-main { flex-wrap: wrap; }
+      .measurement-history-distance { flex: 1 1 8rem; }
     </style>
   </head>
   <body>
@@ -3834,17 +3847,17 @@
               />
             </div>
 
-            <div
+            <details
               class="runtime-status"
               id="runtimeStatusPanel"
               aria-label="Runtime mode"
             >
-              <div class="runtime-status__head">
-                <div class="runtime-status__title">Runtime Mode</div>
-                <div class="runtime-status__mode" id="runtimeModeLabel">
+              <summary class="runtime-status__head">
+                <span class="runtime-status__title">Runtime details</span>
+                <span class="runtime-status__mode" id="runtimeModeLabel">
                   検出中
-                </div>
-              </div>
+                </span>
+              </summary>
               <div class="runtime-status__grid">
                 <div class="runtime-status__item">
                   <span>Browser</span>
@@ -3866,7 +3879,7 @@
                   <span class="runtime-status__value" id="runtimeIsolation">-</span>
                 </div>
               </div>
-            </div>
+            </details>
 
             <div class="file-info" id="fileInfo" style="display: none">
               <div><strong>選択されたファイル:</strong></div>
@@ -3876,17 +3889,6 @@
                 id="selectedFileWarning"
                 style="color: #94a3b8; margin-top: 10px"
               ></div>
-            </div>
-
-            <div class="panel-footer">
-              <button
-                id="sampleDataButton"
-                class="link-btn"
-                type="button"
-                onclick="loadSampleData()"
-              >
-                サンプルデータを使用
-              </button>
             </div>
 
             <div class="panel-actions">
@@ -4564,9 +4566,9 @@
                     3D戻る
                   </button>
                 </div>
-                <div class="slice-range-container" style="margin-top: 10px">
-                  <div class="slice-range-label">
-                    <span>断面幅</span>
+                <div class="section-width-control">
+                  <div class="section-width-label">
+                    <label for="sectionWidthRange">断面幅</label>
                     <span class="slice-value" id="sectionWidthValue">5.0m相当</span>
                   </div>
                   <input
@@ -4578,7 +4580,7 @@
                     value="5"
                     oninput="updateSectionWidthControl(this.value)"
                   />
-                  <label style="display:flex; gap:6px; align-items:center; margin-top:6px; font-size:11px; color:var(--ec-muted);">
+                  <label class="section-ground-filter">
                     <input
                       type="checkbox"
                       id="sectionGroundOnly"
@@ -4586,7 +4588,7 @@
                     />
                     groundのみ
                   </label>
-                  <div class="slice-hint" id="sectionDiagnosticsStatus">
+                  <div id="sectionDiagnosticsStatus">
                     2D表示時に幅内の表示点数を確認できます
                   </div>
                 </div>
@@ -4913,7 +4915,6 @@
                   </svg>
                   <span>スライス表示を開始</span>
                 </button>
-                <div class="slice-description">高さ方向の断面を切り取って内部構造を確認できます</div>
               </div>
 
               <details class="panel-section advanced-settings">
@@ -9856,6 +9857,7 @@
         ["現在の表示点では、対応する空セルが検出されていません。", "No matching empty cell was detected in the displayed points."],
         ["このサンプルは右岸の点を意図的に除いています。", "Points on the right bank were intentionally removed in this sample."],
         ["点/m²", "points/m²"],
+        ["削除", "Delete"],
         ["0点（輪郭）", "Zero points (outline)"],
         ["低密度", "Low density"],
         ["中密度", "Medium density"],
@@ -9988,7 +9990,7 @@
         ["3D戻る", "Back to 3D"],
         ["断面幅", "Section width"],
         ["groundのみ", "Ground only"],
-        ["2D表示時に幅内の表示点数を確認できます", "See the number of displayed points within this width in 2D view."],
+        ["2D表示時に幅内の表示点数を確認できます", "Switch to 2D to see the point count."],
         ["ズーム", "Zoom"],
         ["近づく", "Zoom in"],
         ["引く", "Zoom out"],
@@ -10301,8 +10303,7 @@
       // Translate the UI at the DOM boundary. Data, diagnostics payloads,
       // point decoding and rendering coordinates keep their original values.
       const englishUiPatterns = [
-        [/^(モード|距離|累計3D距離|面積|水平距離|高さ差|勾配|点数|区間数|累計水平距離|始点終点高低差|平均勾配|XY投影面積|周長|d[XYZ]): (.+)$/, (_, label, detail) =>
-          `${translateAppUi(label)}: ${translateAppUi(detail)}`],
+        [/^計測履歴 #(\d+) を選択$/, "Select measurement #$1"],
         [/^点([12]) 元LAS座標: (.+)$/, "Point $1 source LAS coordinates: $2"],
         [/^点データ解析: (.+)$/, "Decoding points: $1"],
         [/^断面対象: ([\d,]+)点$/, "Section: $1 points"],
@@ -10363,7 +10364,7 @@
         [/^最大表示点数: ([\d,]+)点$/, "Display limit: $1 points"],
         [/^VRAM目安:\s*(.+)$/, "Estimated VRAM: $1"],
         [/^([\d.]+)\s*ピクセル$/, "$1 px"],
-        [/^(-?[\d.]+)\s*(m²?)相当$/, "$1 $2 equivalent"],
+        [/^(#\d+ )?(-?[\d.]+)\s*(m²?)相当$/, "$1$2 $3 equivalent"],
         [/^(距離|折れ線|面積) (-?[\d.]+)\s*(m²?)相当$/, (_, mode, value, unit) =>
           `${englishUiText.get(mode)} ${value} ${unit} equivalent`],
         [/^(水平|高さ差|周長) (-?[\d.]+) m相当$/, (_, metric, value) =>
@@ -10381,6 +10382,8 @@
           `${englishUiText.get(mode)}: ${count} points selected. Use Finish or Enter to save.`],
         [/^(距離|折れ線|面積): (\d+)点選択中。点を追加してください$/, (_, mode, count) =>
           `${englishUiText.get(mode)}: ${count} points selected. Add another point.`],
+        [/^(モード|距離|累計3D距離|面積|水平距離|高さ差|勾配|点数|区間数|累計水平距離|始点終点高低差|平均勾配|XY投影面積|周長|d[XYZ]): (.+)$/, (_, label, detail) =>
+          `${translateAppUi(label)}: ${translateAppUi(detail)}`],
         [/^([\s\S]*?)読み込み完了(?:\s*[（(]([\d,]+)点[）)])?$/, (_, name, count) =>
           `Load complete${name.trim() ? `: ${name.trim()}` : ""}${count ? ` (${count} points)` : ""}`],
         [/^(ファイル検証エラー|ファイル選択エラー|ファイル読み込み失敗|読み込み失敗|エラー):\s*(.+)$/, (_, kind, detail) =>
@@ -11279,7 +11282,9 @@
           const hasSelectedFile = workflowState.selectedFile !== null;
           
           // ファイル未選択時のみ表示（リロード後の復帰支援）
-          if (stored && !hasSelectedFile) {
+          const legacySample = stored === "テスト用小規模モデル" ||
+            stored === "Pages Demo Sample";
+          if (stored && !legacySample && !hasSelectedFile) {
             lastFileName.textContent = stored;
             lastFileInfo.style.display = "flex";
           } else {
@@ -11871,7 +11876,6 @@
         previewPointCount = sizeBytes,
       ) {
         console.log("サンプルファイル選択:", fileName);
-        if (filePath !== riverDemo.path) saveLastFileName(fileName);
 
         // サンプルデータを仮想的にセット
         clearSelectedFilePreview();
@@ -12090,7 +12094,7 @@
 
         focusPrimaryAction(
           "fileSelectPanel",
-          "#dropZone .ec-button--ghost, #proceedToQuality, #sampleDataButton, input, button",
+          "#dropZone .ec-button--ghost, #proceedToQuality, #englishDemoButton, input, button",
         );
       };
 
@@ -13039,7 +13043,7 @@
             return [
               `<div class="measurement-history-item" data-measurement-id="${item.id}" tabindex="0" role="button" aria-label="計測履歴 #${item.id} を選択" onmouseenter="previewMeasurementRecord(${item.id}, event, this)" onmousemove="previewMeasurementRecord(${item.id}, event, this)" onmouseleave="clearMeasurementPreview()" onfocus="previewMeasurementRecord(${item.id}, event, this)" onblur="clearMeasurementPreview()" onclick="selectMeasurementRecord(${item.id}, event, this)" onkeydown="handleMeasurementRecordKeydown(${item.id}, event, this)">`,
               '<div class="measurement-history-main">',
-              `<div class="measurement-history-distance">#${item.id} ${escapeHtml(item.distance)}</div>`,
+              `<div class="measurement-history-distance">#${item.id} <span>${escapeHtml(item.distance)}</span></div>`,
               '<div class="measurement-history-actions">',
               `<button class="control-btn" onclick="event.stopPropagation(); copyMeasurementRecord(${item.id})">コピー</button>`,
               `<button class="control-btn" onclick="event.stopPropagation(); copyMeasurementRecordCsv(${item.id})">CSV</button>`,
@@ -18201,9 +18205,6 @@
         slicePanel.innerHTML = `
                 <div class="panel-card__header"><span>スライス設定</span></div>
                 <div class="panel-card__body">
-                    <div class="slice-description">
-                        点群を切断して断面や内部構造を確認できます
-                    </div>
                     <div class="slice-row">
                         <label style="display: block; margin-bottom: 5px;">
                             <input type="checkbox" id="sliceXCheck" style="margin-right: 8px;"> X軸で切断（左右方向）

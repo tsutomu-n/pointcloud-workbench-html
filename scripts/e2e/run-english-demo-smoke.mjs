@@ -31,6 +31,17 @@ try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, permissions: ["clipboard-read", "clipboard-write"] });
   page.setDefaultTimeout(10000);
   const base = `http://127.0.0.1:${server.address().port}`;
+  await page.addInitScript(() => localStorage.setItem("lastLasFileName", "テスト用小規模モデル"));
+  await page.goto(`${base}/PointCloudWorkbench.html?lang=en`);
+  await page.getByRole("button", { name: "Try the river sample", exact: true }).waitFor();
+  assert.equal(await page.getByRole("button", { name: "Choose sample data", exact: true }).count(), 0);
+  assert.equal(await page.locator("#lastFileInfo").isVisible(), false);
+  assert.equal(await page.locator("#runtimeStatusPanel").getAttribute("open"), null);
+  await page.evaluate(() => {
+    localStorage.setItem("lastLasFileName", "調査.las");
+    updateLastFileInfo();
+  });
+  assert.equal(await page.locator("#lastFileName").innerText(), "調査.las");
   await page.goto(`${base}/index.html?lang=en`);
   await page.getByRole("link", { name: "Try the river sample", exact: true }).click();
   await page.getByText("Sample mode · River and bridge", { exact: true }).waitFor();
@@ -80,6 +91,17 @@ try {
   assert.match(await page.locator("#measurementSummary").innerText(), /60\.000/);
   await page.locator('button[onclick="copyMeasurementResult()"]').click();
   await page.waitForFunction(async () => (await navigator.clipboard.readText()).includes("Distance: 60.000 m equivalent"));
+  await page.evaluate(() => {
+    setMeasurementMode("areaXY");
+    for (const index of [0, 1, 121]) {
+      const source = getSourcePointAtIndex(index);
+      handleMeasurementPoint({ index, source, display: sourceToDisplayPoint(source) });
+    }
+  });
+  assert.match(await page.locator("#measurementStatus").innerText(), /3 points selected/);
+  assert.doesNotMatch(await page.locator("#measurementHistoryList").innerText(), /[\u3040-\u30ff\u4e00-\u9fff]/);
+  await page.locator("#measurementHistoryList .measurement-history-item").first().hover();
+  assert.match(await page.getByRole("tooltip").locator(".measurement-tooltip-title").innerText(), /m equivalent/);
   await page.getByRole("button", { name: "Explore density", exact: true }).click();
   await page.waitForFunction(() => densityOverlayState.enabled);
   await page.getByRole("button", { name: "Inspect the empty cell" }).click();
@@ -154,6 +176,16 @@ try {
   const mobileMode = touchPage.getByText("サンプルモード · 河川と橋", { exact: true });
   await mobileMode.waitFor();
   assert.ok((await mobileMode.boundingBox()).y < 844);
+  await touchPage.locator("#languageSelector").selectOption("en");
+  const sectionLayout = await touchPage.locator(".section-width-control").evaluate(element => {
+    const box = element.getBoundingClientRect();
+    const hint = element.querySelector("#sectionDiagnosticsStatus").getBoundingClientRect();
+    const slider = element.querySelector("input[type=range]").getBoundingClientRect();
+    const ground = element.querySelector("input[type=checkbox]").getBoundingClientRect();
+    return { width: box.width, hintWidth: hint.width, afterSlider: ground.top >= slider.bottom };
+  });
+  assert.ok(sectionLayout.width > 200 && sectionLayout.hintWidth === sectionLayout.width && sectionLayout.afterSlider);
+  await touchPage.locator("#languageSelector").selectOption("ja");
 
   for (const width of [390, 320]) {
     await touchPage.setViewportSize({ width, height: 844 });
