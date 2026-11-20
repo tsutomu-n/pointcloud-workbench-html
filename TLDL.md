@@ -1,5 +1,9 @@
 # TLDL: PointCloudWorkbench 監査要約
 
+timestamp="2026-11-20(金)_22:54 JST"
+
+> 履歴資料。記載時点の監査・計画・実装情報です。現行文書は[ドキュメント索引](./PointCloudWorkbench_ドキュメント索引.md)を参照してください。
+
 ## 1. エグゼクティブ要約
 
 PointCloudWorkbench は `PointCloudWorkbench.html` 単体で動作する、ブラウザー実行型 LAS/LAZ ワークベンチです。  

@@ -1,5 +1,7 @@
 # PointCloudWorkbench 実装リファレンス
 
+timestamp="2026-11-20(金)_22:54 JST"
+
 更新日時: 2026-06-03_09:06 JST
 
 ## 1. スコープ
@@ -8,7 +10,7 @@
 
 ### 1.1 誤読防止の前提
 - 関数位置は `PointCloudWorkbench.html` 内の関数名検索を正とする。固定行番号リンクは編集でずれやすいため、主要表では最小限にする。
-- 言語セレクタは `setAppLanguage()` により `document.documentElement.lang` と `localStorage.viewerLanguage` を更新する。UI文言の動的翻訳機構はない。
+- 言語セレクタは `setAppLanguage()` により `document.documentElement.lang` と `localStorage.viewerLanguage` を更新する。`applyAppUiLanguage()` が主要なUI文言を切り替える。アプリは日本語と英語に対応し、ランディングページでの中文選択からは英語版アプリへ遷移する。
 - ファイルサイズ拒否条件は LAS は `3GB超`、LAZ は `2GB超` を拒否します。
 - LAS は `3GBちょうど`、LAZ は `2GBちょうど` まで `critical` 扱いで継続可能です。
 

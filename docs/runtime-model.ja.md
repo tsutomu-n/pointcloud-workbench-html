@@ -1,8 +1,10 @@
 # 実行モデル
 
+timestamp="2026-11-20(金)_22:54 JST"
+
 ## 基本方針
 
-PointCloudWorkbenchは、サーバー負荷を最小化し、重い処理をユーザーPC側で行う設計です。
+PointCloudWorkbenchは、重い処理を利用者の端末で行い、点群ファイルをサーバーへアップロードしません。
 診断情報も通常経路では送信せず、ユーザーが明示的にコピーしたJSONだけをIssue等へ貼り付ける運用です。
 このJSONにはLAS/LAZファイル本体とファイル名を含めません。
 作業メモコピーも同じく手動コピーだけで、表示状態、断面、計測、異常候補、取得品質、地表候補の要約をローカルで作ります。
@@ -13,41 +15,14 @@ PointCloudWorkbenchは、サーバー負荷を最小化し、重い処理をユ�
 アプリのファイル選択画面には、現在のRuntime Mode、ブラウザー種別、Renderer候補、Worker可否、Isolation状態を表示します。
 これらは実行環境の能力表示であり、現行実装が Worker parser や WebGPU renderer を使っているという意味ではありません。
 
-### 1. Portable Online Mode
+| 表示されるモード | 判定の概要 |
+| --- | --- |
+| `hosted-normal` | 通常のホスト配信。公開デモの配信手順は [GitHub Pages ワークフロー](../.github/workflows/deploy-pages.yml) を参照。 |
+| `hosted-high-performance` | ホスト配信でクロスオリジン分離と WebGPU 能力を検出。 |
+| `portable-online-webgpu` / `portable-online-webgl2` | ローカルHTMLを開いた場合のGPU能力に応じた表示。CDN依存の取得にはネット接続が必要。 |
+| `unsupported` | 対応ブラウザーの条件を満たさない、または WebGPU と WebGL2 の両方が利用できない。 |
 
-ユーザーが `PointCloudWorkbench.html` をダウンロードして、ChromeまたはEdgeで開くモードです。
-
-特徴:
-
-- ネットワーク接続が必要
-- JS/WASM と描画・解析に必要なCDN依存を取得する
-- 点群ファイルはアップロードしない
-- SharedArrayBufferは前提にしない
-- Transferable ArrayBufferを使う
-- Three.js / WebGLRenderer で描画する
-
-### 2. Hosted High Performance Mode
-
-Cloudflare Pages上のURLで開くモードです。
-
-特徴:
-
-- HTTPS
-- COOP/COEPヘッダーを設定可能
-- crossOriginIsolatedを狙える
-- SharedArrayBufferを使える可能性がある
-- Wasm threadsを使える可能性がある
-- 最高速候補
-
-### 3. Fallback Mode
-
-renderer やブラウザー能力に制約がある場合の劣化表示です。
-
-特徴:
-
-- WebGL2 fallback
-- Main thread低速処理 fallback
-- 機能制限をUIに表示する
+現行の描画には Three.js の WebGLRenderer を使います。モード名の WebGPU や Worker 可否の表示はブラウザー能力の情報です。将来の配信構成は [Cloudflare Pages の静的配信構成案](./cloudflare-pages-static-only.ja.md) を参照してください。
 
 ## サーバーにやらせないこと
 

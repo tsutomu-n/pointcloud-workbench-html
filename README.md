@@ -1,6 +1,6 @@
 # PointCloudWorkbench
 
-timestamp="2026-11-20(金)_22:47 JST"
+timestamp="2026-11-20(金)_22:54 JST"
 
 [日本語](./docs/README.ja.md) · [Project website](https://tsutomu-n.github.io/pointcloud-workbench-html/)
 
@@ -34,4 +34,4 @@ bun scripts/check-readme.js
 bun scripts/check-server-zero.js
 ```
 
-[Documentation index (Japanese)](./PointCloudWorkbench_ドキュメント索引.md) · [Contributing](./CONTRIBUTING.md) · [Security](./SECURITY.md) · [Code of conduct](./CODE_OF_CONDUCT.md) · [MIT license](./LICENSE)
+[English demo guide](./docs/quickstart.en.md) · [Documentation index (Japanese)](./PointCloudWorkbench_ドキュメント索引.md) · [Contributing](./CONTRIBUTING.md) · [Security](./SECURITY.md) · [Code of conduct](./CODE_OF_CONDUCT.md) · [MIT license](./LICENSE)

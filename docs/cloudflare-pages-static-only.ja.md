@@ -1,4 +1,8 @@
-# Cloudflare Pages Static-only 配信手順
+# Cloudflare Pages の静的配信構成案
+
+timestamp="2026-11-20(金)_22:54 JST"
+
+> 公開デモの現行配信は [GitHub Pages](../.github/workflows/deploy-pages.yml) です。この文書は Cloudflare Pages で配信する場合の構成案です。
 
 ## 目的
 

@@ -1,5 +1,7 @@
 # クイックスタート
 
+timestamp="2026-11-20(金)_22:54 JST"
+
 ## 目的
 
 PointCloudWorkbenchを使って、ブラウザー上でLAS/LAZ点群を確認します。
@@ -8,14 +10,20 @@ PointCloudWorkbenchを使って、ブラウザー上でLAS/LAZ点群を確認し
 
 - 最新の Google Chrome または Microsoft Edge
 - ネットワーク接続
-- `.las` または `.laz` ファイル
 - 可能ならメモリに余裕のあるPC
 
 Safari、Firefox、古いブラウザーは対応対象外です。
 
-## 使い方
+## ファイルなしで試す
 
-1. `PointCloudWorkbench.html` を開きます。
+1. [河川と橋のサンプルを開く](https://tsutomu-n.github.io/pointcloud-workbench-html/PointCloudWorkbench.html?lang=ja&demo=river)と、合成点群が読み込まれます。
+2. 「橋を横切る断面を見る」で断面を開き、厚さを変えて表示点の数を比較します。
+3. 橋の計測で A・B を選ぶと、水平距離が履歴に追加されます。結果は CSV でコピーできます。
+4. 「密度を見る」で右岸の点が抜けた区画を確認します。スマホではモデル右上の「ツール」から操作欄を開けます。
+
+## 手元のLAS・LAZを開く
+
+1. [アプリを開きます](https://tsutomu-n.github.io/pointcloud-workbench-html/PointCloudWorkbench.html?lang=ja)。サンプルを開いている場合は「自分のファイルを開く」で戻れます。
 2. `.las` または `.laz` ファイルを選択します。
 3. Preflight画面で以下を確認します。
    - ファイルサイズ

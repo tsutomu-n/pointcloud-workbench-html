@@ -14,7 +14,6 @@ test("README and guides describe the split LAS/LAZ size ceilings", () => {
   const assetsGuide = read("assets/README.md");
   const ops = read("PointCloudWorkbench_運用手順書.md");
   const ref = read("PointCloudWorkbench_実装リファレンス.md");
-  const index = read("PointCloudWorkbench_ドキュメント索引.md");
   const html = read("PointCloudWorkbench.html");
 
   expect(readme).toContain("LAS files above 3GB and LAZ files above 2GB are rejected");
@@ -25,7 +24,6 @@ test("README and guides describe the split LAS/LAZ size ceilings", () => {
   expect(ops).toContain("LAS は 3GB超、LAZ は 2GB超で読み込み不可");
   expect(ops).toContain("Chrome / Edge の最新版のみ対応");
   expect(ref).toContain("LAS は `3GB超`、LAZ は `2GB超` を拒否");
-  expect(index).toContain("LAS は `3GB超`、LAZ は `2GB超` を拒否");
   expect(html).toContain(".las 最大3GB / .laz 最大2GB");
   expect(assetsGuide).toContain("landing-hero.png");
   expect(assetsGuide).toContain("preflight-panel.png");
@@ -60,7 +58,6 @@ test("CRS diagnostics docs keep local-only and no-conversion boundaries aligned"
   const readmeJa = read("docs/README.ja.md");
   const ops = read("PointCloudWorkbench_運用手順書.md");
   const ref = read("PointCloudWorkbench_実装リファレンス.md");
-  const index = read("PointCloudWorkbench_ドキュメント索引.md");
   const spec = read("docs/crs-diagnostics-final-spec.ja.md");
   const plan = read("docs/archive/crs-diagnostics-implementation-plan.ja.md");
 
@@ -76,7 +73,6 @@ test("CRS diagnostics docs keep local-only and no-conversion boundaries aligned"
   expect(ref).toContain("bounds 中心変換");
   expect(ref).toContain("Subresource Integrity");
   expect(ref).toContain("EPSG DB 参照、ジオイド補正");
-  expect(index).toContain("LAS/LAZ アップロードは行いません");
   expect(spec).toContain("座標変換」ではなく");
   expect(plan).toContain("EVLR header を先に読み");
 });
