@@ -126,15 +126,25 @@ try {
   assert.equal(await landingTheme.getAttribute("aria-pressed"), "false");
   await landingTheme.press("Enter");
   assert.equal(await landingTheme.getAttribute("aria-pressed"), "true");
-  await page.getByRole("link", { name: "Try the river sample", exact: true }).click();
+  const demoLink = page.getByRole("link", { name: "Try the river sample", exact: true });
+  const landingAccent = await demoLink.evaluate(link => getComputedStyle(link).backgroundColor);
+  const landingContrast = await themeContrast(page, [
+    ["--color-ink", "--color-accent"],
+    ["--color-ink", "--color-accent-hover"],
+  ]);
+  assert.ok(landingContrast.every(ratio => ratio >= 4.5), landingContrast.join(", "));
+  await demoLink.click();
   await page.getByText("Sample mode · River and bridge", { exact: true }).waitFor();
   const appTheme = page.getByRole("button", { name: "Light theme", exact: true });
   assert.equal(await page.locator("html").getAttribute("data-theme"), "light");
   assert.equal(await appTheme.getAttribute("aria-pressed"), "true");
+  const sliceButton = page.getByRole("button", { name: "See the bridge cross-section", exact: true });
+  assert.equal(await sliceButton.evaluate(button => getComputedStyle(button).backgroundColor), landingAccent);
   const contrastRatios = await themeContrast(page, [
     ["--ec-muted", "--ec-surface"],
     ["--ec-text", "--ec-canvas"],
     ["--ec-accent-text", "--ec-accent"],
+    ["--ec-accent-text", "--ec-accent-hover"],
     ["--ec-accent", "--ec-accent-bg"],
   ]);
   assert.ok(contrastRatios.every(ratio => ratio >= 4.5), contrastRatios.join(", "));
