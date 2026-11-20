@@ -1,6 +1,6 @@
 # PointCloudWorkbench
 
-最終更新: 2026-06-02_11:41 JST
+timestamp="2026-11-20(金)_20:46 JST"
 
 ブラウザーで動く LAS/LAZ 点群ワークベンチです。単一の HTML ファイルとして配布します。
 
@@ -13,12 +13,13 @@
 - ランディングページ: `https://tsutomu-n.github.io/pointcloud-workbench-html/`
 - アプリを直接開く: `https://tsutomu-n.github.io/pointcloud-workbench-html/PointCloudWorkbench.html`
 - 同梱サンプル LAS: `https://tsutomu-n.github.io/pointcloud-workbench-html/demo/pointcloud-demo-sample.las`
-- ランディングページはブラウザ言語（`ja` / `en` / `zh`）に合わせて表示を切り替えられ、手動の言語切替もできます。
+- ランディングページで **河川サンプルを試す** または **LAS / LAZ を開く** を選べます。アプリは日本語と英語に対応し、中国語のランディングページからは英語で開きます。
+- 右上の月と太陽のボタンでライトとダークを切り替えられます。初回は端末の設定に従い、選択後はランディングページとアプリで同じテーマを使います。
 
 ## ビジュアルツアー
 
 - 将来のスクリーンショット素材は `assets/` に置きます。
-- `assets/landing-hero.png`: GitHub Pages ランディングページのヒーロー画像。暗いターミナル風の見た目、大きな `PointCloudWorkbench.` タイポグラフィ、アプリ起動・サンプル LAS ダウンロード・リポジトリアクセスの3つの CTA を見せます。
+- `assets/landing-hero.png`: GitHub Pages の冒頭にある河川サンプルのプレビューと、サンプル・ファイルの2つの入口を見せます。
 - `assets/preflight-panel.png`: 同梱サンプル選択直後のアプリ画面。読み込み経路、リスク表示、ファイルサイズ、元点数、推定表示率、品質プリセットが読める状態を想定します。
 - `assets/workspace-3d.png`: 読み込み後の 3D ワークスペース。奥行きと密度が分かる点群、主要操作パネル、単一 HTML でも実用に見える視点を想定します。
 - `assets/workspace-2d-slice-stats.png`: 2D またはスライス確認中の画面。統計パネルを開き、断面確認、分類レビュー、定量確認ができることを示します。

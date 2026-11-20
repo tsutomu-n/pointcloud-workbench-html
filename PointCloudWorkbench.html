@@ -6,6 +6,50 @@
     <title>PointCloudWorkbench</title>
     <link rel="icon" type="image/svg+xml" sizes="any" href="data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%2024%2024%22%3E%3Crect%20width=%2224%22%20height=%2224%22%20rx=%225%22%20fill=%22%23132630%22/%3E%3Cg%20transform=%22translate%282%201%29%20scale%28.83%29%22%20fill=%22none%22%20stroke=%22%238de4d5%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22%20stroke-width=%221.9%22%3E%3Cpath%20d=%22M3%2014c1-4.5%203.5-6.5%205.75-3.75C10.5%204.5%2015%202.5%2017.25%209.5C19%209%2020.5%2011%2021%2014v3.5l-9%204l-9-4Z%22/%3E%3Cpath%20d=%22m3%2014l9%204l9-4m-9%204v3.5%22/%3E%3C/g%3E%3C/svg%3E" />
 
+    <script>
+      (() => {
+        const key = "pcw-theme";
+        const system = window.matchMedia?.("(prefers-color-scheme: light)");
+        let preference;
+        try {
+          const stored = localStorage.getItem(key);
+          if (stored === "light" || stored === "dark") preference = stored;
+        } catch {
+          // Storage can be unavailable for local files or private browsing.
+        }
+
+        const root = document.documentElement;
+        root.dataset.theme = preference || (system?.matches ? "light" : "dark");
+
+        document.addEventListener("DOMContentLoaded", () => {
+          const toggle = document.getElementById("themeToggle");
+          const syncButton = () => {
+            toggle.setAttribute("aria-pressed", String(root.dataset.theme === "light"));
+          };
+          const applyTheme = (theme) => {
+            if (root.dataset.theme === theme) return;
+            root.dataset.theme = theme;
+            syncButton();
+            root.dispatchEvent(new Event("pcw-theme-change", { bubbles: true }));
+          };
+          syncButton();
+
+          toggle.addEventListener("click", () => {
+            preference = root.dataset.theme === "light" ? "dark" : "light";
+            applyTheme(preference);
+            try {
+              localStorage.setItem(key, preference);
+            } catch {
+              // The current page can still switch theme without storage.
+            }
+          });
+          system?.addEventListener?.("change", (event) => {
+            if (!preference) applyTheme(event.matches ? "light" : "dark");
+          });
+        });
+      })();
+    </script>
+
     <!-- Three.js r128 + OrbitControls -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <!-- LAZ decoder (laz-perf WASM) for legacy viewer diagnostics -->
@@ -450,7 +494,7 @@
         left: 0;
         width: 100vw;
         height: 100vh;
-        background: rgba(0, 0, 0, 0.8);
+        background: var(--ec-backdrop);
         display: flex;
         justify-content: center;
         align-items: center;
@@ -463,8 +507,8 @@
       .compatibility-warning-content,
       .memory-warning-content,
       .performance-warning-content {
-        background: #1a1a1a;
-        color: white;
+        background: var(--ec-surface);
+        color: var(--ec-text);
         padding: 30px;
         border-radius: 15px;
         max-width: 600px;
@@ -498,7 +542,7 @@
       }
 
       .error-modal pre {
-        background: #2a2a2a;
+        background: var(--ec-inset);
         padding: 15px;
         border-radius: 8px;
         font-size: 12px;
@@ -517,7 +561,7 @@
       .error-actions button {
         padding: 10px 20px;
         background: var(--ec-error);
-        color: white;
+        color: var(--ec-accent-text);
         border: none;
         border-radius: 8px;
         cursor: pointer;
@@ -540,7 +584,7 @@
 
       .performance-warning .error-actions button {
         background: var(--ec-warning);
-        color: #333;
+        color: var(--ec-accent-text);
       }
 
       .performance-warning .error-actions button:hover {
@@ -554,7 +598,7 @@
         left: 0;
         width: 100vw;
         height: 100vh;
-        background: rgba(0, 0, 0, 0.9);
+        background: var(--ec-backdrop);
         display: flex;
         justify-content: center;
         align-items: center;
@@ -562,20 +606,20 @@
       }
 
       .initialization-progress-content {
-        background: #1a1a1a;
-        color: white;
+        background: var(--ec-surface);
+        color: var(--ec-text);
         padding: 40px;
         border-radius: 20px;
         text-align: center;
         border: 3px solid var(--ec-accent);
-        box-shadow: 0 15px 40px rgba(2, 132, 199, 0.3);
+        box-shadow: 0 15px 40px var(--ec-border);
         min-width: 400px;
       }
 
       .progress-bar {
         width: 100%;
         height: 8px;
-        background: #333;
+        background: var(--ec-hover);
         border-radius: 4px;
         margin: 20px 0;
         overflow: hidden;
@@ -596,7 +640,7 @@
         left: 0;
         width: 100vw;
         height: 100vh;
-        background: #1a0000;
+        background: var(--ec-bg);
         display: flex;
         justify-content: center;
         align-items: center;
@@ -604,8 +648,8 @@
       }
 
       .critical-startup-error-content {
-        background: #2a0000;
-        color: #ffcccc;
+        background: var(--ec-surface);
+        color: var(--ec-text);
         padding: 40px;
         border-radius: 15px;
         max-width: 700px;
@@ -630,7 +674,7 @@
         left: 50%;
         transform: translate(-50%, -50%);
         z-index: 9500;
-        background: rgba(0, 0, 0, 0.9);
+        background: var(--ec-surface);
         border-radius: 15px;
         padding: 20px;
         max-width: 500px;
@@ -641,7 +685,7 @@
       .file-validation-error-content,
       .file-selection-error-content,
       .file-size-warning-content {
-        color: white;
+        color: var(--ec-text);
         text-align: center;
       }
 
@@ -669,13 +713,13 @@
         left: 50%;
         transform: translate(-50%, -50%);
         z-index: 9600;
-        background: rgba(0, 0, 0, 0.95);
+        background: var(--ec-surface);
         border-radius: 15px;
         padding: 30px;
         max-width: 600px;
         width: 90vw;
         border: 2px solid var(--ec-error);
-        color: white;
+        color: var(--ec-text);
       }
 
       /* FILE WARNING LEVEL STYLES */
@@ -702,10 +746,10 @@
         left: 50%;
         transform: translate(-50%, -50%);
         z-index: 9700;
-        background: rgba(0, 0, 0, 0.9);
+        background: var(--ec-surface);
         border-radius: 15px;
         padding: 30px;
-        color: white;
+        color: var(--ec-text);
         text-align: center;
         border: 2px solid var(--ec-accent);
       }
@@ -713,7 +757,7 @@
       .loading-spinner {
         width: 40px;
         height: 40px;
-        border: 4px solid #333;
+        border: 4px solid var(--ec-border);
         border-top: 4px solid var(--ec-accent);
         border-radius: 50%;
         animation: spin 1s linear infinite;
@@ -792,8 +836,8 @@
         left: 50%;
         transform: translate(-50%, -50%);
         z-index: 1000;
-        background: rgba(0, 0, 0, 0.95);
-        color: white;
+        background: var(--ec-surface);
+        color: var(--ec-text);
         border-radius: 20px;
         padding: 40px;
         box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
@@ -829,14 +873,14 @@
         border-radius: 20px;
         font-size: 14px;
         font-weight: bold;
-        border: 2px solid rgba(255, 255, 255, 0.3);
-        color: rgba(255, 255, 255, 0.5);
+        border: 2px solid var(--ec-border);
+        color: var(--ec-muted);
         transition: all 0.3s ease;
       }
 
       .step.active {
         background: var(--ec-accent);
-        color: #000;
+        color: var(--ec-accent-text);
         border-color: var(--ec-accent);
       }
 
@@ -850,8 +894,8 @@
       .file-input {
         width: 100%;
         padding: 15px;
-        background: rgba(255, 255, 255, 0.1);
-        color: white;
+        background: var(--ec-hover);
+        color: var(--ec-text);
         border: 3px solid var(--ec-accent);
         border-radius: 12px;
         font-size: 16px;
@@ -859,7 +903,7 @@
       }
 
       .file-info {
-        background: rgba(255, 255, 255, 0.05);
+        background: var(--ec-hover);
         border-radius: 12px;
         padding: 20px;
         margin: 20px 0;
@@ -868,7 +912,7 @@
 
       /* 品質選択パネル */
       .performance-info {
-        background: rgba(52, 152, 219, 0.2);
+        background: var(--ec-info-bg);
         border-radius: 12px;
         padding: 20px;
         margin: 20px 0;
@@ -887,8 +931,8 @@
 
       .quality-option {
         display: block;
-        background: rgba(255, 255, 255, 0.05);
-        border: 2px solid rgba(255, 255, 255, 0.2);
+        background: var(--ec-hover);
+        border: 2px solid var(--ec-border);
         border-radius: 12px;
         padding: 20px;
         margin: 15px 0;
@@ -899,12 +943,12 @@
 
       .quality-option:hover {
         border-color: var(--ec-accent);
-        background: rgba(2, 132, 199, 0.1);
+        background: var(--ec-hover);
       }
 
       .quality-option.selected {
         border-color: var(--ec-accent);
-        background: rgba(2, 132, 199, 0.2);
+        background: var(--ec-accent-bg);
       }
 
       .quality-option.recommended::after {
@@ -913,7 +957,7 @@
         top: 10px;
         right: 15px;
         background: var(--ec-warning);
-        color: white;
+        color: var(--ec-accent-text);
         padding: 4px 8px;
         border-radius: 8px;
         font-size: 12px;
@@ -969,7 +1013,7 @@
       .quality-spec-detail div {
         margin-top: 6px;
         padding: 6px 8px;
-        background: rgba(255,255,255,0.05);
+        background: var(--ec-hover);
         border-radius: 4px;
         line-height: 1.7;
         color: var(--ec-muted);
@@ -995,7 +1039,7 @@
       }
 
       .loading-file-info {
-        background: rgba(255, 255, 255, 0.05);
+        background: var(--ec-hover);
         border-radius: 12px;
         padding: 20px;
         margin: 20px 0;
@@ -1009,7 +1053,7 @@
       .progress-bar {
         width: 100%;
         height: 20px;
-        background: rgba(255, 255, 255, 0.2);
+        background: var(--ec-hover);
         border-radius: 10px;
         overflow: hidden;
         margin: 10px 0;
@@ -1070,13 +1114,13 @@
         top: 20px;
         right: 20px;
         z-index: 1000;
-        background: rgba(0, 0, 0, 0.9);
-        color: white;
+        background: var(--ec-surface);
+        color: var(--ec-text);
         border-radius: 15px;
         padding: 25px;
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
         min-width: 300px;
-        border: 2px solid rgba(255, 255, 255, 0.2);
+        border: 2px solid var(--ec-border);
         display: none;
       }
 
@@ -1172,17 +1216,17 @@
 
       .quality-indicator.good {
         background: var(--ec-success);
-        color: white;
+        color: var(--ec-accent-text);
       }
 
       .quality-indicator.warning {
         background: var(--ec-warning);
-        color: white;
+        color: var(--ec-accent-text);
       }
 
       .quality-indicator.error {
         background: var(--ec-error);
-        color: white;
+        color: var(--ec-accent-text);
       }
 
       /* 警告モーダル */
@@ -1192,7 +1236,7 @@
         left: 0;
         width: 100%;
         height: 100%;
-        background: rgba(0, 0, 0, 0.8);
+        background: var(--ec-backdrop);
         display: none;
         justify-content: center;
         align-items: center;
@@ -1299,7 +1343,7 @@
         right: 20px;
         width: 200px;
         max-height: 400px;
-        background: rgba(22, 27, 34, 0.97);
+        background: var(--ec-surface);
         border: 1px solid var(--ec-border);
         border-radius: 8px;
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
@@ -1315,7 +1359,7 @@
         align-items: center;
         padding: 12px;
         background: var(--ec-accent);
-        color: white;
+        color: var(--ec-text);
         font-weight: 600;
         font-size: 14px;
       }
@@ -1329,7 +1373,7 @@
       .legend-close {
         background: none;
         border: none;
-        color: white;
+        color: var(--ec-text);
         font-size: 16px;
         cursor: pointer;
         padding: 0;
@@ -1343,7 +1387,7 @@
       }
 
       .legend-close:hover {
-        background: rgba(255, 255, 255, 0.2);
+        background: var(--ec-hover);
       }
 
       .legend-content {
@@ -1364,7 +1408,7 @@
         align-items: center;
         gap: 8px;
         padding: 6px 0;
-        border-bottom: 1px solid rgba(255,255,255,0.06);
+        border-bottom: 1px solid var(--ec-border);
         font-size: 12px;
       }
 
@@ -1376,7 +1420,7 @@
         width: 16px;
         height: 16px;
         border-radius: 3px;
-        border: 1px solid rgba(255,255,255,0.2);
+        border: 1px solid var(--ec-border);
         flex-shrink: 0;
       }
 
@@ -1404,7 +1448,7 @@
         left: 0;
         width: 100%;
         height: 100%;
-        background: rgba(0, 0, 0, 0.8);
+        background: var(--ec-backdrop);
         z-index: 2000;
         display: flex;
         align-items: center;
@@ -1412,8 +1456,8 @@
       }
 
       .modal-content {
-        background: rgba(0, 0, 0, 0.95);
-        color: white;
+        background: var(--ec-surface);
+        color: var(--ec-text);
         border-radius: 20px;
         padding: 30px;
         border: 3px solid var(--ec-accent);
@@ -1459,7 +1503,7 @@
       }
 
       .sample-file-item {
-        background: rgba(255, 255, 255, 0.1);
+        background: var(--ec-hover);
         border-radius: 12px;
         padding: 20px;
         cursor: pointer;
@@ -1468,7 +1512,7 @@
       }
 
       .sample-file-item:hover {
-        background: rgba(2, 132, 199, 0.2);
+        background: var(--ec-accent-bg);
         border-color: var(--ec-accent);
         transform: translateY(-2px);
       }
@@ -1492,13 +1536,13 @@
         top: 20px;
         left: 20px;
         z-index: 999;
-        background: rgba(0, 0, 0, 0.9);
-        color: white;
+        background: var(--ec-surface);
+        color: var(--ec-text);
         border-radius: 15px;
         padding: 20px;
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
         min-width: 280px;
-        border: 2px solid rgba(2, 132, 199, 0.3);
+        border: 2px solid var(--ec-border);
         font-size: 16px;
         line-height: 1.4;
         display: none;
@@ -1523,7 +1567,7 @@
       .stats-section {
         margin-bottom: 12px;
         padding: 8px;
-        background: rgba(255, 255, 255, 0.05);
+        background: var(--ec-hover);
         border-radius: 6px;
         border-left: 3px solid var(--ec-accent);
       }
@@ -1552,9 +1596,9 @@
         height: 96px;
         display: block;
         margin-top: 8px;
-        border: 1px solid rgba(2, 132, 199, 0.35);
+        border: 1px solid var(--ec-border);
         border-radius: 6px;
-        background: rgba(2, 6, 23, 0.72);
+        background: var(--ec-canvas);
       }
 
       .diagnostic-candidate-list {
@@ -1572,9 +1616,9 @@
 
       .diagnostic-candidate-filter {
         min-height: 32px;
-        border: 1px solid rgba(148, 163, 184, 0.25);
+        border: 1px solid var(--ec-border);
         border-radius: 6px;
-        background: rgba(15, 23, 42, 0.84);
+        background: var(--ec-inset);
         color: var(--ec-muted);
         padding: 0 8px;
         font-size: 12px;
@@ -1582,10 +1626,10 @@
 
       .diagnostic-candidate-copy-btn {
         min-height: 32px;
-        border: 1px solid rgba(2, 132, 199, 0.45);
+        border: 1px solid var(--ec-accent);
         border-radius: 6px;
-        background: rgba(2, 132, 199, 0.14);
-        color: #e2e8f0;
+        background: var(--ec-accent-bg);
+        color: var(--ec-text);
         font-size: 11px;
         padding: 0 10px;
         cursor: pointer;
@@ -1598,16 +1642,16 @@
         gap: 8px;
         margin-top: 8px;
         padding: 8px;
-        border: 1px solid rgba(14, 165, 233, 0.24);
+        border: 1px solid var(--ec-border);
         border-radius: 6px;
-        background: rgba(15, 23, 42, 0.44);
+        background: var(--ec-inset);
       }
 
       .density-overlay-toggle {
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        color: #dbeafe;
+        color: var(--ec-text);
         font-size: 12px;
         white-space: nowrap;
       }
@@ -1665,7 +1709,7 @@
 
       .density-overlay-note {
         margin-top: 6px;
-        color: #94a3b8;
+        color: var(--ec-muted);
         font-size: 11px;
         line-height: 1.45;
       }
@@ -1684,9 +1728,9 @@
         gap: 8px;
         align-items: center;
         padding: 7px 8px;
-        border: 1px solid rgba(148, 163, 184, 0.22);
+        border: 1px solid var(--ec-border);
         border-radius: 6px;
-        background: rgba(15, 23, 42, 0.84);
+        background: var(--ec-inset);
         color: var(--ec-muted);
         font-size: 11px;
         text-align: left;
@@ -1696,8 +1740,8 @@
       .diagnostic-candidate-btn:hover,
       .diagnostic-candidate-btn.active {
         border-color: var(--ec-accent);
-        background: rgba(2, 132, 199, 0.16);
-        color: #f8fafc;
+        background: var(--ec-accent-bg);
+        color: var(--ec-text);
       }
 
       .diagnostic-candidate-kind {
@@ -1717,7 +1761,7 @@
         top: 20px;
         left: 300px;
         z-index: 1001;
-        background: rgba(0, 0, 0, 0.8);
+        background: var(--ec-surface);
         color: var(--ec-accent);
         border: 2px solid var(--ec-accent);
         border-radius: 8px;
@@ -1733,23 +1777,23 @@
       }
 
       .stats-toggle:hover {
-        background: rgba(2, 132, 199, 0.2);
+        background: var(--ec-accent-bg);
       }
 
       /* 点サイズ制御 */
       .point-size-control {
         margin: 15px 0;
         padding: 12px;
-        background: rgba(255, 255, 255, 0.05);
+        background: var(--ec-hover);
         border-radius: 8px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
+        border: 1px solid var(--ec-border);
       }
 
       .point-size-slider {
         width: 100%;
         height: 6px;
         border-radius: 3px;
-        background: rgba(255, 255, 255, 0.2);
+        background: var(--ec-hover);
         outline: none;
         margin: 10px 0;
       }
@@ -1826,7 +1870,7 @@
         border: 1px solid var(--ec-border);
         border-radius: 8px;
       }
-      #slice2DModal::backdrop { background: #020617cc; }
+      #slice2DModal::backdrop { background: var(--ec-backdrop); }
       .slice-dialog-header {
         position: sticky; top: 0; z-index: 1;
         display: flex; justify-content: space-between; align-items: center; gap: 8px;
@@ -1859,22 +1903,38 @@
       .slice-dialog-controls button, .slice-dialog-header button {
         min-height: 36px;
       }
+      .bridge-slice-tools {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 6px 16px;
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--ec-border);
+      }
+      .bridge-slice-tools .slice-dialog-control { width: min(100%, 320px); }
+      .bridge-slice-tools .slice-dialog-slider button { min-height: 36px; }
+      .bridge-slice-tools .bridge-slice-thickness-hint { grid-column: 1 / -1; font-size: .82rem; }
+      .bridge-slice-count { margin: 0; font-size: .88rem; }
+      .bridge-slice-count output { font-variant-numeric: tabular-nums; }
       #sampleDensityGuide .density-overlay-legend { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 8px; }
       .density-overlay-legend .density-empty[hidden] { display: none; }
       .density-overlay-legend .density-empty::before { background: transparent; border: 1px solid currentColor; }
       @media (max-width: 540px) {
         .slice-dialog-body { flex-direction: column; align-items: stretch; }
-        .bridge-slice-map { flex: auto; width: min(100%, 170px); align-self: center; }
+        .bridge-slice-map { flex: auto; width: min(100%, 122px); align-self: center; }
+        .bridge-slice-map figcaption { font-size: .8rem; }
         .slice-dialog-plots { flex: auto; }
+        .bridge-slice-tools { grid-template-columns: minmax(0, 1fr) minmax(0, 100px); gap: 6px 10px; }
       }
       .river-demo-entry { margin-bottom: 1rem; }
       .river-demo-entry p, .river-demo-mode p { margin: .5rem 0; color: var(--ec-muted); }
-      .river-demo-mode { padding: 12px; }
+      .river-demo-mode { padding: 12px; container-type: inline-size; }
       .river-demo-mode h2 { font-size: 1rem; margin: 0; }
       .river-demo-actions { display: flex; flex-wrap: wrap; gap: 6px; }
       .river-demo-actions button { padding: 6px 10px; }
       #bridgeGuideHint, #bridgeGuidePaused { margin-block: 12px; }
       #bridgeGuidePaused[hidden] { display: none; }
+      #riverDemoMode:not([hidden]) ~ #statsToggle { display: none !important; }
       #bridgeGuideHint .river-demo-actions + .river-demo-actions { margin-top: 6px; }
       .bridge-slice-thickness-hint { flex-basis: 100%; margin: 0; color: var(--ec-muted); }
       .sample-help-symbol { position: absolute; pointer-events: none; }
@@ -1884,6 +1944,10 @@
         align-items: stretch;
         flex: 1 1 132px;
         min-width: 0;
+      }
+      #sampleGuide .sample-feature:first-child { flex-basis: 100%; }
+      @container (max-width: 285px) {
+        #sampleGuide .sample-feature { flex-basis: 100%; }
       }
       .sample-feature > .ec-button {
         min-width: 0;
@@ -1922,7 +1986,7 @@
         border: 1px solid var(--ec-border);
         border-radius: 8px;
       }
-      #sampleHelpDialog::backdrop { background: #020617cc; }
+      #sampleHelpDialog::backdrop { background: var(--ec-backdrop); }
       #sampleHelpDialog p { margin: 0; padding: 16px; line-height: 1.6; }
       [data-sample-step][data-complete]::after {
         content: ""; display: inline-block; width: .35em; height: .65em;
@@ -1943,43 +2007,47 @@
     </style>
     <style id="ec-theme">
       :root {
-        --ec-bg: #0f1117;
-        --ec-surface: rgba(15, 23, 42, 0.6);
-        --ec-text: #ffffff;
-        --ec-muted: #a8b5cc;
-        --ec-accent: #0284c7;
-        --ec-accent-600: #0369a1;
-        --ec-accent-hover: #0369a1;
-        --ec-accent-light: #38bdf8;
-        --ec-accent-dark: #0369a1;
-        --ec-accent-darker: #075985;
-        --ec-accent-text: #ffffff;
-        --ec-success: #10b981;
-        --ec-success-hover: #059669;
-        --ec-success-dark: #059669;
-        --ec-success-darker: #047857;
-        --ec-success-bg: rgba(16, 185, 129, 0.12);
-        --ec-warning: #f59e0b;
-        --ec-warning-hover: #d97706;
-        --ec-warning-dark: #d97706;
-        --ec-warning-darker: #b45309;
-        --ec-warning-bg: rgba(245, 158, 11, 0.08);
-        --ec-error: #ef4444;
-        --ec-error-hover: #dc2626;
-        --ec-error-dark: #dc2626;
-        --ec-error-darker: #b91c1c;
-        --ec-error-bg: rgba(239, 68, 68, 0.08);
-        --ec-info: #6366f1;
-        --ec-info-hover: #4f46e5;
-        --ec-info-dark: #4f46e5;
-        --ec-info-bg: rgba(99, 102, 241, 0.08);
-        --ec-axis-x: #ef4444;
-        --ec-axis-y: #10b981;
-        --ec-axis-z: #3b82f6;
-        --ec-border: rgba(255, 255, 255, 0.08);
-        --ec-hover: rgba(255, 255, 255, 0.06);
-        --ec-focus: #38bdf8;
-        --ec-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+        color-scheme: dark;
+        accent-color: var(--ec-accent);
+        --ec-bg: #262528;
+        --ec-surface: #302e32;
+        --ec-toolbar: #2b292d;
+        --ec-canvas: #211f23;
+        --ec-inset: #28262a;
+        --ec-text: #f5eeee;
+        --ec-muted: #c2b8ba;
+        --ec-border: #4f474f;
+        --ec-hover: #3c373e;
+        --ec-accent: #e2bc6d;
+        --ec-accent-hover: #f1cb80;
+        --ec-accent-text: #2a2117;
+        --ec-accent-bg: #403525;
+        --ec-accent-glow: rgba(226, 188, 109, 0.18);
+        --ec-accent-600: var(--ec-accent-hover);
+        --ec-accent-light: var(--ec-accent);
+        --ec-accent-dark: var(--ec-accent-hover);
+        --ec-accent-darker: var(--ec-accent-hover);
+        --ec-focus: var(--ec-accent);
+        --ec-success: #a7cc79;
+        --ec-success-hover: #b9dc8b;
+        --ec-success-bg: #333c2b;
+        --ec-warning: #edaf72;
+        --ec-warning-hover: #f5bd83;
+        --ec-warning-bg: #443329;
+        --ec-error: #f494a4;
+        --ec-error-hover: #ffadba;
+        --ec-error-bg: #472f37;
+        --ec-info: #c3b2ed;
+        --ec-info-bg: #383145;
+        --ec-axis-x: var(--ec-error);
+        --ec-axis-y: var(--ec-success);
+        --ec-axis-z: #97c8e5;
+        --ec-shadow: 0 10px 30px rgba(0, 0, 0, 0.38);
+        --ec-backdrop: rgba(18, 15, 20, 0.68);
+        --ec-plot-grid: #625762;
+        --ec-plot-point: #a59aa4;
+        --ec-select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='m1 1 5 5 5-5' fill='none' stroke='%23c2b8ba' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+
         --ec-topbar-h: 56px;
         --ec-right-w: clamp(280px, 24vw, 360px);
 
@@ -2011,6 +2079,41 @@
         --transition-base: 200ms;
         --transition-slow: 300ms;
         --transition-timing: cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      :root[data-theme="light"] {
+        color-scheme: light;
+        --ec-bg: #f3eee7;
+        --ec-surface: #fffaf4;
+        --ec-toolbar: #fbf6ee;
+        --ec-canvas: #ebe5dc;
+        --ec-inset: #f4eee7;
+        --ec-text: #29232b;
+        --ec-muted: #645a64;
+        --ec-border: #c8b9be;
+        --ec-hover: #ece2da;
+        --ec-accent: #81551e;
+        --ec-accent-hover: #684116;
+        --ec-accent-text: #fff9ef;
+        --ec-accent-bg: #eee0cc;
+        --ec-accent-glow: rgba(129, 85, 30, 0.17);
+        --ec-success: #3c5a23;
+        --ec-success-hover: #304c1a;
+        --ec-success-bg: #e4ebd9;
+        --ec-warning: #83471c;
+        --ec-warning-hover: #6f3913;
+        --ec-warning-bg: #f3e3d2;
+        --ec-error: #9f354d;
+        --ec-error-hover: #84293c;
+        --ec-error-bg: #f6dfe3;
+        --ec-info: #634582;
+        --ec-info-bg: #ece3f3;
+        --ec-axis-z: #2e6080;
+        --ec-shadow: 0 10px 30px rgba(58, 43, 48, 0.16);
+        --ec-backdrop: rgba(52, 43, 51, 0.46);
+        --ec-plot-grid: #b8aeb1;
+        --ec-plot-point: #706670;
+        --ec-select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='m1 1 5 5 5-5' fill='none' stroke='%23645a64' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
       }
 
       :root {
@@ -2074,7 +2177,7 @@
 
       .ec-button--primary {
         background: var(--ec-accent);
-        color: white;
+        color: var(--ec-accent-text);
         border-color: var(--ec-accent);
       }
 
@@ -2184,10 +2287,27 @@
       }
       .ec-main {
         grid-area: main;
+        position: relative;
         min-width: 0;
         min-height: 0;
         overflow: hidden;
       }
+      .viewer-navigation {
+        position: absolute;
+        z-index: 20;
+        inset: 10px 10px auto auto;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px;
+        border: 1px solid var(--ec-border);
+        border-radius: 7px;
+        background: var(--ec-bg);
+      }
+      .ec-shell.is-right-hidden .viewer-navigation { display: none; }
+      #viewerView { padding-inline: 6px; color: var(--ec-muted); font-size: .82rem; }
+      .viewer-navigation button.ec-button { width: 34px; height: 34px; padding: 0; }
+      .viewer-navigation svg { width: 17px; height: 17px; }
       .ec-right {
         grid-area: right;
         min-width: 0;
@@ -2216,7 +2336,7 @@
         position: sticky;
         top: 0;
         height: var(--ec-topbar-h);
-        background: var(--ec-surface);
+        background: var(--ec-toolbar);
         border-bottom: 1px solid var(--ec-border);
         display: flex;
         align-items: center;
@@ -2274,12 +2394,43 @@
         outline: 2px solid var(--ec-focus);
         outline-offset: 2px;
       }
+      .theme-toggle {
+        display: grid;
+        flex: none;
+        place-items: center;
+        width: 40px;
+        height: 40px;
+        padding: 0;
+        background: transparent;
+        color: var(--ec-muted);
+        border: 1px solid transparent;
+        border-radius: 8px;
+        cursor: pointer;
+      }
+      .theme-toggle:hover {
+        background: var(--ec-hover);
+        color: var(--ec-accent);
+        border-color: var(--ec-border);
+      }
+      .theme-toggle svg {
+        width: 22px;
+        height: 22px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.5;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .theme-toggle[aria-pressed="false"] .theme-toggle__moon,
+      .theme-toggle[aria-pressed="true"] .theme-toggle__sun {
+        stroke: var(--ec-accent);
+      }
       .ec-topbar__select {
         height: 36px;
         padding: 0 36px 0 12px;
-        background: rgba(15, 23, 42, 0.9);
-        color: #ffffff;
-        border: 1px solid rgba(255, 255, 255, 0.12);
+        background-color: var(--ec-inset);
+        color: var(--ec-text);
+        border: 1px solid var(--ec-border);
         border-radius: 8px;
         cursor: pointer;
         font-size: 14px;
@@ -2287,7 +2438,7 @@
         appearance: none;
         -webkit-appearance: none;
         -moz-appearance: none;
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23cbd5f5' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+        background-image: var(--ec-select-arrow);
         background-repeat: no-repeat;
         background-position: right 12px center;
         background-size: 12px 8px;
@@ -2399,7 +2550,7 @@
 
       /* Buttons (calmer) */
       .btn {
-        background: #0f172a !important;
+        background: var(--ec-inset) !important;
         color: var(--ec-text) !important;
         border: 1px solid var(--ec-border) !important;
         border-radius: 6px !important;
@@ -2408,15 +2559,15 @@
       }
       .btn:hover {
         border-color: var(--ec-accent) !important;
-        color: #ffffff !important;
+        color: var(--ec-text) !important;
       }
       .btn.warning {
         background: var(--ec-accent) !important;
         border-color: var(--ec-accent) !important;
-        color: #0f1117 !important;
+        color: var(--ec-accent-text) !important;
       }
       .btn.secondary {
-        background: #0f172a !important;
+        background: var(--ec-inset) !important;
         color: var(--ec-text) !important;
         border-color: var(--ec-border) !important;
       }
@@ -2428,7 +2579,7 @@
 
       /* Stats/Legend neutral surfaces */
       .stats-panel {
-        background: rgba(22, 27, 34, 0.95) !important;
+        background: var(--ec-surface) !important;
         color: var(--ec-text) !important;
         border: 1px solid var(--ec-border) !important;
         box-shadow: var(--ec-shadow) !important;
@@ -2442,7 +2593,7 @@
         padding: 0 !important;
       }
       .legend-panel {
-        background: rgba(22, 27, 34, 0.95) !important;
+        background: var(--ec-surface) !important;
         border: 1px solid var(--ec-border) !important;
         padding: 0 !important;
       }
@@ -2471,18 +2622,19 @@
 
       /* Ensure viewport container sits beneath overlays visually */
       #container {
+        background: var(--ec-canvas);
         background: transparent;
       }
 
       /* Primary button should not use legacy gradients */
       .btn.primary {
-        background: #0f172a !important;
-        color: #ffffff !important;
-        border-color: rgba(56, 189, 248, 0.6) !important;
-        box-shadow: 0 0 16px rgba(56, 189, 248, 0.15) !important;
+        background: var(--ec-inset) !important;
+        color: var(--ec-text) !important;
+        border-color: var(--ec-accent) !important;
+        box-shadow: 0 0 16px var(--ec-accent-glow) !important;
       }
       .btn.primary:hover {
-        background: #111c33 !important;
+        background: var(--ec-hover) !important;
         border-color: var(--ec-accent) !important;
       }
       .btn.primary:disabled {
@@ -2495,20 +2647,20 @@
       .compatibility-warning,
       .memory-warning,
       .performance-warning {
-        background: rgba(2, 6, 23, 0.6) !important;
+        background: var(--ec-backdrop) !important;
       }
       .error-modal-content,
       .compatibility-warning-content,
       .memory-warning-content,
       .performance-warning-content {
-        background: rgba(22, 27, 34, 0.98) !important;
+        background: var(--ec-surface) !important;
         color: var(--ec-text) !important;
         border: 1px solid var(--ec-border) !important;
         box-shadow: var(--ec-shadow) !important;
       }
       
       .warning-modal-content {
-        background: rgba(22, 27, 34, 0.98) !important;
+        background: var(--ec-surface) !important;
         color: var(--ec-text) !important;
         border: 1px solid var(--ec-warning) !important;
         box-shadow: var(--ec-shadow) !important;
@@ -2519,14 +2671,14 @@
         color: var(--ec-text) !important;
       }
       .error-modal pre {
-        background: #f3f4f6 !important;
-        color: #111827 !important;
+        background: var(--ec-inset) !important;
+        color: var(--ec-text) !important;
         border-left: 4px solid var(--ec-accent) !important;
       }
       .error-actions button {
         padding: 10px 16px !important;
         background: var(--ec-accent) !important;
-        color: #fff !important;
+        color: var(--ec-accent-text) !important;
         border: 1px solid var(--ec-accent) !important;
         border-radius: 8px !important;
       }
@@ -2536,7 +2688,7 @@
 
       /* Initialization progress overlay */
       .initialization-progress {
-        background: rgba(17, 24, 39, 0.4) !important;
+        background: var(--ec-backdrop) !important;
       }
       .initialization-progress-content {
         background: var(--ec-surface) !important;
@@ -2545,7 +2697,7 @@
         box-shadow: var(--ec-shadow) !important;
       }
       .progress-bar {
-        background: rgba(255, 255, 255, 0.12) !important;
+        background: var(--ec-hover) !important;
       }
       .progress-fill {
         background: linear-gradient(
@@ -2568,7 +2720,7 @@
         font-variant-numeric: tabular-nums;
       }
       .stats-toggle {
-        background: rgba(22, 27, 34, 0.95) !important;
+        background: var(--ec-surface) !important;
         color: var(--ec-text) !important;
         border: 1px solid var(--ec-border) !important;
       }
@@ -2582,7 +2734,7 @@
         gap: 10px;
       }
       .stats-tile {
-        background: rgba(15, 23, 42, 0.6);
+        background: var(--ec-inset);
         border: 1px solid var(--ec-border);
         border-radius: 8px;
         padding: 10px 12px;
@@ -2630,10 +2782,10 @@
 
       /* Sample file modal (calm overrides) */
       .modal-overlay {
-        background: rgba(2, 6, 23, 0.65) !important;
+        background: var(--ec-backdrop) !important;
       }
       .modal-content {
-        background: rgba(22, 27, 34, 0.98) !important;
+        background: var(--ec-surface) !important;
         color: var(--ec-text) !important;
         border: 1px solid var(--ec-border) !important;
         box-shadow: var(--ec-shadow) !important;
@@ -2648,15 +2800,15 @@
         color: var(--ec-accent-600) !important;
       }
       .sample-file-item {
-        background: rgba(15, 23, 42, 0.7) !important;
-        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        background: var(--ec-inset) !important;
+        border: 1px solid var(--ec-border) !important;
         color: var(--ec-text) !important;
         box-shadow: none !important;
       }
       .sample-file-item:hover {
-        background: rgba(30, 41, 59, 0.8) !important;
-        border-color: rgba(56, 189, 248, 0.6) !important;
-        box-shadow: 0 0 14px rgba(56, 189, 248, 0.12) !important;
+        background: var(--ec-hover) !important;
+        border-color: var(--ec-accent) !important;
+        box-shadow: 0 0 14px var(--ec-accent-glow) !important;
         transform: translateY(-1px);
       }
       .sample-file-title {
@@ -2669,43 +2821,39 @@
 
       /* Step indicator (calm) */
       .step {
-        background: #fff !important;
+        background: var(--ec-inset) !important;
         color: var(--ec-text) !important;
         border: 1px solid var(--ec-border) !important;
       }
       .step.active {
         background: var(--ec-accent) !important;
-        color: #fff !important;
+        color: var(--ec-accent-text) !important;
         border-color: var(--ec-accent) !important;
       }
       .step.completed {
-        background: #f3f6fb !important;
+        background: var(--ec-accent-bg) !important;
         color: var(--ec-accent) !important;
         border-color: var(--ec-accent) !important;
       }
 
       /* Quality options (calm) */
       .quality-option {
-        border: 1px solid rgba(255, 255, 255, 0.08) !important;
-        background: rgba(30, 41, 59, 0.4) !important;
+        border: 1px solid var(--ec-border) !important;
+        background: var(--ec-inset) !important;
       }
       .quality-option:hover {
-        border-color: rgba(56, 189, 248, 0.6) !important;
-        background: rgba(30, 41, 59, 0.5) !important;
+        border-color: var(--ec-accent) !important;
+        background: var(--ec-hover) !important;
       }
       .quality-option.selected {
         border-color: var(--ec-accent) !important;
-        background: linear-gradient(
-          145deg,
-          rgba(56, 189, 248, 0.12),
-          rgba(30, 41, 59, 0.5)
-        ) !important;
-        box-shadow: 0 0 15px rgba(56, 189, 248, 0.15) !important;
+        background: var(--ec-accent-bg) !important;
+        box-shadow: 0 0 15px var(--ec-accent-glow) !important;
       }
       .quality-option.selected .quality-label,
       .quality-option.selected .quality-desc,
       .quality-option.selected .quality-details {
-        color: #ffffff !important;
+        color: var(--ec-text) !important;
       }
       .quality-label {
         color: var(--ec-text) !important;
@@ -2718,7 +2866,7 @@
       .file-info,
       .estimated-info {
         border-left: 3px solid var(--ec-accent) !important;
-        background: rgba(15, 23, 42, 0.6) !important;
+        background: var(--ec-inset) !important;
       }
       .file-size-warning-ok {
         border: 2px solid var(--ec-accent) !important;
@@ -2731,7 +2879,7 @@
 
       /* Control buttons (calm) */
       .control-btn {
-        background: rgba(15, 23, 42, 0.7) !important;
+        background: var(--ec-inset) !important;
         color: var(--ec-text) !important;
         border: var(--border-width) solid var(--ec-border) !important;
         border-radius: var(--radius-md);
@@ -2750,14 +2898,14 @@
         border-color: var(--ec-accent) !important;
         color: var(--ec-accent) !important;
         transform: translateY(-1px);
-        box-shadow: 0 2px 8px rgba(56, 189, 248, 0.1) !important;
+        box-shadow: 0 2px 8px var(--ec-accent-glow) !important;
       }
       .control-btn:active {
         transform: translateY(0);
       }
       .control-btn.active {
-        background: rgba(56, 189, 248, 0.15) !important;
-        color: #ffffff !important;
+        background: var(--ec-accent-bg) !important;
+        color: var(--ec-text) !important;
         border-color: var(--ec-accent) !important;
       }
       .control-btn svg {
@@ -2808,7 +2956,7 @@
         margin-top: 6px;
       }
       #sliceControlPanel button {
-        background: rgba(15, 23, 42, 0.7) !important;
+        background: var(--ec-inset) !important;
         color: var(--ec-text) !important;
         border: 1px solid var(--ec-border) !important;
         border-radius: 6px !important;
@@ -2821,30 +2969,18 @@
         color: var(--ec-accent) !important;
       }
 
-      /* Override inline neon guide colors inside #controls */
-      #controls div[style*="background: rgba(255, 255, 255, 0.05)"] {
-        background: rgba(15, 23, 42, 0.7) !important;
-        border: 1px solid var(--ec-border) !important;
-      }
-      #controls div[style*="#88ccff"],
-      #controls div[style*="#00ff88"] {
-        color: var(--ec-accent) !important;
-      }
-      #controls div[style*="color: #cccccc"] {
-        color: var(--ec-text) !important;
-      }
       #pointSizeValue {
         color: var(--ec-accent) !important;
       }
 
       /* Inputs and loading info */
       .file-input {
-        background: rgba(15, 23, 42, 0.7) !important;
+        background: var(--ec-inset) !important;
         color: var(--ec-text) !important;
         border: 1px solid var(--ec-border) !important;
       }
       .loading-file-info {
-        background: rgba(15, 23, 42, 0.7) !important;
+        background: var(--ec-inset) !important;
         border-left: 3px solid var(--ec-accent) !important;
       }
 
@@ -2895,18 +3031,18 @@
 
       .dropzone {
         position: relative;
-        border: 1px solid rgba(255, 255, 255, 0.08);
+        border: 1px solid var(--ec-border);
         border-radius: 8px;
         padding: 32px;
         text-align: center;
         background:
           radial-gradient(
               circle at 1px 1px,
-              rgba(255, 255, 255, 0.08) 1px,
+              var(--ec-border) 1px,
               transparent 0
             )
             0 0/16px 16px,
-          rgba(15, 23, 42, 0.6);
+          var(--ec-inset);
         transition:
           border-color 0.2s ease,
           background 0.2s ease,
@@ -2921,7 +3057,7 @@
       }
       .dropzone.is-dragover {
         border-color: var(--ec-accent);
-        box-shadow: 0 0 18px rgba(56, 189, 248, 0.25);
+        box-shadow: 0 0 18px var(--ec-accent-glow);
       }
       .dropzone-icon {
         color: var(--ec-accent);
@@ -2949,7 +3085,7 @@
         margin-top: 18px;
         border: 1px solid var(--ec-border);
         border-radius: 8px;
-        background: rgba(15, 23, 42, 0.55);
+        background: var(--ec-inset);
         padding: 14px;
         text-align: left;
       }
@@ -3053,13 +3189,13 @@
         border: var(--border-width) solid var(--ec-border);
         border-radius: var(--radius-lg);
         padding: var(--space-2) var(--space-3);
-        background: rgba(15, 23, 42, 0.45);
+        background: var(--ec-inset);
         transition-property: background-color, border-color;
         transition-duration: var(--transition-slow);
         transition-timing-function: var(--transition-timing);
       }
       details.panel-section:hover {
-        background: rgba(15, 23, 42, 0.6);
+        background: var(--ec-inset);
       }
       details.panel-section summary {
         list-style: none;
@@ -3087,21 +3223,21 @@
         color: var(--ec-text);
       }
       details.panel-section[open] {
-        border-color: rgba(56, 189, 248, 0.45);
-        box-shadow: 0 0 12px rgba(56, 189, 248, 0.12);
+        border-color: var(--ec-accent);
+        box-shadow: 0 0 12px var(--ec-accent-glow);
       }
       .btn.ghost {
-        background: #0f172a !important;
-        color: #ffffff !important;
-        border: 1px solid rgba(56, 189, 248, 0.6) !important;
+        background: var(--ec-inset) !important;
+        color: var(--ec-text) !important;
+        border: 1px solid var(--ec-accent) !important;
         border-radius: 6px !important;
         padding: 10px 16px !important;
       }
       .btn.ghost:hover {
-        background: #111c33 !important;
+        background: var(--ec-hover) !important;
       }
       .btn.secondary {
-        background: #0f172a !important;
+        background: var(--ec-inset) !important;
         color: var(--ec-text) !important;
         border: 1px solid var(--ec-border) !important;
       }
@@ -3113,10 +3249,10 @@
         margin: 16px 0 20px;
       }
       .metric-item {
-        border: 1px solid rgba(255, 255, 255, 0.08);
+        border: 1px solid var(--ec-border);
         border-radius: 6px;
         padding: 10px 12px;
-        background: rgba(15, 23, 42, 0.6);
+        background: var(--ec-inset);
       }
       .metric-label {
         color: var(--ec-muted);
@@ -3154,21 +3290,21 @@
         position: absolute;
         top: 8px;
         right: 10px;
-        background: rgba(15, 23, 42, 0.9);
-        color: #ffffff;
+        background: var(--ec-inset);
+        color: var(--ec-text);
         padding: 2px 6px;
         border-radius: 6px;
         font-size: 10px;
         font-weight: 700;
         letter-spacing: 0.4px;
-        border: 1px solid rgba(255, 255, 255, 0.12);
+        border: 1px solid var(--ec-border);
       }
       .quality-option.selected::before {
         content: "v";
         position: absolute;
         top: 8px;
         left: 10px;
-        color: #ffffff;
+        color: var(--ec-text);
         font-size: 12px;
         opacity: 0.8;
       }
@@ -3209,9 +3345,9 @@
       #qualityRecommendationReason {
         margin-top: 10px;
         padding: 10px 12px;
-        border: 1px solid rgba(255, 255, 255, 0.16);
+        border: 1px solid var(--ec-border);
         border-radius: 8px;
-        background: rgba(15, 23, 42, 0.35);
+        background: var(--ec-inset);
         color: var(--ec-muted);
         font-size: 13px;
         line-height: 1.45;
@@ -3239,7 +3375,7 @@
         background: var(--ec-surface) !important;
       }
       .guide-header {
-        background: rgba(15, 23, 42, 0.8) !important;
+        background: var(--ec-toolbar) !important;
       }
       .guide-section {
         margin-bottom: var(--space-4);
@@ -3269,7 +3405,7 @@
         gap: var(--space-3);
         padding: var(--space-2) var(--space-3);
         margin-bottom: var(--space-2);
-        background: rgba(15, 23, 42, 0.4);
+        background: var(--ec-inset);
         border-radius: var(--radius-md);
         border-left: var(--border-width-thick) solid transparent;
         transition-property: background-color, border-color, transform;
@@ -3277,7 +3413,7 @@
         transition-timing-function: var(--transition-timing);
       }
       .guide-item:hover {
-        background: rgba(15, 23, 42, 0.6);
+        background: var(--ec-inset);
         border-left-color: var(--ec-accent);
         transform: translateX(1px);
       }
@@ -3315,9 +3451,9 @@
         background: linear-gradient(
           145deg,
           rgba(56, 189, 248, 0.2),
-          rgba(15, 23, 42, 0.8)
+          var(--ec-toolbar)
         );
-        border: var(--border-width) solid rgba(56, 189, 248, 0.3);
+        border: var(--border-width) solid var(--ec-border);
         border-radius: var(--radius-sm);
         color: var(--ec-accent);
         font-size: var(--font-size-xs);
@@ -3377,7 +3513,7 @@
       .stats-toggle:hover {
         background: var(--ec-hover);
         border-color: var(--ec-accent);
-        box-shadow: 0 2px 8px rgba(56, 189, 248, 0.1);
+        box-shadow: 0 2px 8px var(--ec-accent-glow);
         transform: translateY(-1px);
       }
       .stats-toggle svg {
@@ -3423,7 +3559,7 @@
 
       .slice-btn.active {
         background: var(--ec-accent);
-        color: white;
+        color: var(--ec-accent-text);
         border-color: var(--ec-accent);
       }
 
@@ -3487,7 +3623,7 @@
         line-height: var(--line-height-normal);
         margin-bottom: var(--space-4);
         padding: var(--space-2) var(--space-3);
-        background: rgba(2, 132, 199, 0.08);
+        background: var(--ec-accent-bg);
         border-left: 2px solid var(--ec-accent);
         border-radius: var(--radius-sm);
       }
@@ -3497,7 +3633,7 @@
       }
 
       .measurement-btn.active {
-        background: rgba(56, 189, 248, 0.18);
+        background: var(--ec-accent-bg);
         border-color: var(--ec-accent);
         color: var(--ec-accent);
       }
@@ -3506,7 +3642,7 @@
         display: none;
         margin-top: var(--space-3);
         padding: var(--space-3);
-        background: rgba(15, 23, 42, 0.72);
+        background: var(--ec-inset);
         border: 1px solid var(--ec-border);
         border-radius: var(--radius-sm);
       }
@@ -3535,7 +3671,7 @@
       }
 
       .measurement-mode-btn.active {
-        background: rgba(56, 189, 248, 0.18);
+        background: var(--ec-accent-bg);
         border-color: var(--ec-accent);
         color: var(--ec-accent);
       }
@@ -3599,8 +3735,8 @@
       }
 
       .measurement-history-item {
-        background: rgba(2, 6, 23, 0.36);
-        border: 1px solid rgba(148, 163, 184, 0.24);
+        background: var(--ec-inset);
+        border: 1px solid var(--ec-border);
         border-radius: var(--radius-sm);
         cursor: pointer;
         padding: var(--space-2);
@@ -3613,9 +3749,9 @@
       .measurement-history-item:hover,
       .measurement-history-item:focus-visible,
       .measurement-history-item.active {
-        background: rgba(14, 116, 144, 0.24);
-        border-color: rgba(56, 189, 248, 0.7);
-        box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.18);
+        background: var(--ec-accent-bg);
+        border-color: var(--ec-accent);
+        box-shadow: 0 0 0 1px var(--ec-accent-glow);
         outline: none;
       }
 
@@ -3657,8 +3793,8 @@
       }
 
       .measurement-tooltip {
-        background: rgba(15, 23, 42, 0.96);
-        border: 1px solid rgba(56, 189, 248, 0.74);
+        background: var(--ec-surface);
+        border: 1px solid var(--ec-accent);
         border-radius: var(--radius-sm);
         box-shadow: 0 14px 36px rgba(0, 0, 0, 0.32);
         color: var(--ec-text);
@@ -3735,9 +3871,9 @@
         line-height: var(--line-height-normal);
         margin-top: var(--space-4);
         padding: var(--space-2) var(--space-3);
-        background: rgba(255, 255, 255, 0.03);
+        background: var(--ec-hover);
         border-radius: var(--radius-sm);
-        border: 1px solid rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--ec-border);
       }
 
       /* Global Animation Settings */
@@ -3922,16 +4058,23 @@
       .ec-topbar__actions { flex: none; }
 
       @media (max-width: 500px) {
-        .ec-topbar { padding-inline: 12px; }
-        .ec-topbar__brand { font-size: 18px; gap: 6px; }
+        .ec-topbar { padding-inline: 10px; }
+        .ec-topbar__brand { font-size: clamp(14px, 4.2vw, 18px); gap: 6px; }
         .ec-topbar__brand .brand-mark { width: 24px; height: 24px; }
+        .ec-topbar__actions { gap: 4px; }
+        .ec-topbar__back { padding-inline: 9px; }
+        .ec-topbar__select { padding-inline: 9px 24px; background-position: right 7px center; }
       }
 
       @media (max-width: 360px) {
         .ec-topbar { padding-inline: 8px; }
-        .ec-topbar__brand { font-size: 15px; }
-        .ec-topbar__actions { gap: 6px; }
-        .ec-topbar__select { padding-inline: 8px 24px; background-position: right 7px center; }
+        .ec-topbar__brand { font-size: 14px; gap: 4px; min-width: 0; }
+        .ec-topbar__brand .brand-mark { width: 20px; height: 20px; }
+        .brand-wordmark { overflow: hidden; text-overflow: ellipsis; }
+        .ec-topbar__actions { gap: 4px; }
+        .ec-topbar__back { padding-inline: 7px; }
+        .theme-toggle { width: 36px; }
+        .ec-topbar__select { font-size: 13px; padding-inline: 7px 20px; background-position: right 6px center; }
       }
     </style>
   </head>
@@ -3968,6 +4111,15 @@
             <option value="ja">日本語</option>
             <option value="en">English</option>
           </select>
+          <button class="theme-toggle" id="themeToggle" type="button" aria-label="ライトテーマ" title="ライトテーマ" aria-pressed="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path class="theme-toggle__moon" d="M10.4 3A5.6 5.6 0 1 0 8.5 13.7l4-4a5.5 5.5 0 0 1-2.1-6.7Z" />
+              <path d="M3.5 20.5l17-17" />
+              <g class="theme-toggle__sun">
+                <path d="M12.5 15.4a3.4 3.4 0 1 0 3-3m.4 8.1v1.2m4-2.8 1 1m-.2-4.6h1.2m-3-4.4 1-1m-8.5 9.5-1 1" />
+              </g>
+            </svg>
+          </button>
         </div>
       </header>
       <main class="ec-main">
@@ -4075,7 +4227,7 @@
               <div id="selectedFileSize">-</div>
               <div
                 id="selectedFileWarning"
-                style="color: #94a3b8; margin-top: 10px"
+                style="color: var(--ec-muted); margin-top: 10px"
               ></div>
             </div>
 
@@ -4307,11 +4459,23 @@
                 キャンセル
               </button>
               <p style="margin:8px 0 0;font-size:11px;color:var(--ec-muted);text-align:center;">
-                <kbd style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:3px;padding:1px 5px;font-size:10px;">ESC</kbd>
+                <kbd style="background:var(--ec-hover);border:1px solid var(--ec-border);border-radius:3px;padding:1px 5px;font-size:10px;">ESC</kbd>
                 でもキャンセルできます
               </p>
             </div>
           </div>
+        </div>
+        <div class="viewer-navigation" role="group" aria-label="表示操作">
+          <span id="viewerView">3D</span>
+          <button type="button" class="ec-button ec-button--secondary" aria-label="近づく" title="近づく" onclick="moveCloser()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M12 5v14"/></svg>
+          </button>
+          <button type="button" class="ec-button ec-button--secondary" aria-label="引く" title="引く" onclick="moveAway()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14"/></svg>
+          </button>
+          <button type="button" class="ec-button ec-button--secondary" aria-label="全体表示" title="全体表示" onclick="fitToView()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+          </button>
         </div>
         <div id="bridgeEndMarkers" hidden>
           <button type="button" data-bridge-end="0" aria-label="橋の端 A" onclick="selectBridgeEnd(0)">A</button>
@@ -4330,13 +4494,13 @@
             <p>合成データ · ローカル座標（m）</p>
             <div class="river-demo-actions">
               <div class="sample-feature">
-                <button class="ec-button ec-button--secondary" onclick="if (is2DMode) exit2DView(); else set2DView('top')">3D / 上面</button>
+                <button id="sampleViewToggle" type="button" class="ec-button ec-button--secondary" onclick="if (is2DMode && current2DView === 'top') exit2DView(); else set2DView('top')">上面に切替</button>
                 <button class="sample-help-button" type="button" data-sample-help="view" aria-label="ヘルプ: 3D / 上面" aria-haspopup="dialog" onclick="showSampleFeatureHelp('view', this)">
                   <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sampleHelpIcon"/></svg>
                 </button>
               </div>
               <div class="sample-feature">
-                <button class="ec-button ec-button--secondary" onclick="if (!statsVisible) toggleStatsPanel(); document.getElementById('statsPanel').scrollIntoView({block:'nearest'})">統計情報</button>
+                <button id="sampleStatsToggle" type="button" class="ec-button ec-button--secondary" aria-expanded="false" aria-controls="statsPanel" onclick="toggleStatsPanel(true)">統計情報</button>
                 <button class="sample-help-button" type="button" data-sample-help="statistics" aria-label="ヘルプ: 統計情報" aria-haspopup="dialog" onclick="showSampleFeatureHelp('statistics', this)">
                   <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sampleHelpIcon"/></svg>
                 </button>
@@ -4352,7 +4516,7 @@
                   </button>
                 </div>
                 <div class="sample-feature">
-                  <button class="ec-button ec-button--secondary" data-sample-step="measure" onclick="startBridgeMeasurement()">橋の両端を測る</button>
+                  <button class="ec-button ec-button--secondary" data-sample-step="measure" onclick="startBridgeMeasurement()">橋を測る</button>
                   <button class="sample-help-button" type="button" data-sample-help="measure" aria-label="ヘルプ: 橋の計測" aria-haspopup="dialog" onclick="showSampleFeatureHelp('measure', this)">
                     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sampleHelpIcon"/></svg>
                   </button>
@@ -4380,9 +4544,12 @@
               <button id="bridgeGuideResume" type="button" class="ec-button ec-button--secondary" onclick="startBridgeMeasurement()">橋の計測を再開</button>
               <button type="button" class="ec-button ec-button--secondary" onclick="cancelBridgeMeasurement()">橋の計測をやめる</button>
             </div>
-            <div id="bridgeGuideDistance" role="status" tabindex="-1" hidden>
-              <p><span>橋の水平距離</span> <output id="bridgeGuideDistanceValue"></output> m</p>
-              <p>計測履歴に保存しました。</p>
+            <div id="bridgeGuideDistance" tabindex="-1" hidden>
+              <div role="status">
+                <p><span>橋の水平距離</span> <output id="bridgeGuideDistanceValue"></output> m</p>
+                <p>このセッションの計測履歴に追加しました。</p>
+              </div>
+              <button type="button" class="ec-button ec-button--secondary" onclick="copyMeasurementRecordCsv(this.closest('#bridgeGuideDistance').dataset.measurementId)">CSVコピー</button>
             </div>
             <div id="sampleDensityGuide" hidden>
               <p>凡例の色は表示点の密度です。輪郭は0点のセルを示します。</p>
@@ -4833,79 +5000,6 @@
                     stroke-linejoin="round"
                     aria-hidden="true"
                   >
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <path d="m21 21-4.35-4.35"></path>
-                    <line x1="11" y1="8" x2="11" y2="14"></line>
-                    <line x1="8" y1="11" x2="14" y2="11"></line>
-                  </svg>
-                  ズーム
-                </div>
-                <div class="control-btn-grid">
-                  <button class="control-btn" onclick="moveCloser()">
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      aria-hidden="true"
-                    >
-                      <circle cx="11" cy="11" r="8"></circle>
-                      <path d="m21 21-4.35-4.35"></path>
-                      <line x1="11" y1="8" x2="11" y2="14"></line>
-                      <line x1="8" y1="11" x2="14" y2="11"></line>
-                    </svg>
-                    近づく
-                  </button>
-                  <button class="control-btn" onclick="moveAway()">
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      aria-hidden="true"
-                    >
-                      <circle cx="11" cy="11" r="8"></circle>
-                      <path d="m21 21-4.35-4.35"></path>
-                      <line x1="8" y1="11" x2="14" y2="11"></line>
-                    </svg>
-                    引く
-                  </button>
-                  <button class="control-btn" onclick="fitToView()">
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      aria-hidden="true"
-                    >
-                      <path
-                        d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"
-                      ></path>
-                    </svg>
-                    全体表示
-                  </button>
-                </div>
-              </div>
-
-              <div class="panel-section">
-                <div class="panel-section-title">
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    aria-hidden="true"
-                  >
                     <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"></path>
                   </svg>
                   表示モード
@@ -5194,7 +5288,7 @@
                       id="cadModeBtn"
                       onclick="toggleCADMode()"
                       style="
-                        background: rgba(255, 255, 255, 0.1);
+                        background: var(--ec-hover);
                         position: relative;
                       "
                       title="CAD系のZ-up座標に切替（Z=高さ）。Three.js標準のY-upと見た目が変わります。"
@@ -5207,7 +5301,7 @@
                           left: 50%;
                           transform: translateX(-50%);
                           font-size: 10px;
-                          color: #88ccff;
+                          color: var(--ec-accent);
                           white-space: nowrap;
                         "
                       >
@@ -5222,9 +5316,9 @@
                     style="
                       margin-top: 15px;
                       padding: 10px;
-                      background: rgba(0, 0, 0, 0.35);
+                      background: var(--ec-inset);
                       border-radius: 8px;
-                      border: 1px solid rgba(255, 255, 255, 0.2);
+                      border: 1px solid var(--ec-border);
                     "
                   >
                     <div
@@ -5239,7 +5333,7 @@
                     <div style="font-size: 11px; color: var(--ec-accent-light)">
                       <span id="coordSystemDisplay">Y-up（Three.js標準）</span>
                     </div>
-                    <div style="font-size: 10px; color: #666; margin-top: 5px">
+                    <div style="font-size: 10px; color: var(--ec-muted); margin-top: 5px">
                       軸: <span style="color: var(--ec-axis-x)">X=横</span>
                       <span id="yAxisLabel" style="color: var(--ec-axis-y)">Y=高さ</span>
                       <span id="zAxisLabel" style="color: var(--ec-axis-z)">Z=奥行</span>
@@ -5288,7 +5382,9 @@
           <button
             class="stats-toggle"
             id="statsToggle"
-            onclick="toggleStatsPanel()"
+            aria-expanded="false"
+            aria-controls="statsPanel"
+            onclick="toggleStatsPanel(true)"
           >
             <svg
               width="16"
@@ -5316,8 +5412,10 @@
             <div class="stats-header panel-card__header">
               <span>統計情報</span>
               <button
+                id="statsCloseButton"
+                type="button"
                 class="control-btn"
-                onclick="toggleStatsPanel()"
+                onclick="toggleStatsPanel(true)"
                 style="padding: 6px 10px"
               >
                 閉じる
@@ -6194,8 +6292,8 @@
                             <h4>メモリ使用量警告</h4>
                             <p>${level === "critical" ? "メモリ使用量が危険レベルです。LOW品質への変更を推奨します。" : "メモリ使用量が高くなっています。"}</p>
                             <div style="display:flex;gap:8px;justify-content:center;margin-top:8px;flex-wrap:wrap;">
-                            <button onclick="this.closest('.memory-warning').remove()" style="background:transparent;color:inherit;border:1px solid rgba(255,255,255,0.3);border-radius:4px;padding:6px 12px;cursor:pointer;">OK</button>
-                            ${level === 'critical' ? '<button onclick="(function(el){el.closest(\'.memory-warning\').remove();window.goHome&&window.goHome();})(this)" style="background:var(--ec-warning);color:#000;border:none;border-radius:4px;padding:6px 12px;cursor:pointer;">ホームに戻る</button>' : ''}
+                            <button onclick="this.closest('.memory-warning').remove()" style="background:transparent;color:inherit;border:1px solid var(--ec-border);border-radius:4px;padding:6px 12px;cursor:pointer;">OK</button>
+                            ${level === 'critical' ? '<button onclick="(function(el){el.closest(\'.memory-warning\').remove();window.goHome&&window.goHome();})(this)" style="background:var(--ec-warning);color:var(--ec-accent-text);border:none;border-radius:4px;padding:6px 12px;cursor:pointer;">ホームに戻る</button>' : ''}
                             </div>
                         </div>
                     `;
@@ -9456,17 +9554,22 @@
         };
       }
 
+      function getThemeColor(token, fallback) {
+        return window.getComputedStyle?.(document.documentElement)
+          .getPropertyValue(token).trim() || fallback;
+      }
+
       function renderSectionProfile(canvas, profile) {
         const ctx = canvas?.getContext?.("2d");
         if (!canvas || !ctx) return false;
         const width = canvas.width || 220;
         const height = canvas.height || 96;
         ctx.clearRect(0, 0, width, height);
-        ctx.fillStyle = "rgba(2, 6, 23, 0.72)";
+        ctx.fillStyle = getThemeColor("--ec-canvas", "#211f23");
         ctx.fillRect(0, 0, width, height);
         const samples = profile?.samples || [];
         if (!samples.length || !Number.isFinite(profile.minZ) || !Number.isFinite(profile.maxZ)) {
-          ctx.fillStyle = "rgba(148, 163, 184, 0.75)";
+          ctx.fillStyle = getThemeColor("--ec-muted", "#c2b8ba");
           ctx.font = "12px sans-serif";
           ctx.fillText(appUiText("2D断面で更新"), 12, 52);
           return false;
@@ -9475,7 +9578,7 @@
         const padding = 10;
         const maxX = Math.max(1, ...samples.map((sample) => Number(sample.x) || 0));
         const zRange = Math.max(0.000001, profile.maxZ - profile.minZ);
-        ctx.strokeStyle = "rgba(148, 163, 184, 0.35)";
+        ctx.strokeStyle = getThemeColor("--ec-plot-grid", "#625762");
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(padding, height - padding);
@@ -9484,15 +9587,15 @@
         ctx.lineTo(padding, height - padding);
         ctx.stroke();
 
+        const groundColor = getThemeColor("--ec-success", "#a7cc79");
+        const otherColor = getThemeColor("--ec-axis-z", "#97c8e5");
         samples.slice(0, 1200).forEach((sample) => {
           const x = padding + ((Number(sample.x) || 0) / maxX) * (width - padding * 2);
           const y =
             height -
             padding -
             ((sample.z - profile.minZ) / zRange) * (height - padding * 2);
-          ctx.fillStyle = sample.classification === 2
-            ? "rgba(34, 197, 94, 0.75)"
-            : "rgba(56, 189, 248, 0.6)";
+          ctx.fillStyle = sample.classification === 2 ? groundColor : otherColor;
           ctx.fillRect(x - 1, y - 1, 2, 2);
         });
         return true;
@@ -10061,6 +10164,19 @@
       }
 
       const englishUiText = new Map([
+        ["ブラウザ互換性の問題", "Browser compatibility"],
+        ["重要な問題:", "Required capabilities missing:"],
+        ["警告:", "Warnings:"],
+        ["このアプリは最新のGoogle ChromeまたはMicrosoft Edge専用です。Safari、Firefox、古いブラウザーは対応対象外です。", "This app supports current versions of Google Chrome and Microsoft Edge. Safari, Firefox, and older browsers are unsupported."],
+        ["最新のGoogle ChromeまたはMicrosoft Edgeを使用してください。Safari、Firefox、古いブラウザーは対応対象外です。", "For the full experience, open this page in a supported browser."],
+        ["WebGLがサポートされていません", "WebGL is unavailable."],
+        ["File APIがサポートされていません", "The File API is unavailable."],
+        ["ArrayBufferがサポートされていません", "ArrayBuffer is unavailable."],
+        ["一部の新しいJavaScript機能がサポートされていません", "Some required JavaScript features are unavailable."],
+        ["理解しました", "Dismiss"],
+        ["表示操作", "View navigation"],
+        ["上面に切替", "Show top view"],
+        ["3Dに戻る", "Back to 3D"],
         ["ヘルプ: 3D / 上面", "Help: 3D / Top view"],
         ["上面に切り替えると、河道の曲がりと橋の位置を真上から確認できます。もう一度押すと3Dに戻ります。", "Switch to a top view to see the river’s bend and the bridge’s position. Press the same control again to return to 3D."],
         ["ヘルプ: 統計情報", "Help: Statistics"],
@@ -10107,7 +10223,7 @@
         ["橋の計測をやめる", "Cancel bridge measurement"],
         ["橋の計測を再開", "Resume bridge measurement"],
         ["橋の水平距離", "Horizontal bridge distance"],
-        ["計測履歴に保存しました。", "Saved to measurement history."],
+        ["このセッションの計測履歴に追加しました。", "Added to this session's history."],
         ["凡例の色は表示点の密度です。輪郭は0点のセルを示します。", "Color shows displayed-point density. The outline marks a cell with zero points."],
         ["現在の表示点では、対応する空セルが検出されていません。", "No matching empty cell was detected in the displayed points."],
         ["このサンプルは右岸の点を意図的に除いています。", "Points on the right bank were intentionally removed in this sample."],
@@ -10123,7 +10239,7 @@
         ["合成データ · ローカル座標（m）", "Synthetic sample · Local coordinates in meters"],
         ["橋の断面から始めるか、試したい操作を選んでください。", "Start with the bridge section or choose another tool to try."],
         ["橋の断面を見る", "Bridge section"],
-        ["橋の両端を測る", "Measure bridge"],
+        ["橋を測る", "Measure bridge"],
         ["密度を見る", "Explore density"],
         ["橋の両端 A と B を選択してください。", "Select endpoints A and B on the bridge."],
         ["橋の端 A", "Bridge end A"],
@@ -10333,6 +10449,7 @@
         ["総合目安:", "Overall score:"],
         ["密度:", "Density:"],
         ["欠測候補:", "Potential gaps:"],
+        ["欠測候補", "Potential density gaps"],
         ["Z外れ値:", "Z outliers:"],
         ["孤立候補:", "Isolated points:"],
         ["密度スパイク:", "Density spikes:"],
@@ -10372,6 +10489,7 @@
         ["メモリ使用:", "Memory usage:"],
         ["診断情報をコピー", "Copy diagnostics"],
         ["表示言語", "Display language"],
+        ["ライトテーマ", "Light theme"],
         ["ファイルをドロップして選択", "Drop a file or choose one"],
         ["LASまたはLAZファイルを選択", "Choose a LAS or LAZ file"],
         ["正面から見る (R)", "Front view (R)"],
@@ -10775,8 +10893,9 @@
         const queryLanguage = typeof URLSearchParams === "function"
           ? new URLSearchParams(window.location?.search || "").get("lang")
           : null;
-        const hasLanguageOverride = SUPPORTED_LANGUAGES.includes(queryLanguage) || queryLanguage === "zh";
-        const language = hasLanguageOverride ? queryLanguage : storedLanguage;
+        const language = queryLanguage === "zh"
+          ? "en"
+          : SUPPORTED_LANGUAGES.includes(queryLanguage) ? queryLanguage : storedLanguage;
         setAppLanguage(language, { persist: false });
       }
 
@@ -11732,14 +11851,14 @@
                 el.closest('.file-size-warning').remove();
                 const r=document.querySelector('input[name=\'quality\'][value=\'low\']');
                 if(r){r.checked=true;r.dispatchEvent(new Event('change',{bubbles:true}));}
-              })(this)" style="margin-left:8px;background:var(--ec-accent);color:#fff;border:none;border-radius:4px;padding:6px 12px;cursor:pointer;">LOW品質で試す</button>`;
+              })(this)" style="margin-left:8px;background:var(--ec-accent);color:var(--ec-accent-text);border:none;border-radius:4px;padding:6px 12px;cursor:pointer;">LOW品質で試す</button>`;
           warningDiv.innerHTML = `
                     <div class="file-size-warning-content">
                         <h4>ファイルサイズ警告</h4>
                         <p>${escapeHtml(sizeCheck.message)}</p>
                         ${sizeCheck.isCritical ? "<p><strong>このファイルは読み込めません。別のファイルを選択してください。</strong></p>" : ""}
                         <div style="margin-top:10px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
-                          <button onclick="this.closest('.file-size-warning').remove()" style="background:transparent;color:inherit;border:1px solid rgba(255,255,255,0.3);border-radius:4px;padding:6px 12px;cursor:pointer;">閉じる</button>
+                          <button onclick="this.closest('.file-size-warning').remove()" style="background:transparent;color:inherit;border:1px solid var(--ec-border);border-radius:4px;padding:6px 12px;cursor:pointer;">閉じる</button>
                           ${actionBtn}
                         </div>
                     </div>
@@ -12158,7 +12277,7 @@
         ].map(([x, y]) => sourceToDisplayPoint({ x, y, z: height }));
         sampleGapOutline = new THREE.LineLoop(
           new THREE.BufferGeometry().setFromPoints(corners),
-          new THREE.LineBasicMaterial({ color: 0xfff0a8, depthTest: false }),
+          new THREE.LineBasicMaterial({ color: getThemeColor("--ec-accent", "#e2bc6d"), depthTest: false }),
         );
         sampleGapOutline.renderOrder = 5;
         scene.add(sampleGapOutline);
@@ -13522,6 +13641,12 @@
       }
 
       function updateMeasurementResultUi() {
+        const bridgeResult = document.getElementById("bridgeGuideDistance");
+        const bridgeRecordId = bridgeResult?.dataset?.measurementId;
+        if (bridgeRecordId && !measurementState.history.some(record => record.id === Number(bridgeRecordId))) {
+          bridgeResult.hidden = true;
+          delete bridgeResult.dataset.measurementId;
+        }
         const summary = document.getElementById("measurementSummary");
         const results = document.getElementById("measurementResults");
         const activeRecord = getSelectedOrLatestMeasurementRecord();
@@ -13755,12 +13880,14 @@
           const record = addMeasurementRecord(selected, measurementState.mode);
           if (bridgeGuideActive && record) {
             markSampleStep("measure");
+            const bridgeResult = document.getElementById("bridgeGuideDistance");
             document.getElementById("bridgeGuideDistanceValue").textContent =
               record.metrics.horizontalDistance.toFixed(3);
-            document.getElementById("bridgeGuideDistance").hidden = false;
+            bridgeResult.dataset.measurementId = String(record.id);
+            bridgeResult.hidden = false;
             measurementState.enabled = false;
             endBridgeGuide();
-            document.getElementById("bridgeGuideDistance").focus();
+            bridgeResult.focus();
           }
           resetMeasurementDraft();
         }
@@ -14516,7 +14643,7 @@
           }
         } else {
           scene = new THREE.Scene();
-          scene.background = new THREE.Color(0x001122);
+          scene.background = new THREE.Color(getThemeColor("--ec-canvas", "#211f23"));
 
           perspectiveCamera = new THREE.PerspectiveCamera(
             60,
@@ -17617,6 +17744,15 @@
         const frontBtn = document.getElementById("view2dFrontBtn");
         const rightBtn = document.getElementById("view2dRightBtn");
         const exitBtn = document.getElementById("view2dExitBtn");
+        const viewerView = document.getElementById("viewerView");
+        const sampleViewToggle = document.getElementById("sampleViewToggle");
+        if (viewerView) {
+          const viewLabels = { top: "2D上面", front: "2D正面", right: "2D右側" };
+          viewerView.textContent = is2DMode ? viewLabels[current2DView] : "3D";
+        }
+        if (sampleViewToggle) {
+          sampleViewToggle.textContent = is2DMode && current2DView === "top" ? "3Dに戻る" : "上面に切替";
+        }
 
         if (topBtn) topBtn.classList.remove("active");
         if (frontBtn) frontBtn.classList.remove("active");
@@ -17748,7 +17884,7 @@
             ptsText = `（${ptsNum.toLocaleString()}点）`;
           }
           const fname = loadedFile ? (loadedFile.name || loadedFile.fileName || '') : '';
-          showToast(`${fname ? fname + ' ' : ''}読み込み完了${ptsText}`, 'success');
+          if (!isRiverDemo()) showToast(`${fname ? fname + ' ' : ''}読み込み完了${ptsText}`, 'success');
 
           // 自動モード推奨（データ解析完了後）
           setTimeout(() => {
@@ -17875,44 +18011,26 @@
         setActiveViewBtn('viewBackBtn');
       };
 
-      // 近づく機能
-      window.moveCloser = function () {
+      function changeViewZoom(factor) {
         if (!pointCloud || !controls) return;
 
-        // 現在のカメラ位置からターゲットへの方向ベクトル
-        const direction = new THREE.Vector3();
-        direction.subVectors(controls.target, camera.position);
-        direction.normalize();
+        if (camera.isOrthographicCamera) {
+          camera.zoom = Math.max(controls.minZoom, Math.min(controls.maxZoom, camera.zoom * factor));
+          camera.updateProjectionMatrix();
+        } else {
+          camera.position.lerp(controls.target, 1 - 1 / factor);
+        }
+        controls.update();
+      }
 
-        // カメラを20%近づける
-        const moveDistance = camera.position.distanceTo(controls.target) * 0.2;
-        camera.position.add(direction.multiplyScalar(moveDistance));
-
-        if (controls) controls.update();
-        console.log("カメラを近づけました");
-      };
-
-      // 引く機能
-      window.moveAway = function () {
-        if (!pointCloud || !controls) return;
-
-        // 現在のカメラ位置からターゲットへの方向ベクトル
-        const direction = new THREE.Vector3();
-        direction.subVectors(camera.position, controls.target);
-        direction.normalize();
-
-        // カメラを25%引く
-        const moveDistance = camera.position.distanceTo(controls.target) * 0.25;
-        camera.position.add(direction.multiplyScalar(moveDistance));
-
-        if (controls) controls.update();
-        console.log("カメラを引きました");
-      };
+      window.moveCloser = () => changeViewZoom(1.25);
+      window.moveAway = () => changeViewZoom(0.8);
 
       // 全体表示機能
       window.fitToView = function () {
         if (!pointCloud) return;
         if (is2DMode) {
+          orthoCamera.zoom = 1;
           apply2DView(current2DView);
           return;
         }
@@ -18970,7 +19088,7 @@
         const btn = document.getElementById("cadModeBtn");
         btn.style.background = isCADMode
           ? "var(--ec-success)"
-          : "rgba(255, 255, 255, 0.1)";
+          : "var(--ec-hover)";
 
         // 座標系インジケーターを更新
         document.getElementById("coordSystemDisplay").textContent = isCADMode
@@ -19241,31 +19359,38 @@
         const modal = document.createElement("dialog");
         modal.id = "slice2DModal";
         modal.setAttribute("aria-labelledby", "sliceDialogTitle");
+        const thicknessControl = `
+          <div class="slice-dialog-control">
+            <label for="sliceThickness">スライス厚さ:</label>
+            <output id="thicknessValue" for="sliceThickness">${defaultThickness}</output>
+            ${bridge ? "m" : ""}
+            <div class="slice-dialog-slider">
+              <button type="button" class="ec-button ec-button--secondary" data-thickness-step="-1" aria-label="断面を狭くする">−</button>
+              <input type="range" id="sliceThickness" min="0.1" max="${maxThickness.toFixed(1)}" value="${defaultThickness}" step="0.1"${bridge ? ' aria-describedby="bridgeSliceThicknessHint"' : ""}>
+              <button type="button" class="ec-button ec-button--secondary" data-thickness-step="1" aria-label="断面を広くする">+</button>
+            </div>
+          </div>`;
         modal.innerHTML = `
           <header class="slice-dialog-header">
             <h2 id="sliceDialogTitle">${bridge ? "橋を横切る断面" : "2D断面ビュー"}</h2>
             <button class="ec-button ec-button--secondary" data-close autofocus>閉じる</button>
           </header>
+          ${bridge ? `
+            <div class="bridge-slice-tools">
+              ${thicknessControl}
+              <p class="bridge-slice-count"><span>断面内の表示点:</span> <output id="bridgeSlicePointCount"></output></p>
+              <p id="bridgeSliceThicknessHint" class="bridge-slice-thickness-hint">厚さを変えると、上面図の切断帯の幅と、断面に含まれる点数が変わります。</p>
+            </div>` : ""}
           <div class="slice-dialog-body">
             ${bridge ? `
               <figure class="bridge-slice-map">
                 <figcaption>上面図の切断帯 · Y = 0 m</figcaption>
                 <canvas id="bridgeSliceMap" width="240" height="260" role="img" aria-label="橋の位置と切断帯"></canvas>
-                <p><span>断面内の表示点:</span> <output id="bridgeSlicePointCount"></output></p>
               </figure>` : ""}
             <div class="slice-dialog-plots"></div>
           </div>
           <footer class="slice-dialog-controls">
-            <div class="slice-dialog-control">
-              <label for="sliceThickness">スライス厚さ:</label>
-              <output id="thicknessValue" for="sliceThickness">${defaultThickness}</output>
-              ${bridge ? "m" : ""}
-              <div class="slice-dialog-slider">
-                <button class="ec-button ec-button--secondary" data-thickness-step="-1" aria-label="断面を狭くする">−</button>
-                <input type="range" id="sliceThickness" min="0.1" max="${maxThickness.toFixed(1)}" value="${defaultThickness}" step="0.1"${bridge ? ' aria-describedby="bridgeSliceThicknessHint"' : ""}>
-                <button class="ec-button ec-button--secondary" data-thickness-step="1" aria-label="断面を広くする">+</button>
-              </div>
-            </div>
+            ${bridge ? "" : thicknessControl}
             <div class="slice-dialog-control">
               <label for="slice2DPointSize">点サイズ:</label>
               <input type="range" id="slice2DPointSize" min="0.1" max="4" value="2" step="0.1">
@@ -19273,7 +19398,6 @@
             </div>
             <button id="autoThicknessBtn" class="ec-button ec-button--secondary">自動調整</button>
             <button class="ec-button ec-button--primary" data-export>画像保存</button>
-            ${bridge ? '<p id="bridgeSliceThicknessHint" class="bridge-slice-thickness-hint">厚さを変えると、上面図の切断帯の幅と、断面に含まれる点数が変わります。</p>' : ""}
           </footer>`;
 
         const plots = modal.querySelector(".slice-dialog-plots");
@@ -19303,6 +19427,7 @@
 
         thicknessSlider.addEventListener("input", redraw);
         pointSizeSlider.addEventListener("input", redraw);
+        document.documentElement.addEventListener("pcw-theme-change", redraw);
         for (const button of modal.querySelectorAll("[data-thickness-step]")) {
           button.addEventListener("click", () => {
             const value = Number(thicknessSlider.value) + Number(button.dataset.thicknessStep) * 0.5;
@@ -19335,6 +19460,7 @@
         closeButton.addEventListener("click", () => modal.close());
         modal.addEventListener("keydown", event => event.stopPropagation());
         modal.addEventListener("close", () => {
+          document.documentElement.removeEventListener("pcw-theme-change", redraw);
           modal.remove();
           if (opener?.isConnected) opener.focus({ preventScroll: true });
         });
@@ -19353,27 +19479,27 @@
           (canvas.height - 2 * padding) / (maxY - minY));
         const mapX = x => canvas.width / 2 + (x - (minX + maxX) / 2) * scale;
         const mapY = y => canvas.height / 2 - (y - (minY + maxY) / 2) * scale;
-        ctx.fillStyle = "#142131";
+        ctx.fillStyle = getThemeColor("--ec-canvas", "#211f23");
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = "#8597aa";
+        ctx.fillStyle = getThemeColor("--ec-plot-point", "#a59aa4");
         for (let i = 0; i < points.length; i += 3) {
           ctx.fillRect(mapX(points[i]), mapY(points[i + 1]), 1, 1);
         }
         const top = mapY(thickness / 2);
-        ctx.fillStyle = "#f5b94250";
+        ctx.fillStyle = getThemeColor("--ec-accent-glow", "rgba(226, 188, 109, 0.18)");
         ctx.fillRect(mapX(minX), top, (maxX - minX) * scale, thickness * scale);
-        ctx.strokeStyle = "#f5b942";
+        ctx.strokeStyle = getThemeColor("--ec-accent", "#e2bc6d");
         ctx.strokeRect(mapX(minX), top, (maxX - minX) * scale, thickness * scale);
-        drawBridgeReferenceLabels(ctx, mapX, mapY(0), false);
+        drawBridgeReferenceLabels(ctx, mapX, mapY(0));
         canvas.dataset.thickness = String(thickness);
       }
 
-      function drawBridgeReferenceLabels(ctx, projectX, y, lightBackground) {
+      function drawBridgeReferenceLabels(ctx, projectX, y) {
         ctx.save();
         ctx.font = "bold 16px system-ui";
         ctx.textAlign = "center";
         ctx.textBaseline = "bottom";
-        ctx.fillStyle = lightBackground ? "#6b3b00" : "#fff1c9";
+        ctx.fillStyle = getThemeColor("--ec-accent", "#e2bc6d");
         bridgeEnds.forEach((x, index) => {
           const px = projectX(x);
           ctx.fillRect(px - 1, y - 6, 2, 9);
@@ -19408,10 +19534,10 @@
 
         const container = document.createElement("div");
         container.style.cssText = `
-                background: white;
+                background: var(--ec-surface);
                 border-radius: 8px;
                 padding: 10px;
-                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                box-shadow: var(--ec-shadow);
                 margin: 5px;
             `;
 
@@ -19421,7 +19547,7 @@
                 text-align: center;
                 font-weight: bold;
                 margin-bottom: 10px;
-                color: #333;
+                color: var(--ec-text);
                 font-size: 16px;
             `;
         const axisLabels = {
@@ -19437,7 +19563,7 @@
         canvas.width = canvasSize;
         canvas.height = bridge ? Math.round(canvasSize * 0.58) : canvasSize;
         canvas.style.cssText = `
-                border: 2px solid #ddd;
+                border: 2px solid var(--ec-border);
                 cursor: crosshair;
                 max-width: 100%;
                 height: auto;
@@ -19447,11 +19573,11 @@
           canvas.setAttribute("role", "img");
           canvas.setAttribute("aria-label", "橋面・水面・両岸の断面");
           const axis = document.createElement("div");
-          axis.style.cssText = "text-align:center;color:#333";
+          axis.style.cssText = "text-align:center;color:var(--ec-text)";
           axis.textContent = "断面に沿った距離（m）";
           container.appendChild(axis);
           const elevations = document.createElement("p");
-          elevations.style.cssText = "margin:6px 0 0;text-align:center;color:#333;font-size:.8rem";
+          elevations.style.cssText = "margin:6px 0 0;text-align:center;color:var(--ec-text);font-size:.8rem";
           elevations.textContent = "橋面と水面の高さ: 9 m / 0 m";
           container.appendChild(elevations);
           return container;
@@ -19462,7 +19588,7 @@
         coordDisplay.style.cssText = `
                 text-align: center;
                 margin-top: 5px;
-                color: #666;
+                color: var(--ec-muted);
                 font-size: 12px;
             `;
         coordDisplay.textContent = "マウス座標: -";
@@ -19518,7 +19644,9 @@
         bridge = false,
       ) {
         const ctx = canvas.getContext("2d");
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const plotText = getThemeColor("--ec-text", "#f5eeee");
+        ctx.fillStyle = getThemeColor("--ec-canvas", "#211f23");
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         if (!pointCloud || !pointCloud.geometry) return;
 
@@ -19573,7 +19701,7 @@
 
         // 投影範囲を計算
         if (projectedPoints.length === 0) {
-          ctx.fillStyle = "#666";
+          ctx.fillStyle = plotText;
           ctx.font = "14px Arial";
           ctx.textAlign = "center";
           ctx.fillText(
@@ -19611,7 +19739,7 @@
         const offsetY = canvas.height / 2 - ((minY + maxY) / 2) * scale;
 
         // グリッドを描画
-        ctx.strokeStyle = "#f0f0f0";
+        ctx.strokeStyle = getThemeColor("--ec-plot-grid", "#625762");
         ctx.lineWidth = 0.5;
         for (let i = 0; i <= 10; i++) {
           const x = (canvas.width * i) / 10;
@@ -19653,7 +19781,7 @@
           const zAt = z => -(z - statsData.header.minZ) * scale + offsetY;
           const axisY = zAt(statsData.header.minZ) + 18;
           ctx.save();
-          ctx.fillStyle = "#333";
+          ctx.fillStyle = plotText;
           ctx.font = "14px system-ui";
           ctx.textAlign = "center";
           for (let step = 0; step <= 4; step++) {
@@ -19665,11 +19793,11 @@
             ctx.fillText(String(z), 4, zAt(z));
           }
           ctx.restore();
-          drawBridgeReferenceLabels(ctx, xAt, zAt(9), true);
+          drawBridgeReferenceLabels(ctx, xAt, zAt(9));
         }
 
         // 統計情報を表示
-        ctx.fillStyle = "#333";
+        ctx.fillStyle = plotText;
         ctx.font = `${Math.max(12, canvas.width / 50)}px Arial`;
         ctx.textAlign = "left";
         if (!bridge) {
@@ -19680,14 +19808,14 @@
         // スケールバーを表示
         const scaleBarLength = 100;
         const realLength = scaleBarLength / scale;
-        ctx.strokeStyle = "#333";
+        ctx.strokeStyle = plotText;
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.moveTo(canvas.width - 120, canvas.height - 30);
         ctx.lineTo(canvas.width - 20, canvas.height - 30);
         ctx.stroke();
 
-        ctx.fillStyle = "#333";
+        ctx.fillStyle = plotText;
         ctx.font = `${Math.max(10, canvas.width / 60)}px Arial`;
         ctx.textAlign = "center";
         ctx.fillText(
@@ -20370,14 +20498,14 @@
         overlay.setAttribute('aria-describedby', 'confirmDialogMsg');
         overlay.style.cssText = [
           'position:fixed','inset:0','z-index:20001',
-          'background:rgba(2,6,23,0.8)',
+          'background:var(--ec-backdrop)',
           'display:flex','align-items:center','justify-content:center',
           'padding:16px',
         ].join(';');
 
         const panel = document.createElement('div');
         panel.style.cssText = [
-          'background:rgba(22,27,34,0.99)',
+          'background:var(--ec-surface)',
           `border:1px solid ${isDanger ? 'var(--ec-warning)' : 'var(--ec-border)'}`,
           'border-radius:12px','padding:24px',
           'max-width:400px','width:100%',
@@ -20410,7 +20538,7 @@
         cancelBtn.onclick = () => { closeDialog(); if (opts.onCancel) opts.onCancel(); };
 
         const confirmBtn = document.createElement('button');
-        confirmBtn.style.cssText = `background:${isDanger ? 'var(--ec-warning)' : 'var(--ec-accent)'};border:none;color:${isDanger ? '#000' : '#fff'};border-radius:6px;padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600;`;
+        confirmBtn.style.cssText = `background:${isDanger ? 'var(--ec-warning)' : 'var(--ec-accent)'};border:none;color:var(--ec-accent-text);border-radius:6px;padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600;`;
         confirmBtn.textContent = confirmLabel;
         confirmBtn.onclick = () => {
           closeDialog();
@@ -20480,7 +20608,7 @@
           toast.setAttribute('aria-atomic', 'true');
           toast.style.cssText = [
             'position:fixed', 'right:24px', 'z-index:19999',
-            'background:rgba(22,27,34,0.97)',
+            'background:var(--ec-surface)',
             `border:1px solid ${c.border}`,
             'border-radius:8px', 'padding:10px 12px 10px 14px',
             'display:flex', 'align-items:center', 'gap:10px',
@@ -20576,6 +20704,8 @@
         if (workflowState.step !== "complete") return;
 
         const key = event.key.toLowerCase();
+        if ((key === " " || key === "enter") &&
+            event.target?.closest?.("button, a[href], summary, [role=button]")) return;
         if (measurementState.enabled && event.ctrlKey && key === "z") {
           undoMeasurementPoint();
           event.preventDefault();
@@ -20883,7 +21013,7 @@
         overlay.setAttribute('aria-labelledby', 'keyboardHelpTitle');
         overlay.style.cssText = [
           'position:fixed','inset:0','z-index:20000',
-          'background:rgba(2,6,23,0.75)',
+          'background:var(--ec-backdrop)',
           'display:flex','align-items:center','justify-content:center',
           'padding:16px',
         ].join(';');
@@ -20892,7 +21022,7 @@
 
         const panel = document.createElement('div');
         panel.style.cssText = [
-          'background:rgba(22,27,34,0.98)',
+          'background:var(--ec-surface)',
           'border:1px solid var(--ec-border)',
           'border-radius:12px','padding:20px 24px',
           'max-width:480px','width:100%',
@@ -20919,7 +21049,7 @@
 
         // マウス操作セクション
         const mouseSection = document.createElement('div');
-        mouseSection.style.cssText = 'margin-bottom:12px;padding:10px 12px;background:rgba(255,255,255,0.04);border-radius:6px;font-size:12px;color:var(--ec-muted);';
+        mouseSection.style.cssText = 'margin-bottom:12px;padding:10px 12px;background:var(--ec-inset);border-radius:6px;font-size:12px;color:var(--ec-muted);';
         mouseSection.innerHTML = '<strong style="color:var(--ec-text)">マウス</strong><br>左ドラッグ: 回転 &nbsp;|&nbsp; 右ドラッグ: 平行移動 &nbsp;|&nbsp; ホイール: ズーム';
 
         // キーボードテーブル
@@ -20931,7 +21061,7 @@
             const catRow = table.insertRow();
             const catCell = catRow.insertCell();
             catCell.colSpan = 2;
-            catCell.style.cssText = 'padding:8px 0 4px;font-size:11px;color:var(--ec-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;border-top:1px solid rgba(255,255,255,0.06);';
+            catCell.style.cssText = 'padding:8px 0 4px;font-size:11px;color:var(--ec-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;border-top:1px solid var(--ec-border);';
             catCell.textContent = cat;
             lastCat = cat;
           }
@@ -20939,7 +21069,7 @@
           const keyCell = row.insertCell();
           keyCell.style.cssText = 'padding:3px 8px 3px 0;white-space:nowrap;';
           const kbd = document.createElement('kbd');
-          kbd.style.cssText = 'background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:3px;padding:1px 6px;font-size:11px;font-family:monospace;';
+          kbd.style.cssText = 'background:var(--ec-hover);border:1px solid var(--ec-border);border-radius:3px;padding:1px 6px;font-size:11px;font-family:monospace;';
           kbd.textContent = key;
           keyCell.appendChild(kbd);
           const descCell = row.insertCell();
@@ -21020,11 +21150,14 @@
 
       function setStatsToggleLabel(text) {
         const button = document.getElementById("statsToggle");
-        if (!button) return;
-        const label = button.querySelector(".stats-toggle__label");
+        const label = button?.querySelector(".stats-toggle__label");
         if (label) {
           label.textContent = text;
         }
+        const sampleButton = document.getElementById("sampleStatsToggle");
+        if (sampleButton) sampleButton.textContent = text;
+        button?.setAttribute("aria-expanded", String(statsVisible));
+        sampleButton?.setAttribute("aria-expanded", String(statsVisible));
       }
 
       function resetStatsToggleState() {
@@ -21032,12 +21165,12 @@
         if (button) {
           button.classList.remove("is-open");
         }
-        setStatsToggleLabel("統計情報");
         statsVisible = false;
+        setStatsToggleLabel("統計情報");
       }
 
       // 統計パネル切り替え
-      window.toggleStatsPanel = function () {
+      window.toggleStatsPanel = function (moveFocus = false) {
         const panel = document.getElementById("statsPanel");
         const button = document.getElementById("statsToggle");
 
@@ -21048,10 +21181,17 @@
           button.classList.add("is-open");
           setStatsToggleLabel("統計非表示");
           updateStatsDisplay();
+          if (moveFocus) {
+            panel.scrollIntoView({ block: "start" });
+            document.getElementById("statsCloseButton").focus({ preventScroll: true });
+          }
         } else {
           panel.classList.remove("visible");
           button.classList.remove("is-open");
           setStatsToggleLabel("統計情報");
+          if (moveFocus) {
+            (isRiverDemo() ? document.getElementById("sampleStatsToggle") : button).focus();
+          }
         }
       };
 
@@ -21454,6 +21594,15 @@
       // ========================================
       // 初期化実行
       // ========================================
+
+      document.addEventListener("pcw-theme-change", () => {
+        scene?.background?.set?.(getThemeColor("--ec-canvas", "#211f23"));
+        sampleGapOutline?.material.color.set(getThemeColor("--ec-accent", "#e2bc6d"));
+        renderSectionProfile(
+          document.getElementById("sectionProfileCanvas"),
+          statsData.sectionProfile,
+        );
+      });
 
       document.addEventListener("DOMContentLoaded", () => {
         console.log("段階的ビューアー起動");

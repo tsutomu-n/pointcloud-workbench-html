@@ -28,11 +28,11 @@ try {
     executablePath: process.env.PCW_CHROME || undefined,
     args: ["--enable-unsafe-swiftshader"],
   });
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, permissions: ["clipboard-read", "clipboard-write"] });
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, colorScheme: "dark", permissions: ["clipboard-read", "clipboard-write"] });
   page.setDefaultTimeout(10000);
   const base = `http://127.0.0.1:${server.address().port}`;
   await page.addInitScript(() => localStorage.setItem("lastLasFileName", "テスト用小規模モデル"));
-  await page.goto(`${base}/PointCloudWorkbench.html?lang=en`);
+  await page.goto(`${base}/PointCloudWorkbench.html?lang=zh`);
   const appBrand = page.getByRole("button", { name: "PointCloudWorkbench", exact: true });
   const favicon = await page.locator('link[rel="icon"]').getAttribute("href", { timeout: 1500 });
   assert.ok(favicon?.startsWith("data:image/svg+xml,"));
@@ -42,6 +42,7 @@ try {
     return loaded.length === 1 && loaded[0].status === "loaded";
   }), true);
   await page.getByRole("button", { name: "Try the river sample", exact: true }).waitFor();
+  assert.equal(await page.locator("html").getAttribute("lang"), "en");
   assert.equal(await page.getByRole("button", { name: "Choose sample data", exact: true }).count(), 0);
   assert.equal(await page.locator("#lastFileInfo").isVisible(), false);
   assert.equal(await page.locator("#runtimeStatusPanel").getAttribute("open"), null);
@@ -55,8 +56,19 @@ try {
   await heading.waitFor();
   assert.equal(await page.locator('link[rel="icon"]').getAttribute("href"), favicon);
   assert.equal(await heading.locator("img").evaluate(img => img.complete && img.naturalWidth > 0), true);
+  const landingTheme = page.getByRole("button", { name: "Light theme", exact: true });
+  assert.equal(await landingTheme.getAttribute("aria-pressed"), "false");
+  await landingTheme.press("Enter");
+  assert.equal(await landingTheme.getAttribute("aria-pressed"), "true");
   await page.getByRole("link", { name: "Try the river sample", exact: true }).click();
   await page.getByText("Sample mode · River and bridge", { exact: true }).waitFor();
+  const appTheme = page.getByRole("button", { name: "Light theme", exact: true });
+  assert.equal(await page.locator("html").getAttribute("data-theme"), "light");
+  assert.equal(await appTheme.getAttribute("aria-pressed"), "true");
+  const lightBackground = await page.evaluate(() => scene.background.getHexString());
+  await appTheme.press("Space");
+  assert.equal(await page.locator("html").getAttribute("data-theme"), "dark");
+  await page.waitForFunction(background => scene.background.getHexString() !== background, lightBackground);
   assert.equal(await page.evaluate(() => statsData.displayPoints), 23746);
   assert.equal(await page.locator("#qualitySelectPanel").isVisible(), false);
   const sampleHelp = page.locator("#riverDemoMode button[data-sample-help]");
@@ -81,6 +93,13 @@ try {
   await page.keyboard.press("h");
   await page.getByRole("heading", { name: "Keyboard and mouse controls" }).waitFor();
   await page.keyboard.press("Escape");
+  const sampleStats = page.getByRole("button", { name: "Statistics", exact: true });
+  assert.equal(await sampleStats.count(), 1);
+  await sampleStats.click();
+  assert.match(await page.locator("#statsPanel").innerText(), /Potential density gaps/);
+  assert.doesNotMatch(await page.locator("#statsPanel").innerText(), /欠測候補/);
+  await page.locator("#statsPanel").getByRole("button", { name: "Close", exact: true }).click();
+  assert.equal(await sampleStats.evaluate(button => document.activeElement === button), true);
   const sectionTrigger = page.getByRole("button", { name: "See the bridge cross-section", exact: true });
   await sectionTrigger.click();
   const section = page.getByRole("dialog", { name: "Cross-section through the bridge" });
@@ -121,7 +140,10 @@ try {
     await page.getByRole("button", { name, exact: true }).click();
   }
   assert.match(await page.locator("#bridgeGuideDistance").innerText(), /60\.000 m/);
-  assert.match(await page.locator("#bridgeGuideDistance").innerText(), /Saved to measurement history/);
+  const bridgeResult = page.locator("#bridgeGuideDistance");
+  assert.match(await bridgeResult.innerText(), /Added to this session's history/);
+  await bridgeResult.getByRole("button", { name: "Copy CSV", exact: true }).click();
+  await page.waitForFunction(async () => (await navigator.clipboard.readText()).includes("60.000"));
   assert.match(await page.locator("#measurementSummary").innerText(), /60\.000/);
   await page.locator('button[onclick="copyMeasurementResult()"]').click();
   await page.waitForFunction(async () => (await navigator.clipboard.readText()).includes("Distance: 60.000 m equivalent"));
@@ -147,6 +169,9 @@ try {
   await page.getByRole("button", { name: "Delete all history", exact: true }).click();
   await page.getByRole("alertdialog").getByRole("button", { name: "Cancel", exact: true }).click();
   assert.equal(await page.evaluate(() => measurementState.history.length), historyCount);
+  await page.locator("#measurementHistoryList").getByRole("button", { name: "Delete", exact: true }).first().click();
+  assert.equal(await bridgeResult.isVisible(), false);
+  assert.equal(await page.evaluate(() => measurementState.history.length), historyCount - 1);
   await page.getByRole("button", { name: "Open slicing controls", exact: true }).click();
   const slicing = page.locator("#sliceControlPanel");
   assert.equal(await slicing.evaluate(node => !!node.closest(".slice-section")), true);
@@ -197,17 +222,15 @@ try {
   assert.equal(await page.evaluate(() => densityOverlayState.enabled), false);
   const endMarker = page.getByRole("button", { name: "Bridge end A", exact: true });
   const markerLeft = await endMarker.evaluate(button => button.style.left);
-  const originalZoom = await page.evaluate(() => {
-    const previous = camera.zoom;
-    camera.zoom *= 1.2;
-    camera.updateProjectionMatrix();
-    return previous;
-  });
+  const originalZoom = await page.evaluate(() => camera.zoom);
+  await page.getByRole("button", { name: "Zoom in", exact: true }).press("Space");
+  assert.ok(await page.evaluate(() => camera.zoom) > originalZoom);
   await page.waitForFunction(left => document.querySelector("#bridgeEndMarkers button").style.left !== left, markerLeft);
-  await page.evaluate(zoom => {
-    camera.zoom = zoom;
-    camera.updateProjectionMatrix();
-  }, originalZoom);
+  await page.getByRole("button", { name: "Zoom out", exact: true }).click();
+  assert.equal(await page.evaluate(() => camera.zoom), originalZoom);
+  await page.getByRole("button", { name: "Zoom in", exact: true }).click();
+  await page.getByRole("button", { name: "Fit to view", exact: true }).click();
+  assert.equal(await page.evaluate(() => camera.zoom), originalZoom);
   await page.getByRole("button", { name: "Select A", exact: true }).click();
   await measureBridge.click();
   assert.equal(await page.getByRole("button", { name: "Select B", exact: true }).evaluate(button => button === document.activeElement), true);
@@ -225,7 +248,7 @@ try {
   await resumeBridge.click();
   assert.equal(await page.evaluate(() => measurementState.selectedPoints.length), 1);
   assert.equal(await page.evaluate(() => densityOverlayState.enabled), false);
-  await page.getByRole("button", { name: "3D / Top view", exact: true }).click();
+  await page.locator("#riverDemoMode").getByRole("button", { name: "Back to 3D", exact: true }).click();
   await resumeBridge.waitFor();
   await resumeBridge.click();
   assert.equal(await page.evaluate(() => measurementState.selectedPoints.length), 1);
@@ -302,7 +325,7 @@ try {
   await touchPage.locator("#languageSelector").selectOption("ja");
 
   for (const width of [390, 320]) {
-    await touchPage.setViewportSize({ width, height: 844 });
+    await touchPage.setViewportSize({ width, height: 720 });
     const brandFits = await touchPage.locator("#appTitle").evaluate(element => {
       const wordmark = element.querySelector(".brand-wordmark");
       const actions = document.querySelector(".ec-topbar__actions");
@@ -317,6 +340,9 @@ try {
     assert.ok(closeBox.x >= 0 && closeBox.x + closeBox.width <= width);
     assert.equal(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth), true);
     const thickness = dialog.locator("#sliceThickness");
+    const thicknessBox = await thickness.boundingBox();
+    const chartBox = await dialog.locator(".slice-dialog-plots canvas").boundingBox();
+    assert.ok(thicknessBox.y + thicknessBox.height < chartBox.y && chartBox.y + chartBox.height <= 720);
     const before = Number(await thickness.inputValue());
     await dialog.getByRole("button", { name: "断面を広くする" }).tap();
     assert.ok(Number(await thickness.inputValue()) > before);
@@ -324,7 +350,7 @@ try {
     await dialog.waitFor({ state: "hidden" });
   }
   await touchPage.setViewportSize({ width: 320, height: 720 });
-  await touchPage.getByRole("button", { name: "橋の両端を測る", exact: true }).tap();
+  await touchPage.getByRole("button", { name: "橋を測る", exact: true }).tap();
   const bridgeChoicesFit = await touchPage.locator("#bridgeGuideChoices").evaluate(choices => {
     const bounds = choices.getBoundingClientRect();
     const panel = document.getElementById("rightPanel").getBoundingClientRect();
@@ -368,6 +394,14 @@ try {
   assert.equal(await touchPage.locator("#thicknessValue").innerText(), "0.1");
   await touchPage.getByRole("dialog", { name: "2D断面ビュー" })
     .getByRole("button", { name: "閉じる", exact: true }).tap();
+  const unsupported = await browser.newPage({
+    userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1",
+  });
+  await unsupported.addInitScript(() => Object.defineProperty(Navigator.prototype, "userAgentData", { get: () => undefined, configurable: true }));
+  await unsupported.goto(`${base}/PointCloudWorkbench.html?lang=en`);
+  await unsupported.getByRole("heading", { name: "Browser compatibility", exact: true }).waitFor();
+  assert.match(await unsupported.locator(".compatibility-warning").innerText(), /Safari, Firefox, and older browsers are unsupported/);
+  await unsupported.close();
   console.log("River cross-section, bridge measurement, density, failure recovery, touch controls, and own LAS passed");
 } finally {
   await browser?.close();

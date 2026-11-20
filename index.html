@@ -1,8 +1,47 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      (() => {
+        const storageKey = "pcw-theme";
+        const root = document.documentElement;
+        const systemTheme = window.matchMedia?.("(prefers-color-scheme: light)");
+        let choice;
+        try {
+          choice = localStorage.getItem(storageKey);
+        } catch {
+          // Theme selection still works when storage is unavailable.
+        }
+        let manual = choice === "light" || choice === "dark";
+        const preferredTheme = () => systemTheme?.matches ? "light" : "dark";
+        root.dataset.theme = manual ? choice : preferredTheme();
+
+        document.addEventListener("DOMContentLoaded", () => {
+          const button = document.getElementById("themeToggle");
+          const applyTheme = (theme) => {
+            root.dataset.theme = theme;
+            button.setAttribute("aria-pressed", String(theme === "light"));
+          };
+
+          applyTheme(root.dataset.theme);
+          button.addEventListener("click", () => {
+            manual = true;
+            const theme = root.dataset.theme === "light" ? "dark" : "light";
+            applyTheme(theme);
+            try {
+              localStorage.setItem(storageKey, theme);
+            } catch {
+              // Keep the current theme for this page.
+            }
+          });
+          systemTheme?.addEventListener?.("change", () => {
+            if (!manual) applyTheme(preferredTheme());
+          });
+        });
+      })();
+    </script>
     <title>PointCloudWorkbench | Native LAS/LAZ Viewer</title>
     <link rel="icon" type="image/svg+xml" sizes="any" href="data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%2024%2024%22%3E%3Crect%20width=%2224%22%20height=%2224%22%20rx=%225%22%20fill=%22%23132630%22/%3E%3Cg%20transform=%22translate%282%201%29%20scale%28.83%29%22%20fill=%22none%22%20stroke=%22%238de4d5%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22%20stroke-width=%221.9%22%3E%3Cpath%20d=%22M3%2014c1-4.5%203.5-6.5%205.75-3.75C10.5%204.5%2015%202.5%2017.25%209.5C19%209%2020.5%2011%2021%2014v3.5l-9%204l-9-4Z%22/%3E%3Cpath%20d=%22m3%2014l9%204l9-4m-9%204v3.5%22/%3E%3C/g%3E%3C/svg%3E" />
     <style>
@@ -112,30 +151,38 @@
       }
       :root {
         color-scheme: dark;
-        --color-void: oklch(0.12 0.01 250);
-        --color-surface: oklch(0.16 0.01 250);
-        --color-panel: oklch(0.19 0.01 250);
-        --color-ink: oklch(0.08 0.01 250);
-        --color-bone: oklch(0.96 0.01 250);
-        --color-muted: oklch(0.65 0.01 250);
-        --color-laser: oklch(0.75 0.2 150);
-        --color-warn: oklch(0.8 0.18 70);
-        --space-huge: clamp(6rem, 15vw, 15rem);
-        --space-lg: clamp(4rem, 8vw, 10rem);
-        --space-md: clamp(2rem, 5vw, 5rem);
-        --font-copy:
-          "Avenir Next", "Helvetica Neue", "Noto Sans JP", "Hiragino Sans",
-          sans-serif;
-        --font-mono:
-          "Space Mono", "SF Mono", "Menlo", "Consolas", monospace;
+        --color-void: #262528;
+        --color-surface: #302e32;
+        --color-toolbar: #2b292d;
+        --color-ink: #2a2117;
+        --color-bone: #f5eeee;
+        --color-muted: #c2b8ba;
+        --color-border: #4f474f;
+        --color-accent: #e2bc6d;
+        --color-accent-hover: #efca82;
+        --color-brand: #a8d5ba;
+        --space-huge: clamp(3.5rem, 7vw, 7rem);
+        --space-md: clamp(1.25rem, 3vw, 2.5rem);
+        --font-copy: "Avenir Next", "Segoe UI", "Noto Sans JP", "Hiragino Sans", sans-serif;
+        --font-mono: "SF Mono", "Menlo", "Consolas", monospace;
+      }
+
+      :root[data-theme="light"] {
+        color-scheme: light;
+        --color-void: #f3eee7;
+        --color-surface: #fffaf4;
+        --color-toolbar: #fbf6ee;
+        --color-ink: #fffaf4;
+        --color-bone: #29232b;
+        --color-muted: #645a64;
+        --color-border: #c8b9be;
+        --color-accent: #81551e;
+        --color-accent-hover: #6e4519;
+        --color-brand: #386451;
       }
 
       * {
         box-sizing: border-box;
-      }
-
-      html {
-        scroll-behavior: smooth;
       }
 
       body {
@@ -145,19 +192,17 @@
         font-family: var(--font-copy);
         line-height: 1.6;
         -webkit-font-smoothing: antialiased;
-        background:
-          radial-gradient(circle at 12% 8%, rgba(117, 240, 150, 0.18), transparent 24%),
-          radial-gradient(circle at 88% 18%, rgba(255, 208, 84, 0.08), transparent 20%),
-          radial-gradient(circle at 80% 78%, rgba(117, 240, 150, 0.1), transparent 28%),
-          radial-gradient(oklch(0.4 0.01 250) 1px, transparent 1px),
-          linear-gradient(180deg, oklch(0.15 0.01 250), var(--color-void));
-        background-size: auto, auto, auto, 24px 24px, auto;
-        background-attachment: scroll, scroll, scroll, fixed, scroll;
+        background: var(--color-void);
       }
 
       ::selection {
-        color: var(--color-void);
-        background: var(--color-laser);
+        color: var(--color-ink);
+        background: var(--color-accent);
+      }
+
+      :focus-visible {
+        outline: 2px solid var(--color-accent);
+        outline-offset: 3px;
       }
 
       a {
@@ -165,19 +210,17 @@
       }
 
       code {
-        padding: 0.2em 0.45em;
-        border: 1px solid rgba(255, 255, 255, 0.12);
+        padding: 0.13em 0.35em;
+        border: 1px solid var(--color-border);
         color: var(--color-bone);
         font-size: 0.85em;
         font-family: var(--font-mono);
-        background: rgba(255, 255, 255, 0.05);
+        background: var(--color-toolbar);
       }
 
       .viewport-canvas {
-        position: relative;
-        width: min(1440px, calc(100% - 24px));
+        width: min(1240px, calc(100% - clamp(32px, 9vw, 128px)));
         margin: 0 auto;
-        padding: 0 4vw 4vw;
       }
 
       .grid-x {
@@ -186,306 +229,229 @@
         gap: var(--space-md);
       }
 
-      .y-axis-line {
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        left: 4vw;
-        width: 1px;
-        opacity: 0.1;
-        background: var(--color-bone);
-      }
-
       .landing-toolbar {
         display: flex;
+        align-items: center;
         justify-content: flex-end;
-        padding-top: 1.5rem;
+        gap: 0.55rem;
+        min-height: 64px;
+        border-bottom: 1px solid var(--color-border);
       }
 
       .landing-language {
         display: inline-flex;
         align-items: center;
-        gap: 0.75rem;
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        background: rgba(255, 255, 255, 0.03);
-        padding: 0.65rem 0.85rem;
-        font-size: 0.78rem;
-        font-family: var(--font-mono);
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        backdrop-filter: blur(8px);
+        gap: 0.65rem;
+        font-size: 0.85rem;
       }
 
       .landing-language__label {
         color: var(--color-muted);
       }
 
-      .landing-language__select {
-        border: 1px solid rgba(255, 255, 255, 0.15);
+      .landing-language__select,
+      .theme-toggle {
+        border: 1px solid var(--color-border);
+        border-radius: 5px;
         color: var(--color-bone);
-        background: rgba(7, 10, 17, 0.92);
-        padding: 0.45rem 2rem 0.45rem 0.7rem;
-        font-size: 0.78rem;
-        font-family: var(--font-mono);
-        letter-spacing: 0.06em;
+        background: var(--color-toolbar);
+        font: inherit;
+        cursor: pointer;
       }
 
-      .badge-mono {
-        display: inline-block;
-        padding: 0.45rem 0.9rem;
-        border: 1px solid var(--color-laser);
-        color: var(--color-laser);
-        font-size: 0.75rem;
-        font-family: var(--font-mono);
-        letter-spacing: 0.15em;
-        text-transform: uppercase;
+      .landing-language__select {
+        min-height: 40px;
+        padding: 0.35rem 0.55rem;
+      }
+
+      .theme-toggle {
+        display: inline-grid;
+        place-items: center;
+        width: 40px;
+        height: 40px;
+        padding: 0;
+        color: var(--color-muted);
+      }
+
+      .theme-toggle:hover,
+      .theme-toggle:focus-visible {
+        color: var(--color-accent);
+        border-color: var(--color-accent);
+      }
+
+      .theme-toggle svg {
+        width: 22px;
+        height: 22px;
+      }
+
+      .theme-toggle[aria-pressed="false"] .theme-toggle__moon,
+      .theme-toggle[aria-pressed="true"] .theme-toggle__sun {
+        stroke: var(--color-accent);
       }
 
       .section-label {
-        grid-column: 1 / 13;
+        grid-column: 1 / -1;
         margin: 0;
-        padding-bottom: 1rem;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        color: var(--color-laser);
-        font-size: 0.85rem;
-        font-family: var(--font-mono);
-        letter-spacing: 0.1em;
-      }
-
-      .reveal {
-        opacity: 1;
-      }
-
-      @supports (animation-timeline: view()) {
-        @keyframes scrollReveal {
-          0% {
-            opacity: 0;
-            filter: blur(4px);
-            transform: translateY(5vh);
-          }
-
-          100% {
-            opacity: 1;
-            filter: blur(0);
-            transform: translateY(0);
-          }
-        }
-
-        .reveal {
-          animation: scrollReveal linear both;
-          animation-timeline: view();
-          animation-range: entry 5% cover 25%;
-          will-change: transform, opacity;
-        }
+        padding-bottom: 0.85rem;
+        border-bottom: 1px solid var(--color-border);
+        color: var(--color-accent);
+        font-size: 1rem;
+        font-weight: 700;
       }
 
       .hero-domain {
-        min-height: calc(92vh - 4rem);
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        padding-top: 8vh;
-      }
-
-      .hero-meta {
-        grid-column: 1 / 13;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.75rem;
-      }
-
-      .hero-meta span {
-        display: inline-flex;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
         align-items: center;
-        gap: 0.55rem;
-        color: var(--color-muted);
-        font-size: 0.82rem;
-        font-family: var(--font-mono);
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-      }
-
-      .hero-meta span::before {
-        content: "";
-        width: 0.55rem;
-        height: 0.55rem;
-        border-radius: 999px;
-        background: var(--color-laser);
-        box-shadow: 0 0 12px rgba(117, 240, 150, 0.45);
+        gap: clamp(2rem, 5vw, 5rem);
+        padding: clamp(2.75rem, 7vw, 7rem) 0 clamp(3rem, 6vw, 6rem);
       }
 
       .massive-headline {
         display: flex;
         align-items: flex-start;
-        gap: clamp(.5rem, 2vw, 1.75rem);
-        margin: 2rem 0 var(--space-md);
+        gap: clamp(0.65rem, 1.6vw, 1.25rem);
+        margin: 0 0 1.6rem;
         color: var(--color-bone);
-        font: 600 clamp(2.8rem, 10vw, 8.5rem)/.9 "Barlow Semi Condensed", "Aptos Narrow",
+        font: 600 clamp(3.1rem, 6vw, 6rem)/0.92 "Barlow Semi Condensed", "Aptos Narrow",
           "Arial Narrow", system-ui, sans-serif;
-        letter-spacing: -.035em;
+        letter-spacing: -0.035em;
       }
 
       .massive-headline .brand-mark {
-        width: clamp(2.2rem, 5.5vw, 4.75rem);
+        width: clamp(2rem, 4.1vw, 3.7rem);
         height: auto;
         flex: none;
-        margin-top: .08em;
+        margin-top: 0.08em;
       }
 
       .massive-headline .brand-wordmark { min-width: 0; }
       .massive-headline .brand-wordmark > span { display: block; }
-      .massive-headline .brand-wordmark > span + span { color: #8de4d5; }
+      .massive-headline .brand-wordmark > span + span { color: var(--color-brand); }
 
       .hero-lead {
-        grid-column: 1 / 9;
         margin: 0;
         color: var(--color-bone);
-        font-size: clamp(1.05rem, 2vw, 1.35rem);
+        font-size: clamp(1.13rem, 1.7vw, 1.45rem);
         font-weight: 600;
+        line-height: 1.45;
+      }
+
+      .hero-desc,
+      .hero-support,
+      .hero-language-note {
+        color: var(--color-muted);
       }
 
       .hero-desc {
-        grid-column: 1 / 8;
-        margin: 1rem 0 0;
-        color: var(--color-muted);
+        margin: 0.8rem 0 0;
+        max-width: 40ch;
         font-size: 1rem;
       }
 
-      .hero-slab {
-        grid-column: 9 / 13;
-        align-self: end;
-        padding: 1.25rem 1.35rem;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        background:
-          linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0)),
-          rgba(255, 255, 255, 0.02);
-        backdrop-filter: blur(4px);
-      }
-
-      .hero-slab-label {
-        margin: 0 0 0.5rem;
-        color: var(--color-laser);
-        font-size: 0.78rem;
-        font-family: var(--font-mono);
-        letter-spacing: 0.14em;
-        text-transform: uppercase;
-      }
-
-      .hero-slab strong {
-        display: block;
-        font-size: clamp(1.8rem, 3vw, 2.75rem);
-        line-height: 1;
-      }
-
-      .hero-slab span {
-        display: block;
-        margin-top: 0.7rem;
-        color: var(--color-muted);
-        font-size: 0.9rem;
-      }
-
       .trigger-matrix {
-        grid-column: 1 / 13;
         display: flex;
         flex-wrap: wrap;
-        gap: 1rem;
-        margin-top: 3rem;
+        gap: 0.6rem;
+        margin-top: 1.5rem;
       }
 
       .terminal-btn {
-        position: relative;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        overflow: hidden;
-        padding: 1.2rem 2rem;
-        color: var(--color-ink);
+        gap: 0.7rem;
+        min-height: 46px;
+        padding: 0.56rem 1rem;
+        border: 1px solid var(--color-border);
+        border-radius: 5px;
+        color: var(--color-bone);
+        background: var(--color-surface);
         text-decoration: none;
-        font-size: 0.85rem;
+        font-size: 0.95rem;
         font-weight: 700;
-        font-family: var(--font-mono);
-        letter-spacing: 0.05em;
-        transition: color 0.3s ease, transform 0.3s ease;
-        background: var(--color-bone);
       }
 
       .terminal-btn.primary {
-        background: var(--color-laser);
-      }
-
-      .terminal-btn.ghost {
-        border: 1px solid var(--color-muted);
-        color: var(--color-bone);
-        background: transparent;
-      }
-
-      .terminal-btn::after {
-        content: "";
-        position: absolute;
-        inset: 0;
-        z-index: 1;
-        background: var(--color-laser);
-        transform: scaleY(0);
-        transform-origin: bottom;
-        transition: transform 0.3s cubic-bezier(0.19, 1, 0.22, 1);
-      }
-
-      .terminal-btn.ghost::after {
-        background: var(--color-bone);
+        color: var(--color-ink);
+        background: var(--color-accent);
+        border-color: var(--color-accent);
       }
 
       .terminal-btn:hover {
-        transform: translateY(-2px);
+        border-color: var(--color-accent);
+        color: var(--color-accent);
       }
 
-      .terminal-btn:hover::after {
-        transform: scaleY(1);
-        transform-origin: top;
-      }
-
-      .terminal-btn.ghost:hover {
+      .terminal-btn.primary:hover {
         color: var(--color-ink);
+        background: var(--color-accent-hover);
       }
 
-      .terminal-btn span {
-        position: relative;
-        z-index: 2;
+      .hero-support,
+      .hero-language-note {
+        margin: 0.65rem 0 0;
+        font-size: 0.86rem;
+      }
+
+      .hero-language-note {
+        margin-top: 0.25rem;
+      }
+
+      .hero-slab {
+        margin: 0;
+        overflow: hidden;
+        border: 1px solid var(--color-border);
+        border-radius: 8px;
+        background: var(--color-surface);
+      }
+
+      .hero-slab img {
+        display: block;
+        width: 100%;
+        height: auto;
+        background: #2b292d;
+      }
+
+      .hero-slab figcaption {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 0.35rem 1rem;
+        min-height: 48px;
+        padding: 0.7rem 1rem;
+        border-top: 1px solid var(--color-border);
+        font-size: 0.86rem;
+      }
+
+      .hero-slab figcaption span + span {
+        color: var(--color-muted);
+        font-family: var(--font-mono);
       }
 
       .metrics-domain {
-        position: relative;
-        padding: var(--space-huge) 0;
+        padding: 0 0 var(--space-huge);
       }
 
       .stats-matrix {
         grid-column: 1 / 13;
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-        gap: clamp(2rem, 4vw, 4rem);
-        margin-top: var(--space-md);
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+        gap: clamp(1.5rem, 4vw, 3rem);
       }
 
       .stat-node {
         display: flex;
         flex-direction: column;
-        gap: 1rem;
-      }
-
-      .tech-tag {
-        width: fit-content;
-        padding: 0.25rem 0.65rem;
-        color: var(--color-laser);
-        font-size: 0.75rem;
-        font-family: var(--font-mono);
-        background: rgba(117, 240, 150, 0.1);
+        gap: 0.55rem;
       }
 
       .stat-head {
         margin: 0;
         color: var(--color-bone);
-        font-size: 1.55rem;
-        font-weight: 800;
-        line-height: 1.2;
+        font-size: 1.25rem;
+        font-weight: 700;
+        line-height: 1.3;
         letter-spacing: -0.02em;
       }
 
@@ -505,98 +471,55 @@
         display: grid;
         grid-template-columns: repeat(12, minmax(0, 1fr));
         gap: var(--space-md);
-        margin-top: var(--space-md);
       }
 
       .spec-card {
         grid-column: span 6;
-        position: relative;
-        overflow: hidden;
-        padding: 3rem;
-        border-top: 2px solid var(--color-muted);
-        background:
-          linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0)),
-          var(--color-surface);
-      }
-
-      .spec-card::after {
-        content: "";
-        position: absolute;
-        inset: 0;
-        background: linear-gradient(135deg, rgba(117, 240, 150, 0.05), transparent 45%);
-        pointer-events: none;
-      }
-
-      .spec-card.warn {
-        border-top-color: var(--color-warn);
-      }
-
-      .spec-card.warn::after {
-        background: linear-gradient(135deg, rgba(255, 208, 84, 0.06), transparent 45%);
+        padding: clamp(1rem, 3vw, 2rem);
+        border: 1px solid var(--color-border);
+        border-radius: 8px;
+        background: var(--color-surface);
       }
 
       .spec-title {
-        position: relative;
-        z-index: 1;
-        margin: 0 0 1.5rem;
+        margin: 0 0 0.8rem;
         color: var(--color-bone);
         font-size: 1.2rem;
         font-weight: 700;
-        font-family: var(--font-mono);
-        text-transform: uppercase;
       }
 
       .spec-card.warn .spec-title {
-        color: var(--color-warn);
+        color: var(--color-accent);
       }
 
       .spec-list {
-        position: relative;
-        z-index: 1;
         margin: 0;
-        padding: 0;
-        list-style: none;
+        padding-left: 1rem;
         color: var(--color-muted);
         font-size: 0.95rem;
         line-height: 1.8;
       }
 
       .spec-list li {
-        position: relative;
-        margin-bottom: 0.8rem;
-        padding-left: 1.5rem;
+        margin-bottom: 0.45rem;
       }
 
-      .spec-list li::before {
-        content: "›";
-        position: absolute;
-        left: 0;
-        top: 0;
-        color: var(--color-laser);
-        font-size: 1.2rem;
-        line-height: 1;
-        font-family: var(--font-mono);
-      }
-
-      .spec-card.warn .spec-list li::before {
-        content: "!";
-        color: var(--color-warn);
+      .spec-list li::marker {
+        color: var(--color-accent);
       }
 
       .docs-matrix {
         grid-column: 1 / 13;
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 2rem;
-        margin-top: var(--space-md);
+        gap: 1rem;
       }
 
       .doc-item {
         padding: 1.3rem 1.15rem;
-        border-left: 1px solid var(--color-muted);
-        background:
-          linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0)),
-          rgba(255, 255, 255, 0.015);
+        border-left: 1px solid var(--color-border);
+        background: var(--color-surface);
+        overflow-wrap: anywhere;
         font-family: var(--font-mono);
       }
 
@@ -616,89 +539,54 @@
 
       .docs-note {
         grid-column: 1 / 13;
-        margin: 2rem 0 0;
+        margin: 0;
         color: var(--color-muted);
         font-size: 0.8rem;
         font-family: var(--font-mono);
       }
 
       .footer-domain {
-        padding: var(--space-md) 0 4vw;
-        border-top: 1px solid var(--color-muted);
+        padding: var(--space-md) 0 clamp(2rem, 4vw, 4rem);
+        border-top: 1px solid var(--color-border);
       }
 
       .footer-matrix {
         grid-column: 1 / 13;
         display: flex;
         flex-direction: column;
-        gap: 2rem;
+        gap: 0.9rem;
         color: var(--color-muted);
         font-size: 0.85rem;
-        font-family: var(--font-mono);
-        text-transform: uppercase;
       }
 
       .footer-links {
         display: flex;
         flex-wrap: wrap;
-        gap: 1.5rem;
+        gap: 0.45rem 1.25rem;
       }
 
       .footer-links a {
-        position: relative;
+        color: var(--color-muted);
+        text-underline-offset: 0.18em;
+      }
+
+      .footer-links a:hover {
         color: var(--color-bone);
-        text-decoration: none;
       }
 
-      .footer-links a::after {
-        content: "";
-        position: absolute;
-        left: 0;
-        bottom: -4px;
-        width: 100%;
-        height: 1px;
-        transform: scaleX(0);
-        transform-origin: right;
-        background: var(--color-laser);
-        transition: transform 0.3s ease;
-      }
-
-      .footer-links a:hover::after {
-        transform: scaleX(1);
-        transform-origin: left;
-      }
-
-      @media (max-width: 980px) {
-        body {
-          background-attachment: scroll;
-        }
-
+      @media (max-width: 760px) {
         .grid-x {
           display: flex;
           flex-direction: column;
-          gap: var(--space-md);
         }
 
-        .y-axis-line {
-          display: none;
+        .hero-domain {
+          grid-template-columns: minmax(0, 1fr);
+          gap: 1.5rem;
         }
 
-        .landing-toolbar {
-          justify-content: flex-start;
-        }
-
-        .landing-language {
-          flex-wrap: wrap;
-        }
-
-        .hero-lead,
-        .hero-desc,
-        .hero-slab {
-          grid-column: 1 / -1;
-        }
-
-        .hero-slab {
-          align-self: stretch;
+        .massive-headline {
+          margin-bottom: 1.15rem;
         }
 
         .specs-grid {
@@ -707,225 +595,199 @@
           gap: 1rem;
         }
 
-        .spec-card {
-          padding: 2rem;
-        }
-
         .docs-matrix {
           grid-template-columns: 1fr;
         }
       }
 
-      @media (min-width: 981px) {
+      @media (max-width: 460px) {
+        .trigger-matrix {
+          flex-direction: column;
+          margin-top: 1.15rem;
+        }
+      }
+
+      @media (min-width: 761px) {
         .footer-matrix {
           flex-direction: row;
           align-items: center;
           justify-content: space-between;
         }
       }
-
-      @media (prefers-reduced-motion: reduce) {
-        html {
-          scroll-behavior: auto;
-        }
-
-        *,
-        *::before,
-        *::after {
-          animation: none !important;
-          transition: none !important;
-        }
-      }
     </style>
   </head>
   <body>
     <div class="viewport-canvas">
-      <div class="y-axis-line"></div>
-
       <div class="landing-toolbar">
         <div class="landing-language">
-          <span class="landing-language__label" id="landingLanguageLabel">Language</span>
-          <select
-            id="landingLanguageSelector"
-            class="landing-language__select"
-            aria-label="Landing page language"
-          >
+          <label class="landing-language__label" id="landingLanguageLabel" for="landingLanguageSelector">Language</label>
+          <select id="landingLanguageSelector" class="landing-language__select">
             <option value="en">English</option>
-            <option value="ja">日本語</option>
-            <option value="zh">中文</option>
+            <option value="ja" lang="ja">日本語</option>
+            <option value="zh" lang="zh">中文</option>
           </select>
         </div>
+        <button type="button" class="theme-toggle" id="themeToggle" aria-label="Light theme" title="Light theme" aria-pressed="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+            <path class="theme-toggle__moon" d="M10.4 3A5.6 5.6 0 1 0 8.5 13.7l4-4a5.5 5.5 0 0 1-2.1-6.7Z" />
+            <path d="M3.5 20.5l17-17" />
+            <path class="theme-toggle__sun" d="M12.5 15.4a3.4 3.4 0 1 0 3-3m.4 8.1v1.2m4-2.8 1 1m-.2-4.6h1.2m-3-4.4 1-1m-8.5 9.5-1 1" />
+          </svg>
+        </button>
       </div>
 
-      <header class="hero-domain">
-        <div class="grid-x reveal">
-          <div style="grid-column: 1 / 13">
-            <div class="badge-mono" id="badgeMono">Native HTML Application</div>
+      <main>
+        <header class="hero-domain">
+          <div>
             <h1 class="massive-headline" aria-label="PointCloudWorkbench">
               <img class="brand-mark" src="data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%2024%2024%22%3E%3Crect%20width=%2224%22%20height=%2224%22%20rx=%225%22%20fill=%22%23132630%22/%3E%3Cg%20transform=%22translate%282%201%29%20scale%28.83%29%22%20fill=%22none%22%20stroke=%22%238de4d5%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22%20stroke-width=%221.9%22%3E%3Cpath%20d=%22M3%2014c1-4.5%203.5-6.5%205.75-3.75C10.5%204.5%2015%202.5%2017.25%209.5C19%209%2020.5%2011%2021%2014v3.5l-9%204l-9-4Z%22/%3E%3Cpath%20d=%22m3%2014l9%204l9-4m-9%204v3.5%22/%3E%3C/g%3E%3C/svg%3E" width="32" height="32" alt="" />
               <span class="brand-wordmark"><span>PointCloud</span><span>Workbench</span></span>
             </h1>
+            <p class="hero-lead" id="heroLead">Inspect and measure LAS / LAZ point clouds in your browser.</p>
+            <p class="hero-desc" id="heroDesc">Start with a river and bridge sample to explore cross-sections, measurements, and point density.</p>
+
+            <div class="trigger-matrix">
+              <a class="terminal-btn primary" href="./PointCloudWorkbench.html?lang=en&amp;demo=river" aria-describedby="heroSupport heroLanguageNote">
+                <span id="ctaLaunch">Try the river sample</span><span aria-hidden="true">→</span>
+              </a>
+              <a class="terminal-btn" href="./PointCloudWorkbench.html?lang=en" aria-describedby="heroSupport heroLanguageNote">
+                <span id="ctaOpenFile">Open LAS / LAZ</span>
+              </a>
+            </div>
+            <p class="hero-support" id="heroSupport">Supported browsers: latest Chrome or Edge.</p>
+            <p class="hero-language-note" id="heroLanguageNote" hidden></p>
           </div>
 
-          <div class="hero-meta">
-            <span id="heroMetaOne">Single HTML Delivery</span>
-            <span id="heroMetaTwo">LAS / LAZ Ready</span>
-            <span id="heroMetaThree">GitHub Pages Demo</span>
+          <figure class="hero-slab">
+            <!-- Oblique projection of demo/river-bridge-demo.las, colored by classification. -->
+            <img
+              src="data:image/webp;base64,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"
+              width="640"
+              height="376"
+              alt=""
+            />
+            <figcaption>
+              <span id="heroSlabLabel">Synthetic river and bridge sample</span>
+              <span id="heroSlabPoints">23,746 points</span>
+            </figcaption>
+          </figure>
+        </header>
+
+        <section class="metrics-domain grid-x">
+          <h2 class="section-label" id="sectionCapabilities">Explore point clouds</h2>
+
+          <div class="stats-matrix">
+            <article class="stat-node">
+              <h3 class="stat-head" id="capOneTitle">Load large files in chunks</h3>
+              <p class="stat-desc" id="capOneDesc">
+                Chunked LAS reads and LAZ chunk transfer into WASM heap reduce load
+                spikes and unnecessary memory duplication.
+              </p>
+            </article>
+            <article class="stat-node">
+              <h3 class="stat-head" id="capTwoTitle">Check files before import</h3>
+              <p class="stat-desc" id="capTwoDesc">
+                Header-first inspection exposes load path, risk level, source point
+                count, and estimated render ratio before you commit to import.
+              </p>
+            </article>
+            <article class="stat-node">
+              <h3 class="stat-head" id="capThreeTitle">Inspect in 3D and 2D</h3>
+              <p class="stat-desc" id="capThreeDesc">
+                Switch between 3D and 2D, inspect slices, review classification output,
+                and validate results with the statistics panel in one browser tool.
+              </p>
+            </article>
+          </div>
+        </section>
+
+        <section class="system-domain grid-x">
+          <h2 class="section-label" id="sectionRequirements">
+            Browser support and limits
+          </h2>
+
+          <div class="specs-grid">
+            <article class="spec-card">
+              <h3 class="spec-title" id="reqTitle">Requirements</h3>
+              <ul class="spec-list" id="reqList">
+                <li><strong>Recommended:</strong> latest Chrome / Edge only</li>
+                <li><strong>Unsupported:</strong> Firefox and Safari are not supported</li>
+                <li><strong>Required APIs:</strong> WebGL / File API / ArrayBuffer</li>
+                <li><strong>Accepted formats:</strong> <code>.las</code> / <code>.laz</code></li>
+                <li>
+                  <strong>Network:</strong> runtime loads <code>three.js</code> and
+                  <code>laz-perf</code> from CDNs
+                </li>
+              </ul>
+            </article>
+
+            <article class="spec-card warn">
+              <h3 class="spec-title" id="limitsTitle">System Limits</h3>
+              <ul class="spec-list" id="limitsList">
+                <li>
+                  <strong>LAS ceiling:</strong> <code>above 3GB</code> is rejected.
+                  <code>2GB to 3GB</code> should start from <code>LOW</code>.
+                </li>
+                <li>
+                  <strong>LAZ ceiling:</strong> decoder overhead narrows the safe range.
+                  <code>above 2GB</code> is rejected.
+                </li>
+                <li>
+                  <strong>Auto classification:</strong> assistive only. It is not a
+                  survey-grade classification guarantee.
+                </li>
+                <li>
+                  URL loading and some compatibility paths may still use full
+                  <code>ArrayBuffer</code> reads.
+                </li>
+              </ul>
+            </article>
+          </div>
+        </section>
+
+        <section class="system-domain grid-x">
+          <h2 class="section-label" id="sectionDocs">Files and documentation</h2>
+
+          <div class="docs-matrix">
+            <div class="doc-item">
+              <strong id="docOneTitle">PointCloudWorkbench.html</strong>
+              <span id="docOneDesc">Single-file runtime artifact. No build step.</span>
+            </div>
+            <div class="doc-item">
+              <strong id="docTwoTitle">demo/river-bridge-demo.las</strong>
+              <span id="docTwoDesc">
+                River and bridge sample for cross-sections and measurements.
+              </span>
+            </div>
+            <div class="doc-item">
+              <strong id="docThreeTitle">README.md</strong>
+              <span id="docThreeDesc">
+                Public entry document with live demo links, constraints, and workflow
+                summary.
+              </span>
+            </div>
+            <div class="doc-item">
+              <strong id="docFourTitle">scripts/*.test.js</strong>
+              <span id="docFourDesc">
+                Regression coverage for runtime behavior, repo metadata, and public
+                presentation.
+              </span>
+            </div>
           </div>
 
-          <p class="hero-lead" id="heroLead">
-            Browser-native LAS/LAZ point cloud workbench delivered as a single HTML
-            file.
+          <p class="docs-note" id="docsNote">
+            &gt; test commands: <code>bun test scripts/*.test.js</code> |
+            <code>bun scripts/check-readme.js</code>
           </p>
-          <p class="hero-desc" id="heroDesc">
-            Open the GitHub Pages landing page, launch the real app, and inspect
-            point clouds in 3D/2D without a build step. The runtime artifact stays
-            in <code>PointCloudWorkbench.html</code>.
-          </p>
+        </section>
 
-          <aside class="hero-slab">
-            <p class="hero-slab-label" id="heroSlabLabel">Demo Payload</p>
-            <strong id="heroSlabPoints">23,746 pts</strong>
-            <span id="heroSlabDesc">
-              Bundled LAS sample included for fast first-run validation.
-            </span>
-          </aside>
-
-          <nav class="trigger-matrix">
-            <a class="terminal-btn primary" href="./PointCloudWorkbench.html?lang=en&amp;demo=river">
-              <span id="ctaLaunch">Try the river sample</span>
-            </a>
-            <a class="terminal-btn ghost" href="./demo/river-bridge-demo.las">
-              <span id="ctaSample">DATA // SAMPLE LAS</span>
-            </a>
-            <a
-              class="terminal-btn ghost"
-              href="https://github.com/tsutomu-n/pointcloud-workbench-html"
-              rel="noopener noreferrer"
-            >
-              <span id="ctaRepository">REPOSITORY // GITHUB</span>
-            </a>
-          </nav>
-        </div>
-      </header>
-
-      <section class="metrics-domain grid-x reveal">
-        <h2 class="section-label" id="sectionCapabilities">01 // SYSTEM CAPABILITIES</h2>
-
-        <div class="stats-matrix">
-          <article class="stat-node">
-            <span class="tech-tag" id="capOneTag">Chunked Processing</span>
-            <h3 class="stat-head" id="capOneTitle">Large-file pressure smoothing</h3>
-            <p class="stat-desc" id="capOneDesc">
-              Chunked LAS reads and LAZ chunk transfer into WASM heap reduce load
-              spikes and unnecessary memory duplication.
-            </p>
-          </article>
-          <article class="stat-node">
-            <span class="tech-tag" id="capTwoTag">Pre-Flight Evaluation</span>
-            <h3 class="stat-head" id="capTwoTitle">Pre-load risk and quality review</h3>
-            <p class="stat-desc" id="capTwoDesc">
-              Header-first inspection exposes load path, risk level, source point
-              count, and estimated render ratio before you commit to import.
-            </p>
-          </article>
-          <article class="stat-node">
-            <span class="tech-tag" id="capThreeTag">Multi-Dimensional Viz</span>
-            <h3 class="stat-head" id="capThreeTitle">3D, 2D, slice, stats</h3>
-            <p class="stat-desc" id="capThreeDesc">
-              Switch between 3D and 2D, inspect slices, review classification output,
-              and validate results with the statistics panel in one browser tool.
-            </p>
-          </article>
-        </div>
-      </section>
-
-      <section class="system-domain grid-x reveal">
-        <h2 class="section-label" id="sectionRequirements">
-          02 // CONSTRAINTS &amp; REQUIREMENTS
-        </h2>
-
-        <div class="specs-grid">
-          <article class="spec-card">
-            <h3 class="spec-title" id="reqTitle">Requirements</h3>
-            <ul class="spec-list" id="reqList">
-              <li><strong>Recommended:</strong> latest Chrome / Edge only</li>
-              <li><strong>Unsupported:</strong> Firefox and Safari are not supported</li>
-              <li><strong>Required APIs:</strong> WebGL / File API / ArrayBuffer</li>
-              <li><strong>Accepted formats:</strong> <code>.las</code> / <code>.laz</code></li>
-              <li>
-                <strong>Network:</strong> runtime loads <code>three.js</code> and
-                <code>laz-perf</code> from CDNs
-              </li>
-            </ul>
-          </article>
-
-          <article class="spec-card warn">
-            <h3 class="spec-title" id="limitsTitle">System Limits</h3>
-            <ul class="spec-list" id="limitsList">
-              <li>
-                <strong>LAS ceiling:</strong> <code>above 3GB</code> is rejected.
-                <code>2GB to 3GB</code> should start from <code>LOW</code>.
-              </li>
-              <li>
-                <strong>LAZ ceiling:</strong> decoder overhead narrows the safe range.
-                <code>above 2GB</code> is rejected.
-              </li>
-              <li>
-                <strong>Auto classification:</strong> assistive only. It is not a
-                survey-grade classification guarantee.
-              </li>
-              <li>
-                URL loading and some compatibility paths may still use full
-                <code>ArrayBuffer</code> reads.
-              </li>
-            </ul>
-          </article>
-        </div>
-      </section>
-
-      <section class="system-domain grid-x reveal" style="padding-top: 0">
-        <h2 class="section-label" id="sectionDocs">03 // ARCHITECTURE &amp; DOCS</h2>
-
-        <div class="docs-matrix">
-          <div class="doc-item">
-            <strong id="docOneTitle">PointCloudWorkbench.html</strong>
-            <span id="docOneDesc">Single-file runtime artifact. No build step.</span>
-          </div>
-          <div class="doc-item">
-            <strong id="docTwoTitle">demo/pointcloud-demo-sample.las</strong>
-            <span id="docTwoDesc">
-              Bundled LAS sample for quick first-run validation on GitHub Pages.
-            </span>
-          </div>
-          <div class="doc-item">
-            <strong id="docThreeTitle">README.md</strong>
-            <span id="docThreeDesc">
-              Public entry document with live demo links, constraints, and workflow
-              summary.
-            </span>
-          </div>
-          <div class="doc-item">
-            <strong id="docFourTitle">scripts/*.test.js</strong>
-            <span id="docFourDesc">
-              Regression coverage for runtime behavior, repo metadata, and public
-              presentation.
-            </span>
-          </div>
-        </div>
-
-        <p class="docs-note" id="docsNote">
-          &gt; test commands: <code>bun test scripts/*.test.js</code> |
-          <code>bun scripts/check-readme.js</code>
-        </p>
-      </section>
+      </main>
 
       <footer class="footer-domain grid-x">
         <div class="footer-matrix">
-          <div id="footerLicense">LICENSE // MIT. SYSTEM DISTRIBUTED AS SINGLE HTML.</div>
+          <div id="footerLicense">MIT license · Single HTML distribution</div>
           <nav class="footer-links">
-            <a href="./PointCloudWorkbench.html">EXECUTE_APP</a>
-            <a href="./demo/river-bridge-demo.las">SAMPLE_LAS</a>
+            <a id="ctaSample" href="./demo/river-bridge-demo.las" download>Download sample LAS</a>
             <a
               href="https://github.com/tsutomu-n/pointcloud-workbench-html/blob/main/README.md"
               rel="noopener noreferrer"
@@ -934,7 +796,7 @@
             <a
               href="https://github.com/tsutomu-n/pointcloud-workbench-html"
               rel="noopener noreferrer"
-              >GITHUB</a
+              >GitHub</a
             >
           </nav>
         </div>
@@ -943,41 +805,32 @@
 
     <script>
       const LANDING_SUPPORTED_LANGUAGES = ["ja", "en", "zh"];
-      const LANDING_STORAGE_KEY = "pcwLandingLanguage";
 
       const LANDING_TRANSLATIONS = {
         en: {
           title: "PointCloudWorkbench | Native LAS/LAZ Viewer",
           languageLabel: "Language",
           languageAriaLabel: "Landing page language",
-          badge: "Native HTML Application",
-          heroMetaOne: "Single HTML Delivery",
-          heroMetaTwo: "LAS / LAZ Ready",
-          heroMetaThree: "GitHub Pages Demo",
-          heroLead:
-            "Browser-native LAS/LAZ point cloud workbench delivered as a single HTML file.",
-          heroDesc:
-            "No file needed. Open the river and bridge sample to try a cross-section, measure the bridge, and explore point density.",
-          heroSlabLabel: "Demo Payload",
-          heroSlabPoints: "23,746 pts",
-          heroSlabDesc: "Bundled LAS sample included for fast first-run validation.",
+          themeLabel: "Light theme",
+          heroLead: "Inspect and measure LAS / LAZ point clouds in your browser.",
+          heroDesc: "Start with a river and bridge sample to explore cross-sections, measurements, and point density.",
+          heroSupport: "Supported browsers: latest Chrome or Edge.",
+          heroSlabLabel: "Synthetic river and bridge sample",
+          heroSlabPoints: "23,746 points",
           ctaLaunch: "Try the river sample",
-          ctaSample: "DATA // SAMPLE LAS",
-          ctaRepository: "REPOSITORY // GITHUB",
-          sectionCapabilities: "01 // SYSTEM CAPABILITIES",
-          capOneTag: "Chunked Processing",
-          capOneTitle: "Large-file pressure smoothing",
+          ctaOpenFile: "Open LAS / LAZ",
+          ctaSample: "Download sample LAS",
+          sectionCapabilities: "Explore point clouds",
+          capOneTitle: "Load large files in chunks",
           capOneDesc:
             "Chunked LAS reads and LAZ chunk transfer into WASM heap reduce load spikes and unnecessary memory duplication.",
-          capTwoTag: "Pre-Flight Evaluation",
-          capTwoTitle: "Pre-load risk and quality review",
+          capTwoTitle: "Check files before import",
           capTwoDesc:
             "Header-first inspection exposes load path, risk level, source point count, and estimated render ratio before you commit to import.",
-          capThreeTag: "Multi-Dimensional Viz",
-          capThreeTitle: "3D, 2D, slice, stats",
+          capThreeTitle: "Inspect in 3D and 2D",
           capThreeDesc:
             "Switch between 3D and 2D, inspect slices, review classification output, and validate results with the statistics panel in one browser tool.",
-          sectionRequirements: "02 // CONSTRAINTS &amp; REQUIREMENTS",
+          sectionRequirements: "Browser support and limits",
           reqTitle: "Requirements",
           reqList: [
             "<strong>Recommended:</strong> latest Chrome / Edge only",
@@ -993,12 +846,12 @@
             "<strong>Auto classification:</strong> assistive only. It is not a survey-grade classification guarantee.",
             "URL loading and some compatibility paths may still use full <code>ArrayBuffer</code> reads.",
           ],
-          sectionDocs: "03 // ARCHITECTURE &amp; DOCS",
+          sectionDocs: "Files and documentation",
           docOneTitle: "PointCloudWorkbench.html",
           docOneDesc: "Single-file runtime artifact. No build step.",
-          docTwoTitle: "demo/pointcloud-demo-sample.las",
+          docTwoTitle: "demo/river-bridge-demo.las",
           docTwoDesc:
-            "Bundled LAS sample for quick first-run validation on GitHub Pages.",
+            "River and bridge sample for cross-sections and measurements.",
           docThreeTitle: "README.md",
           docThreeDesc:
             "Public entry document with live demo links, constraints, and workflow summary.",
@@ -1007,40 +860,32 @@
             "Regression coverage for runtime behavior, repo metadata, and public presentation.",
           docsNote:
             "&gt; test commands: <code>bun test scripts/*.test.js</code> | <code>bun scripts/check-readme.js</code>",
-          footerLicense: "LICENSE // MIT. SYSTEM DISTRIBUTED AS SINGLE HTML.",
+          footerLicense: "MIT license · Single HTML distribution",
         },
         ja: {
           title: "PointCloudWorkbench | ブラウザ点群ビューアー",
           languageLabel: "言語",
           languageAriaLabel: "ランディングページの表示言語",
-          badge: "単一HTMLアプリケーション",
-          heroMetaOne: "単一 HTML 配布",
-          heroMetaTwo: "LAS / LAZ 対応",
-          heroMetaThree: "GitHub Pages デモ",
-          heroLead:
-            "ブラウザで動く、LAS/LAZ 対応の単一 HTML 点群ワークベンチです。",
-          heroDesc:
-            "ファイル不要。河川と橋の点群を開いて、橋の断面・両端の計測・点の密度を確認できます。",
-          heroSlabLabel: "デモ内容",
+          themeLabel: "ライトテーマ",
+          heroLead: "LAS / LAZ 点群をブラウザで確認・計測。",
+          heroDesc: "河川と橋のサンプルで、断面の確認、距離の計測、点の密度の確認を試せます。",
+          heroSupport: "対応ブラウザは最新の Chrome または Edge です。",
+          heroSlabLabel: "河川と橋の合成サンプル",
           heroSlabPoints: "23,746 点",
-          heroSlabDesc: "初回確認用に軽量な同梱 LAS サンプルを用意しています。",
           ctaLaunch: "河川サンプルを試す",
-          ctaSample: "DATA // SAMPLE LAS",
-          ctaRepository: "REPOSITORY // GITHUB",
-          sectionCapabilities: "01 // 主な機能",
-          capOneTag: "Chunked Processing",
+          ctaOpenFile: "LAS / LAZ を開く",
+          ctaSample: "サンプル LAS をダウンロード",
+          sectionCapabilities: "主な機能",
           capOneTitle: "大容量負荷の平準化",
           capOneDesc:
             "LAS のチャンク読み込みと LAZ の WASM ヒープ直書きで、負荷の集中とメモリ重複を抑えます。",
-          capTwoTag: "Pre-Flight Evaluation",
           capTwoTitle: "読込前の危険度と品質確認",
           capTwoDesc:
             "ヘッダー先読みで、読込経路、危険度、元点数、推定表示率を読み込み前に確認できます。",
-          capThreeTag: "Multi-Dimensional Viz",
           capThreeTitle: "3D / 2D / スライス / 統計",
           capThreeDesc:
             "3D と 2D を切り替え、断面確認、分類確認、統計検証までブラウザ内で完結します。",
-          sectionRequirements: "02 // 動作条件と制約",
+          sectionRequirements: "動作条件と制約",
           reqTitle: "動作条件",
           reqList: [
             "<strong>推奨環境:</strong> Chrome / Edge の最新版のみ対応",
@@ -1056,51 +901,44 @@
             "<strong>自動分類:</strong> 補助機能であり、測量級の厳密な分類保証ではありません。",
             "URL 読込や一部互換経路では全量 <code>ArrayBuffer</code> を使う場合があります。",
           ],
-          sectionDocs: "03 // ファイル構成と文書",
+          sectionDocs: "ファイル構成と文書",
           docOneTitle: "PointCloudWorkbench.html",
           docOneDesc: "単一 HTML の実行本体。ビルド工程はありません。",
-          docTwoTitle: "demo/pointcloud-demo-sample.las",
-          docTwoDesc: "GitHub Pages で初回確認しやすい軽量な同梱 LAS サンプルです。",
+          docTwoTitle: "demo/river-bridge-demo.las",
+          docTwoDesc: "断面確認と計測を試すための河川と橋の LAS サンプルです。",
           docThreeTitle: "README.md",
           docThreeDesc: "公開向けの入口文書。Live Demo、制約、開発情報をまとめています。",
           docFourTitle: "scripts/*.test.js",
           docFourDesc: "挙動回帰、公開面、リポジトリ整合性を Bun で検証します。",
           docsNote:
             "&gt; test commands: <code>bun test scripts/*.test.js</code> | <code>bun scripts/check-readme.js</code>",
-          footerLicense: "LICENSE // MIT. 単一 HTML 配布モデル。",
+          footerLicense: "MIT ライセンス · 単一 HTML 配布",
         },
         zh: {
           title: "PointCloudWorkbench | 浏览器点云查看器",
           languageLabel: "语言",
           languageAriaLabel: "着陆页语言",
-          badge: "单文件 HTML 应用",
-          heroMetaOne: "单 HTML 交付",
-          heroMetaTwo: "支持 LAS / LAZ",
-          heroMetaThree: "GitHub Pages 演示",
-          heroLead:
-            "这是一个在浏览器中运行、以单一 HTML 文件交付的 LAS/LAZ 点云工作台。",
-          heroDesc:
-            "从 GitHub Pages 入口即可启动真实应用，无需构建步骤，就能进入 3D / 2D 点云检查流程。运行主体保持为 <code>PointCloudWorkbench.html</code>。",
-          heroSlabLabel: "演示载荷",
-          heroSlabPoints: "23,746 点",
-          heroSlabDesc: "内置轻量 LAS 样本，便于首次快速验证。",
+          themeLabel: "浅色主题",
+          heroLead: "在浏览器中查看和测量 LAS / LAZ 点云。",
+          heroDesc: "用河流和桥梁样本查看剖面、测量距离并检查点密度。",
+          heroSupport: "支持最新版 Chrome 或 Edge。",
+          heroLanguageNote: "应用将以英文打开。",
+          heroSlabLabel: "河流和桥梁合成样本",
+          heroSlabPoints: "23,746 个点",
           ctaLaunch: "试用河流样本",
-          ctaSample: "DATA // SAMPLE LAS",
-          ctaRepository: "REPOSITORY // GITHUB",
-          sectionCapabilities: "01 // 核心能力",
-          capOneTag: "Chunked Processing",
+          ctaOpenFile: "打开 LAS / LAZ",
+          ctaSample: "下载 LAS 样本",
+          sectionCapabilities: "主要功能",
           capOneTitle: "大文件压力平滑",
           capOneDesc:
             "LAS 分块读取与 LAZ 写入 WASM 堆相结合，可减少加载高峰和重复内存占用。",
-          capTwoTag: "Pre-Flight Evaluation",
           capTwoTitle: "加载前风险与质量确认",
           capTwoDesc:
             "通过预读头信息，在正式导入前查看加载路径、风险级别、源点数和预计显示比例。",
-          capThreeTag: "Multi-Dimensional Viz",
           capThreeTitle: "3D / 2D / 切片 / 统计",
           capThreeDesc:
             "在浏览器中切换 3D 与 2D，查看切片断面、分类结果，并结合统计面板进行验证。",
-          sectionRequirements: "02 // 条件与限制",
+          sectionRequirements: "运行条件与限制",
           reqTitle: "运行条件",
           reqList: [
             "<strong>推荐环境:</strong> 仅支持最新版 Chrome / Edge",
@@ -1116,18 +954,18 @@
             "<strong>自动分类:</strong> 仅为辅助能力，不保证测绘级分类精度。",
             "URL 加载和部分兼容路径仍可能使用完整 <code>ArrayBuffer</code> 读取。",
           ],
-          sectionDocs: "03 // 架构与文档",
+          sectionDocs: "文件与文档",
           docOneTitle: "PointCloudWorkbench.html",
           docOneDesc: "单文件运行主体，无需构建。",
-          docTwoTitle: "demo/pointcloud-demo-sample.las",
-          docTwoDesc: "用于 GitHub Pages 首次体验的内置轻量 LAS 样本。",
+          docTwoTitle: "demo/river-bridge-demo.las",
+          docTwoDesc: "用于查看剖面和测量距离的河流和桥梁 LAS 样本。",
           docThreeTitle: "README.md",
           docThreeDesc: "公共入口文档，汇总 Live Demo、限制与开发说明。",
           docFourTitle: "scripts/*.test.js",
           docFourDesc: "使用 Bun 验证运行行为、仓库元数据与公开展示面。",
           docsNote:
             "&gt; test commands: <code>bun test scripts/*.test.js</code> | <code>bun scripts/check-readme.js</code>",
-          footerLicense: "LICENSE // MIT. 以单 HTML 形式分发。",
+          footerLicense: "MIT 许可证 · 单 HTML 文件分发",
         },
       };
 
@@ -1233,34 +1071,27 @@
         document.title = copy.title;
 
         setLandingText("landingLanguageLabel", copy.languageLabel);
-        setLandingText("badgeMono", copy.badge);
-        setLandingText("heroMetaOne", copy.heroMetaOne);
-        setLandingText("heroMetaTwo", copy.heroMetaTwo);
-        setLandingText("heroMetaThree", copy.heroMetaThree);
         setLandingText("heroLead", copy.heroLead);
-        setLandingHtml("heroDesc", copy.heroDesc);
+        setLandingText("heroDesc", copy.heroDesc);
+        setLandingText("heroSupport", copy.heroSupport);
         setLandingText("heroSlabLabel", copy.heroSlabLabel);
         setLandingText("heroSlabPoints", copy.heroSlabPoints);
-        setLandingText("heroSlabDesc", copy.heroSlabDesc);
         setLandingText("ctaLaunch", copy.ctaLaunch);
+        setLandingText("ctaOpenFile", copy.ctaOpenFile);
         setLandingText("ctaSample", copy.ctaSample);
-        setLandingText("ctaRepository", copy.ctaRepository);
-        setLandingHtml("sectionCapabilities", copy.sectionCapabilities);
-        setLandingText("capOneTag", copy.capOneTag);
+        setLandingText("sectionCapabilities", copy.sectionCapabilities);
         setLandingText("capOneTitle", copy.capOneTitle);
         setLandingText("capOneDesc", copy.capOneDesc);
-        setLandingText("capTwoTag", copy.capTwoTag);
         setLandingText("capTwoTitle", copy.capTwoTitle);
         setLandingText("capTwoDesc", copy.capTwoDesc);
-        setLandingText("capThreeTag", copy.capThreeTag);
         setLandingText("capThreeTitle", copy.capThreeTitle);
         setLandingText("capThreeDesc", copy.capThreeDesc);
-        setLandingHtml("sectionRequirements", copy.sectionRequirements);
+        setLandingText("sectionRequirements", copy.sectionRequirements);
         setLandingText("reqTitle", copy.reqTitle);
         setLandingList("reqList", copy.reqList);
         setLandingText("limitsTitle", copy.limitsTitle);
         setLandingList("limitsList", copy.limitsList);
-        setLandingHtml("sectionDocs", copy.sectionDocs);
+        setLandingText("sectionDocs", copy.sectionDocs);
         setLandingText("docOneTitle", copy.docOneTitle);
         setLandingText("docOneDesc", copy.docOneDesc);
         setLandingText("docTwoTitle", copy.docTwoTitle);
@@ -1272,9 +1103,23 @@
         setLandingHtml("docsNote", copy.docsNote);
         setLandingText("footerLicense", copy.footerLicense);
 
-        for (const link of document.querySelectorAll?.('a[href^="./PointCloudWorkbench.html"]') || []) {
-          const demo = link.classList.contains("primary") ? "&demo=river" : "";
-          link.setAttribute("href", `./PointCloudWorkbench.html?lang=${normalized}${demo}`);
+        const appLanguage = normalized === "zh" ? "en" : normalized;
+        for (const link of document.querySelectorAll('a[href^="./PointCloudWorkbench.html"]')) {
+          const destination = new URL(link.getAttribute("href"), document.baseURI);
+          destination.searchParams.set("lang", appLanguage);
+          link.setAttribute("href", `./PointCloudWorkbench.html${destination.search}${destination.hash}`);
+        }
+
+        const languageNote = document.getElementById("heroLanguageNote");
+        if (languageNote) {
+          languageNote.hidden = !copy.heroLanguageNote;
+          languageNote.textContent = copy.heroLanguageNote ?? "";
+        }
+
+        const themeToggle = document.getElementById("themeToggle");
+        if (themeToggle) {
+          themeToggle.setAttribute("aria-label", copy.themeLabel);
+          themeToggle.title = copy.themeLabel;
         }
 
         const selector = document.getElementById("landingLanguageSelector");

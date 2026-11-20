@@ -3821,7 +3821,10 @@ test("hideAllPanels preserves stats toggle markup", () => {
   const context = createContext();
   const label = createMockElement("statsToggleLabel");
   const button = createMockElement("statsToggle");
+  const sampleButton = createMockElement("sampleStatsToggle");
   const panel = createMockElement("statsPanel");
+  const sampleAttributes = new Map();
+  sampleButton.setAttribute = (name, value) => sampleAttributes.set(name, value);
 
   button.querySelector = (selector) =>
     selector === ".stats-toggle__label" ? label : null;
@@ -3842,6 +3845,7 @@ test("hideAllPanels preserves stats toggle markup", () => {
 
   context.__statsPanel = panel;
   context.__statsToggle = button;
+  context.__sampleStatsToggle = sampleButton;
 
   vm.runInContext(
     `
@@ -3849,6 +3853,7 @@ test("hideAllPanels preserves stats toggle markup", () => {
       document.getElementById = (id) => {
         if (id === "statsPanel") return __statsPanel;
         if (id === "statsToggle") return __statsToggle;
+        if (id === "sampleStatsToggle") return __sampleStatsToggle;
         return {
           classList: { add() {}, remove() {}, contains() { return false; } },
           querySelector() { return null; },
@@ -3862,6 +3867,8 @@ test("hideAllPanels preserves stats toggle markup", () => {
 
   expect(label.textContent).toBe("統計情報");
   expect(button.textContent).toBe("");
+  expect(sampleButton.textContent).toBe("統計情報");
+  expect(sampleAttributes.get("aria-expanded")).toBe("false");
 });
 
 test("sample modal includes the bundled Pages demo LAS option", () => {

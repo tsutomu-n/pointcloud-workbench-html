@@ -154,13 +154,13 @@ test("Pages demo assets and deployment workflow are present", () => {
   expect(index).toContain("PointCloudWorkbench | Native LAS/LAZ Viewer");
   expect(index).toContain("河川サンプルを試す");
   expect(index).toContain("./PointCloudWorkbench.html");
-  expect(index).toContain("01 // SYSTEM CAPABILITIES");
-  expect(index).toContain("02 // CONSTRAINTS &amp; REQUIREMENTS");
-  expect(index).toContain("03 // ARCHITECTURE &amp; DOCS");
-  expect(index).toContain("DATA // SAMPLE LAS");
+  expect(index).toContain("Open LAS / LAZ");
+  expect(index).toContain("Browser support and limits");
+  expect(index).toContain("Files and documentation");
+  expect(index).toContain("Download sample LAS");
   expect(index).toContain("Chrome / Edge only");
   expect(index).toContain("Firefox and Safari are not supported");
-  expect(index).toContain("LICENSE // MIT. SYSTEM DISTRIBUTED AS SINGLE HTML.");
+  expect(index).toContain("MIT license · Single HTML distribution");
   expect(index).toContain('id="landingLanguageSelector"');
   expect(index).toContain('const LANDING_SUPPORTED_LANGUAGES = ["ja", "en", "zh"]');
   expect(index).toContain("navigator.languages");

@@ -5,24 +5,46 @@ const vm = require("vm");
 
 const indexPath = path.join(__dirname, "..", "index.html");
 
-function extractInlineScript(html) {
+function extractInlineScript(html, marker) {
   const matches = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
   const target = matches
     .map((match) => match[1])
-    .find((script) => script.includes("__pcwLandingTestApi"));
+    .find((script) => script.includes(marker));
 
   if (!target) {
-    throw new Error("landing page test api script was not found");
+    throw new Error(`landing page script missing: ${marker}`);
   }
 
   return target;
 }
 
-function buildContext({ query = "", stored = null, languages = [], language = "en-US" } = {}) {
+function buildContext({
+  html,
+  query = "",
+  stored = null,
+  languages = [],
+  language = "en-US",
+  storedTheme = null,
+  systemTheme = null,
+} = {}) {
   const storage = new Map();
   if (stored !== null) {
     storage.set("pcwLandingLanguage", stored);
   }
+  if (storedTheme !== null) {
+    storage.set("pcw-theme", storedTheme);
+  }
+
+  const appLinks = [...html.matchAll(/<a\b[^>]*href="(\.\/PointCloudWorkbench\.html[^"]*)"[^>]*>/g)]
+    .map(([, href]) => ({
+      href: href.replaceAll("&amp;", "&"),
+      getAttribute(name) {
+        return this[name] ?? null;
+      },
+      setAttribute(name, value) {
+        this[name] = value;
+      },
+    }));
 
   const selector = {
     value: "",
@@ -35,47 +57,22 @@ function buildContext({ query = "", stored = null, languages = [], language = "e
     innerHTML: "",
   });
 
+  const documentListeners = {};
+  const themeListeners = {};
+  const themeToggle = {
+    ...textNode(),
+    setAttribute(name, value) {
+      this[name] = value;
+    },
+    addEventListener(type, listener) {
+      themeListeners[type] = listener;
+    },
+  };
+
   const nodes = {
     landingLanguageSelector: selector,
-    landingLanguageLabel: textNode(),
-    badgeMono: textNode(),
-    heroMetaOne: textNode(),
-    heroMetaTwo: textNode(),
-    heroMetaThree: textNode(),
-    heroLead: textNode(),
-    heroDesc: textNode(),
-    heroSlabLabel: textNode(),
-    heroSlabPoints: textNode(),
-    heroSlabDesc: textNode(),
-    ctaLaunch: textNode(),
-    ctaSample: textNode(),
-    ctaRepository: textNode(),
-    sectionCapabilities: textNode(),
-    capOneTag: textNode(),
-    capOneTitle: textNode(),
-    capOneDesc: textNode(),
-    capTwoTag: textNode(),
-    capTwoTitle: textNode(),
-    capTwoDesc: textNode(),
-    capThreeTag: textNode(),
-    capThreeTitle: textNode(),
-    capThreeDesc: textNode(),
-    sectionRequirements: textNode(),
-    reqTitle: textNode(),
-    reqList: textNode(),
-    limitsTitle: textNode(),
-    limitsList: textNode(),
-    sectionDocs: textNode(),
-    docOneTitle: textNode(),
-    docOneDesc: textNode(),
-    docTwoTitle: textNode(),
-    docTwoDesc: textNode(),
-    docThreeTitle: textNode(),
-    docThreeDesc: textNode(),
-    docFourTitle: textNode(),
-    docFourDesc: textNode(),
-    docsNote: textNode(),
-    footerLicense: textNode(),
+    themeToggle,
+    heroLanguageNote: textNode(),
   };
 
   const documentElement = {
@@ -85,17 +82,27 @@ function buildContext({ query = "", stored = null, languages = [], language = "e
 
   const context = {
     console,
+    URL,
     URLSearchParams,
     window: {
       location: { search: query },
       addEventListener() {},
+      matchMedia: systemTheme
+        ? () => ({ matches: systemTheme === "light", addEventListener() {} })
+        : undefined,
     },
     document: {
+      baseURI: "https://example.com/pointcloud-workbench/",
       documentElement,
       getElementById(id) {
         return nodes[id] || null;
       },
-      addEventListener() {},
+      querySelectorAll(selector) {
+        return selector === 'a[href^="./PointCloudWorkbench.html"]' ? appLinks : [];
+      },
+      addEventListener(type, callback) {
+        (documentListeners[type] ??= []).push(callback);
+      },
     },
     navigator: {
       languages,
@@ -118,21 +125,21 @@ function buildContext({ query = "", stored = null, languages = [], language = "e
   context.window.navigator = context.navigator;
   context.window.localStorage = context.localStorage;
 
-  return { context, storage, nodes, documentElement };
+  return { appLinks, context, storage, nodes, documentElement, documentListeners, themeListeners };
 }
 
-function loadApi(options) {
+function loadApi(options = {}) {
   const html = fs.readFileSync(indexPath, "utf8");
-  const script = extractInlineScript(html);
-  const { context, storage, nodes, documentElement } = buildContext(options);
+  const script = extractInlineScript(html, "__pcwLandingTestApi");
+  const harness = buildContext({ html, ...options });
+  const { context } = harness;
   vm.createContext(context);
   vm.runInContext(script, context);
 
   return {
+    ...harness,
+    html,
     api: context.window.__pcwLandingTestApi,
-    storage,
-    nodes,
-    documentElement,
   };
 }
 
@@ -187,4 +194,34 @@ test("landing page normalizes language tags and persists only explicit selection
   expect(harness.documentElement.lang).toBe("en");
   expect(harness.storage.get("pcwLandingLanguage")).toBe("en");
   expect(harness.nodes.landingLanguageSelector.value).toBe("en");
+});
+
+test("landing app links preserve the sample and use English for Chinese", () => {
+  const { api, appLinks, nodes } = loadApi();
+
+  for (const [language, expectedLang] of [["zh", "en"], ["ja", "ja"], ["en", "en"]]) {
+    api.applyLandingLanguage(language);
+    const routes = appLinks.map(({ href }) => href);
+    expect(routes).toEqual([
+      `./PointCloudWorkbench.html?lang=${expectedLang}&demo=river`,
+      `./PointCloudWorkbench.html?lang=${expectedLang}`,
+    ]);
+    expect(nodes.heroLanguageNote.hidden).toBe(language !== "zh");
+    if (language === "zh") expect(nodes.heroLanguageNote.textContent).toBe("应用将以英文打开。");
+  }
+});
+
+test("landing theme uses the saved choice ahead of system and persists a click", () => {
+  const { context, html, storage, nodes, documentElement, documentListeners, themeListeners } =
+    loadApi({ storedTheme: "dark", systemTheme: "light" });
+  vm.runInContext(extractInlineScript(html, "pcw-theme"), context);
+
+  expect(documentElement.dataset.theme).toBe("dark");
+  for (const listener of documentListeners.DOMContentLoaded) listener();
+  expect(nodes.themeToggle["aria-pressed"]).toBe("false");
+
+  themeListeners.click();
+  expect(documentElement.dataset.theme).toBe("light");
+  expect(nodes.themeToggle["aria-pressed"]).toBe("true");
+  expect(storage.get("pcw-theme")).toBe("light");
 });

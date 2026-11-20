@@ -1,6 +1,6 @@
 # PointCloudWorkbench
 
-timestamp="2026-11-20(金)_17:22 JST"
+timestamp="2026-11-20(金)_20:46 JST"
 
 Browser-native LAS/LAZ point cloud workbench delivered as a single HTML file.
 
@@ -11,12 +11,13 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 - Landing Page: `https://tsutomu-n.github.io/pointcloud-workbench-html/`
 - [Launch the English demo](https://tsutomu-n.github.io/pointcloud-workbench-html/PointCloudWorkbench.html?lang=en&demo=river)
 - Bundled Sample LAS: `https://tsutomu-n.github.io/pointcloud-workbench-html/demo/river-bridge-demo.las`
-- The landing page passes the selected language to the app. The app offers Japanese and English, with Japanese as the fallback for Chinese landing-page links.
+- Choose **Try the river sample** or **Open LAS / LAZ** on the landing page. The app supports Japanese and English and opens in English from the Chinese landing page.
+- Use the moon-and-sun button at the upper right to switch themes. The initial theme follows your device. Your selection applies to both the landing page and the app.
 
 ## Visual Tour
 
 - Planned screenshot assets live under `assets/`.
-- `assets/landing-hero.png`: Full-width GitHub Pages landing-page hero showing the dark terminal-like visual identity, oversized `PointCloudWorkbench.` typography, and the three CTA buttons for app launch, sample LAS download, and repository access.
+- `assets/landing-hero.png`: GitHub Pages landing page showing the river sample preview and the two ways to start.
 - `assets/preflight-panel.png`: App state immediately after selecting the bundled sample, with the pre-flight panel visible and enough detail to read the load path, risk indicator, file size, source point count, estimated display ratio, and quality presets.
 - `assets/workspace-3d.png`: Main 3D workspace after load, showing a point cloud rendered with visible depth and density, the primary control panels, and a viewpoint that makes the browser-native single-file experience feel production-ready rather than experimental.
 - `assets/workspace-2d-slice-stats.png`: 2D or slice-oriented inspection state with the statistics panel open, making it obvious that the tool supports cross-section inspection, classification review, and quantitative validation in addition to 3D viewing.
@@ -46,7 +47,7 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 
 1. Open the English demo in Chrome or Edge.
 2. The 23,746-point synthetic river sample opens directly. From the normal app entry, select **Try the river sample**.
-3. In **See the bridge cross-section**, change the thickness to update the band in plan view and the slice point count. In **Measure bridge**, select A and B to save the horizontal distance to the measurement history. If you switch to density or 3D mid-measurement, select **Resume bridge measurement** to continue from your selected point. **Explore density** outlines the zero-point cell on the right bank and shows its count and area. Select the question mark next to a tool for help.
+3. In **See the bridge cross-section**, change the thickness above the plots to update the band and point count. In **Measure bridge**, select A and B to add the horizontal distance to this session's history. Use **Copy CSV** to keep the result. If you switch to density or 3D mid-measurement, select **Resume bridge measurement** to continue from your selected point. **Explore density** outlines the zero-point cell on the right bank and shows its count and area. Select the question mark next to a tool for help.
 4. Select **Open your own file** to return to file selection.
 
 The bundled LAS uses local metre coordinates with no geographic location. Regenerate it with `node scripts/generate-river-demo.mjs`.
