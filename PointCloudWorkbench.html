@@ -10908,6 +10908,11 @@
         ["この位置に点がありません", "No points at this position"],
         ["スライス厚さを増やしてください", "Increase the slice thickness"],
         ["現在の点群データは破棄されます。ファイル選択画面に戻りますか？", "Return to file selection and close the current point cloud?"],
+        ["種類で色分けについて", "About classification colors"],
+        ["このファイルの分類データには制限があります。", "This file has limited classification data."],
+        ["標高で色分けの使用をお勧めします。", "Use elevation colors to inspect the terrain."],
+        ["標高で色分けに戻る", "Return to elevation colors"],
+        ["種類で色分けを続行", "Continue with classification colors"],
         ["分類データが不適切です", "Poor classification data"],
         ["分類データが限定的です", "Limited classification data"],
         ["検出された問題：", "Detected issues:"],
@@ -10944,6 +10949,7 @@
       // Translate the UI at the DOM boundary. Data, diagnostics payloads,
       // point decoding and rendering coordinates keep their original values.
       const englishUiPatterns = [
+        [/^タイプ(\d+)$/, "Class $1"],
         [/^([\d,]+)個の点を自動分類します。処理には時間がかかる場合があります。続行しますか？$/,
           "Automatically classify $1 points? This may take some time."],
         [/^自動分類完了（([\d.]+)秒）— 地面:([\d,]+) 植生:([\d,]+) 建物:([\d,]+)点$/,

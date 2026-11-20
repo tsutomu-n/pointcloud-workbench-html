@@ -623,6 +623,18 @@ try {
   if (await advancedSettings.getAttribute("open") === null) await advancedSettings.locator("summary").tap();
   const languageSelector = touchPage.locator("#languageSelector");
   await languageSelector.selectOption("en");
+  const originalClasses = await touchPage.evaluate(() => {
+    window.setColorMode("height");
+    const counts = statsData.classificationCounts;
+    statsData.classificationCounts = { 1: statsData.displayPoints };
+    return counts;
+  });
+  await touchPage.getByRole("button", { name: "Color by classification", exact: true }).tap();
+  const classificationWarning = touchPage.locator("#classificationWarningModal");
+  await classificationWarning.waitFor();
+  assert.doesNotMatch(await classificationWarning.innerText(), /[\u3040-\u30ff\u3400-\u9fff]/);
+  await classificationWarning.getByRole("button", { name: "Return to elevation colors", exact: true }).tap();
+  await touchPage.evaluate(counts => { statsData.classificationCounts = counts; }, originalClasses);
   const autoClassify = touchPage.getByRole("button", { name: "Auto-classify", exact: true });
   const classificationDialog = touchPage.getByRole("alertdialog", { name: "Auto-classify", exact: true });
   await autoClassify.tap();
