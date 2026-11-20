@@ -98,8 +98,21 @@ try {
           Math.abs(attribute.getZ(index) - projected.z) < 0.001;
       });
   }), true);
-  await page.getByRole("button", { name: "Hide sample guide", exact: true }).click();
-  await page.getByRole("button", { name: "Show sample guide", exact: true }).click();
+  const savedMeasurements = await page.evaluate(() => measurementState.history.length);
+  await page.getByRole("button", { name: "Measure bridge", exact: true }).click();
+  assert.equal(await page.evaluate(() => densityOverlayState.enabled), false);
+  await page.getByRole("button", { name: "Select A", exact: true }).click();
+  await sectionTrigger.click();
+  await section.getByRole("button", { name: "Close", exact: true }).click();
+  assert.equal(await page.evaluate(() => measurementState.selectedPoints.length), 0);
+  assert.equal(await page.evaluate(() => measurementState.enabled), false);
+  assert.equal(await page.evaluate(() => measurementState.history.length), savedMeasurements);
+  await page.getByRole("button", { name: "Hide sample guide", exact: true }).press("Enter");
+  const showGuide = page.getByRole("button", { name: "Show sample guide", exact: true });
+  assert.equal(await showGuide.evaluate(button => document.activeElement === button), true);
+  await showGuide.press("Enter");
+  assert.equal(await page.getByRole("button", { name: "Hide sample guide", exact: true })
+    .evaluate(button => document.activeElement === button), true);
   await page.route("**/demo/river-bridge-demo.las", route => route.fulfill({ status: 404 }));
   await page.goto(`${base}/PointCloudWorkbench.html?lang=en`);
   await page.getByRole("button", { name: "Try the river sample", exact: true }).click();
@@ -167,6 +180,29 @@ try {
   await touchPage.getByRole("button", { name: "読み込み開始", exact: true }).click();
   await touchPage.waitForFunction(() => workflowState.step === "complete" && statsData.displayPoints === 4096);
   assert.equal(await mobileMode.isVisible(), false);
+  // Use a real gap between displayed X coordinates in the ordinary LAS.
+  const gapWidth = await touchPage.evaluate(() => {
+    const coordinates = pointCloud.geometry.getAttribute("position").array;
+    const xs = [];
+    for (let i = 0; i < coordinates.length; i += 3) xs.push(coordinates[i]);
+    xs.sort((a, b) => a - b);
+    let width = 0;
+    let center = 0;
+    for (let i = 1; i < xs.length; i++) {
+      if (xs[i] - xs[i - 1] <= width) continue;
+      width = xs[i] - xs[i - 1];
+      center = (xs[i] + xs[i - 1]) / 2;
+    }
+    create2DSliceModal([{ axis: "X", position: 0, coordinate: center }, { axis: "Y", position: 0 }]);
+    return width;
+  });
+  assert.ok(gapWidth > 0.1);
+  const ordinaryThickness = touchPage.locator("#sliceThickness");
+  await ordinaryThickness.fill("0.1");
+  assert.equal(await ordinaryThickness.inputValue(), "0.1");
+  assert.equal(await touchPage.locator("#thicknessValue").innerText(), "0.1");
+  await touchPage.getByRole("dialog", { name: "2D断面ビュー" })
+    .getByRole("button", { name: "閉じる", exact: true }).tap();
   console.log("River cross-section, bridge measurement, density, failure recovery, touch controls, and own LAS passed");
 } finally {
   await browser?.close();

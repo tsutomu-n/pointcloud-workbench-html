@@ -4173,8 +4173,8 @@
                 </div>
               </div>
             </div>
-            <button id="hideSampleGuide" class="link-btn" onclick="setSampleGuideVisible(false)">サンプルガイドを閉じる</button>
-            <button id="showSampleGuide" class="link-btn" onclick="setSampleGuideVisible(true)" hidden>サンプルガイドを表示</button>
+            <button id="hideSampleGuide" class="link-btn" onclick="setSampleGuideVisible(false, true)">サンプルガイドを閉じる</button>
+            <button id="showSampleGuide" class="link-btn" onclick="setSampleGuideVisible(true, true)" hidden>サンプルガイドを表示</button>
             <button class="link-btn" onclick="goHome()">自分のファイルを開く</button>
           </section>
           <!-- 操作ガイド（上部に配置） -->
@@ -11625,10 +11625,13 @@
         return window.startDataLoading();
       }
 
-      function setSampleGuideVisible(visible) {
+      function setSampleGuideVisible(visible, moveFocus = false) {
+        const hide = document.getElementById("hideSampleGuide");
+        const show = document.getElementById("showSampleGuide");
         document.getElementById("sampleGuide").hidden = !visible;
-        document.getElementById("hideSampleGuide").hidden = !visible;
-        document.getElementById("showSampleGuide").hidden = visible;
+        hide.hidden = !visible;
+        show.hidden = visible;
+        if (moveFocus) (visible ? hide : show).focus({ preventScroll: true });
       }
 
       function showRiverDemoMode() {
@@ -11667,10 +11670,24 @@
         if (button) button.dataset.complete = "true";
       }
 
-      function openBridgeSection() {
+      function leaveSampleDensityGuide() {
+        const guide = document.getElementById("sampleDensityGuide");
+        if (guide.hidden) return;
+        guide.hidden = true;
+        window.setDensityOverlayEnabled(false);
+      }
+
+      function leaveSampleMeasurement() {
         endBridgeGuide();
-        clearSampleGapInspection();
-        document.getElementById("sampleDensityGuide").hidden = true;
+        if (!measurementState.enabled) return;
+        measurementState.enabled = false;
+        resetMeasurementDraft();
+        updateMeasurementUi();
+      }
+
+      function openBridgeSection() {
+        leaveSampleMeasurement();
+        leaveSampleDensityGuide();
         if (isCADMode) window.toggleCADMode();
         window.resetSlicing();
         const coordinate = sourceToDisplayPoint({ x: 0, y: 0, z: 0 }).z;
@@ -11679,8 +11696,7 @@
       }
 
       function startBridgeMeasurement() {
-        clearSampleGapInspection();
-        document.getElementById("sampleDensityGuide").hidden = true;
+        leaveSampleDensityGuide();
         document.getElementById("bridgeGuideDistance").hidden = true;
         if (isCADMode) window.toggleCADMode();
         window.resetSlicing();
@@ -11729,7 +11745,7 @@
       }
 
       function exploreSampleDensity() {
-        endBridgeGuide();
+        leaveSampleMeasurement();
         if (isCADMode) window.toggleCADMode();
         window.resetSlicing();
         window.set2DView("top");
@@ -18838,7 +18854,7 @@
           modal.querySelector("#thicknessValue").textContent = thickness.toFixed(1);
           modal.querySelector("#pointSizeValue2D").textContent = pointSize.toFixed(1);
           canvases.forEach((canvas, index) =>
-            drawSliceProjection(canvas, activeSlices[index], thickness, !bridge, pointSize, bridge),
+            drawSliceProjection(canvas, activeSlices[index], thickness, pointSize, bridge),
           );
           if (map) {
             drawBridgeSliceMap(map, thickness);
@@ -18857,9 +18873,12 @@
         }
         modal.querySelector("#autoThicknessBtn").addEventListener("click", () => {
           const candidates = [0.02, 0.05, 0.1, 0.15, 0.2, 0.25].map(ratio => avgSize * ratio);
-          const thickness = candidates.find(candidate =>
-            activeSlices.every(slice => countPointsInSlice(slice, candidate) > 100),
+          const counts = candidates.map(candidate =>
+            activeSlices.map(slice => countPointsInSlice(slice, candidate)),
           );
+          const resolved = counts.findIndex(count => count.every(value => value > 100));
+          const nonempty = counts.findIndex(count => count.every(value => value > 0));
+          const thickness = candidates[resolved === -1 ? nonempty : resolved];
           thicknessSlider.value = (thickness ?? initial).toFixed(1);
           redraw();
         });
@@ -19056,7 +19075,6 @@
         canvas,
         slice,
         thickness,
-        autoRetry = true,
         customPointSize = null,
         bridge = false,
       ) {
@@ -19068,7 +19086,6 @@
         const positions = pointCloud.geometry.attributes.position.array;
         const colors = pointCloud.geometry.attributes.color.array;
         const box = pointCloud.geometry.boundingBox;
-        const size = box.getSize(new THREE.Vector3());
         const slicePos = resolveSlicePosition(slice, box);
 
         // 投影された点を収集
@@ -19117,32 +19134,6 @@
 
         // 投影範囲を計算
         if (projectedPoints.length === 0) {
-          // 自動リトライ：厚さを増やして再試行
-          if (autoRetry) {
-            const avgSize = (size.x + size.y + size.z) / 3;
-            const newThickness = Math.min(thickness * 2, avgSize * 0.5);
-            if (newThickness > thickness) {
-              console.log(
-                `点が見つかりません。厚さを ${thickness.toFixed(1)} から ${newThickness.toFixed(1)} に増やして再試行`,
-              );
-              drawSliceProjection(
-                canvas,
-                slice,
-                newThickness,
-                false,
-                customPointSize,
-              );
-              // スライダーも更新
-              const slider = document.getElementById("sliceThickness");
-              const valueDisplay = document.getElementById("thicknessValue");
-              if (slider && valueDisplay) {
-                slider.value = newThickness.toFixed(1);
-                valueDisplay.textContent = newThickness.toFixed(1);
-              }
-              return;
-            }
-          }
-
           ctx.fillStyle = "#666";
           ctx.font = "14px Arial";
           ctx.textAlign = "center";
