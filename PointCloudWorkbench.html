@@ -3692,7 +3692,6 @@
           >
             <option value="ja">日本語</option>
             <option value="en">English</option>
-            <option value="zh">中文</option>
           </select>
         </div>
       </header>
@@ -3710,7 +3709,7 @@
               <div class="last-session-hint__icon"></div>
               <div class="last-session-hint__content">
                 <div class="last-session-hint__label">前回使用（再選択が必要です）</div>
-                <div class="last-session-hint__filename" id="lastFileName">-</div>
+                <div class="last-session-hint__filename" id="lastFileName" data-pcw-source-text>-</div>
               </div>
               <button
                 class="ec-button ec-button--secondary ec-button--sm"
@@ -3785,7 +3784,7 @@
 
             <div class="file-info" id="fileInfo" style="display: none">
               <div><strong>選択されたファイル:</strong></div>
-              <div id="selectedFileName">-</div>
+              <div id="selectedFileName" data-pcw-source-text>-</div>
               <div id="selectedFileSize">-</div>
               <div
                 id="selectedFileWarning"
@@ -3794,6 +3793,15 @@
             </div>
 
             <div class="panel-footer">
+              <button
+                id="englishDemoButton"
+                class="link-btn"
+                type="button"
+                onclick="loadSampleData('demo')"
+                hidden
+              >
+                Load demo sample
+              </button>
               <button
                 id="sampleDataButton"
                 class="link-btn"
@@ -3963,7 +3971,7 @@
 
             <div class="loading-file-info">
               <div>
-                <strong>ファイル:</strong> <span id="loadingFileName">-</span>
+                <strong>ファイル:</strong> <span id="loadingFileName" data-pcw-source-text>-</span>
               </div>
               <div>
                 <strong>品質:</strong> <span id="loadingQuality">-</span>
@@ -4969,7 +4977,7 @@
               <div class="stats-tile">
                 <div class="stats-tile-title">ファイル / 品質</div>
                 <div class="stats-item">
-                  ファイル名: <span class="stats-value" id="fileName">-</span>
+                  ファイル名: <span class="stats-value" id="fileName" data-pcw-source-text>-</span>
                 </div>
                 <div class="stats-item">
                   ファイルサイズ:
@@ -7488,7 +7496,7 @@
         lazHeapOverheadMB: 128,
         fallbackBufferOverheadMB: 160,
       };
-      const SUPPORTED_LANGUAGES = ["ja", "en", "zh"];
+      const SUPPORTED_LANGUAGES = ["ja", "en"];
 
       function getQualityConfig(quality) {
         return qualitySettings[quality] || qualitySettings[DEFAULT_QUALITY];
@@ -9106,7 +9114,7 @@
         if (!samples.length || !Number.isFinite(profile.minZ) || !Number.isFinite(profile.maxZ)) {
           ctx.fillStyle = "rgba(148, 163, 184, 0.75)";
           ctx.font = "12px sans-serif";
-          ctx.fillText("2D断面で更新", 12, 52);
+          ctx.fillText(appUiText("2D断面で更新"), 12, 52);
           return false;
         }
 
@@ -9691,6 +9699,582 @@
         return await readBlobAsArrayBuffer(file, loadSessionId);
       }
 
+      const englishUiText = new Map([
+        ["ファイル選択", "File selection"],
+        ["ドラッグ&ドロップ、またはボタンから選択できます", "Drop a LAS or LAZ file here, or choose one below."],
+        ["前回使用（再選択が必要です）", "Previously opened (select the file again)"],
+        ["ファイルを再選択する", "Choose the file again"],
+        ["ここにファイルをドロップ", "Drop a file here"],
+        ["または", "or"],
+        ["ファイルを選択", "Choose file"],
+        [".las 最大3GB / .laz 最大2GB", ".las up to 3 GB / .laz up to 2 GB"],
+        ["検出中", "Detecting"],
+        ["選択されたファイル:", "Selected file:"],
+        ["サンプルデータを使用", "Choose sample data"],
+        ["品質設定へ", "Continue to quality settings"],
+        ["品質設定", "Quality settings"],
+        ["表示品質を選択してください", "Choose display quality"],
+        ["検出中...", "Detecting..."],
+        ["計算中...", "Calculating..."],
+        ["軽量 · 高速 / 6万点", "Low · Fast / 60,000 points"],
+        ["標準 · バランス / 18万点", "Standard · Balanced / 180,000 points"],
+        ["高品質 / 40万点", "High / 400,000 points"],
+        ["最高精度 / 200万点", "Maximum / 2 million points"],
+        ["~1.6GB · ~2分", "~1.6 GB · ~2 min"],
+        ["詳細スペック", "Detailed specifications"],
+        ["詳細スペック [!]", "Detailed specifications [!]"],
+        ["推奨用途: 概要確認・低スペックPC", "Best for quick review and low-spec devices"],
+        ["推奨用途: 通常作業・標準PC", "Best for general work and standard PCs"],
+        ["推奨用途: 詳細確認・高スペックPC", "Best for detailed inspection on high-spec PCs"],
+        ["推奨用途: 最終確認・高性能PC必須", "For final inspection on high-performance PCs"],
+        ["予想読み込み", "Estimated load time"],
+        ["予想メモリ", "Estimated memory"],
+        ["推奨FPS", "Estimated FPS"],
+        ["表示点数", "Display point count"],
+        ["読込経路", "Load strategy"],
+        ["危険度", "Risk"],
+        ["推奨品質の根拠を計算中...", "Calculating recommended quality..."],
+        ["戻る", "Back"],
+        ["読み込み開始", "Start loading"],
+        ["データ読み込み中", "Loading point cloud"],
+        ["ファイル:", "File:"],
+        ["品質:", "Quality:"],
+        ["目標点数:", "Target point count:"],
+        ["進捗:", "Progress:"],
+        ["読み込み済み:", "Loaded:"],
+        ["点", "points"],
+        ["残り時間:", "Time remaining:"],
+        ["推定中...", "Estimating..."],
+        ["現在の処理:", "Current operation:"],
+        ["ファイルを解析しています...", "Analyzing the file..."],
+        ["読み込みを開始します", "Starting load"],
+        ["キャンセル", "Cancel"],
+        ["でもキャンセルできます", "also cancels loading"],
+        ["操作ガイド", "Quick controls"],
+        ["マウス操作", "Mouse controls"],
+        ["見る角度を変える", "Orbit"],
+        ["左ボタンを押しながら動かす", "Drag with the left mouse button"],
+        ["近づく・遠ざかる", "Zoom in or out"],
+        ["ホイールを回す", "Scroll the mouse wheel"],
+        ["位置をずらす", "Pan"],
+        ["右ボタンを押しながら動かす", "Drag with the right mouse button"],
+        ["ショートカットキー", "Keyboard shortcuts"],
+        ["正面から見る", "Front view"],
+        ["視点をリセット", "Reset view"],
+        ["真上から見る", "Top view"],
+        ["全体確認", "Fit to view"],
+        ["詳細データ", "Detailed data"],
+        ["表示/非表示", "Show/hide"],
+        ["ヘルプ表示", "Show help"],
+        ["詳しい操作説明", "Detailed controls"],
+        ["表示の切り替え", "Switch display modes"],
+        ["標高で色分け", "Color by elevation"],
+        ["地形の高低がわかる", "Show terrain elevation"],
+        ["種類で色分け", "Color by classification"],
+        ["地面・植生・水などがわかる", "Show ground, vegetation, water, and other classes"],
+        ["表示制御", "View controls"],
+        ["視点", "View"],
+        ["正面", "Front"],
+        ["真上", "Top"],
+        ["側面", "Side"],
+        ["背面", "Back"],
+        ["2D上面", "2D top"],
+        ["2D正面", "2D front"],
+        ["2D右側", "2D right"],
+        ["3D戻る", "Back to 3D"],
+        ["断面幅", "Section width"],
+        ["groundのみ", "Ground only"],
+        ["2D表示時に幅内の表示点数を確認できます", "See the number of displayed points within this width in 2D view."],
+        ["ズーム", "Zoom"],
+        ["近づく", "Zoom in"],
+        ["引く", "Zoom out"],
+        ["全体表示", "Fit to view"],
+        ["表示モード", "Color mode"],
+        ["推奨表示モード", "Recommended color mode"],
+        ["適用する", "Apply"],
+        ["種類で色分けの凡例", "Classification legend"],
+        ["分類データを解析中...", "Analyzing classification..."],
+        ["距離計測", "Measurement"],
+        ["距離計測を開始", "Start measuring"],
+        ["計測モード終了", "Stop measuring"],
+        ["距離", "Distance"],
+        ["折れ線", "Polyline"],
+        ["面積", "Area"],
+        ["計測", "Measurement"],
+        ["1点目をクリック", "Click the first point"],
+        ["2点目をクリック", "Click the second point"],
+        ["確定", "Finish"],
+        ["1点戻す", "Undo last point"],
+        ["CSVコピー", "Copy CSV"],
+        ["計測を全消去", "Clear measurements"],
+        ["コピー", "Copy"],
+        ["計測履歴", "Measurement history"],
+        ["表示点への計測です。距離はLAS座標単位をm相当として表示し、元データの座標単位に依存します。", "Measurements snap to displayed points. Distance is shown as meter-equivalent and depends on the source coordinate units."],
+        ["スライス表示", "Slicing"],
+        ["スライス表示を開始", "Enable slicing"],
+        ["高さ方向の断面を切り取って内部構造を確認できます", "Use a slice to inspect the interior of the point cloud."],
+        ["詳細設定", "Advanced settings"],
+        ["自動分類", "Auto-classify"],
+        ["地面・植生・建物を高さから自動判別", "Estimate ground, vegetation, and buildings by height"],
+        ["CADモード:", "CAD mode:"],
+        ["Z軸を高さ方向に", "Use Z as the up axis"],
+        ["現在の座標系:", "Current axes:"],
+        ["Y-up（Three.js標準）", "Y-up (Three.js default)"],
+        ["軸:", "Axes:"],
+        ["X=横", "X = width"],
+        ["Y=高さ", "Y = height"],
+        ["Z=奥行", "Z = depth"],
+        ["点サイズ調整", "Point size"],
+        ["統計情報", "Statistics"],
+        ["閉じる", "Close"],
+        ["ファイル / 品質", "File / quality"],
+        ["ファイル名:", "File name:"],
+        ["ファイルサイズ:", "File size:"],
+        ["LAS形式:", "LAS format:"],
+        ["選択品質:", "Selected quality:"],
+        ["読込経路:", "Load strategy:"],
+        ["ピークRAM推定:", "Estimated peak RAM:"],
+        ["座標情報", "Coordinate information"],
+        ["判定:", "Status:"],
+        ["不明", "Unknown"],
+        ["水平CRS:", "Horizontal CRS:"],
+        ["垂直CRS / 高さ基準:", "Vertical CRS / height datum:"],
+        ["EPSG候補:", "EPSG candidates:"],
+        ["単位:", "Units:"],
+        ["注意:", "Notes:"],
+        ["中心緯度経度:", "Center latitude/longitude:"],
+        ["未変換", "Unavailable"],
+        ["X/Y入れ替え候補:", "Alternate X/Y:"],
+        ["地図:", "Map:"],
+        ["地理院地図", "GSI Maps"],
+        ["入れ替え候補:", "Alternate axes:"],
+        ["リンクを開くと緯度経度だけが外部地図へ渡ります。LAS/LAZ本体とファイル名は送信しません。", "Opening a map link shares the latitude and longitude with the map provider. Your file and filename stay local."],
+        ["確認文をコピー", "Copy CRS inquiry"],
+        ["点群 / 分類", "Point cloud / classification"],
+        ["元データ点数:", "Source point count:"],
+        ["表示中点数:", "Displayed points:"],
+        ["表示率:", "Display ratio:"],
+        ["点密度:", "Point density:"],
+        ["地面:", "Ground:"],
+        ["植生:", "Vegetation:"],
+        ["水域:", "Water:"],
+        ["その他:", "Other:"],
+        ["座標 / 品質評価", "Coordinates / quality"],
+        ["X範囲:", "X range:"],
+        ["Y範囲:", "Y range:"],
+        ["Z範囲:", "Z range:"],
+        ["対象面積:", "Area:"],
+        ["分類種類数:", "Classification count:"],
+        ["未分類率:", "Unclassified:"],
+        ["品質評価:", "Quality:"],
+        ["推奨モード:", "Recommended mode:"],
+        ["診断 / 異常候補", "Diagnostics / anomaly candidates"],
+        ["総合目安:", "Overall score:"],
+        ["密度:", "Density:"],
+        ["欠測候補:", "Potential gaps:"],
+        ["Z外れ値:", "Z outliers:"],
+        ["孤立候補:", "Isolated points:"],
+        ["密度スパイク:", "Density spikes:"],
+        ["地表候補:", "Ground candidates:"],
+        ["参考 / 未計算", "Estimate / pending"],
+        ["地表方式:", "Ground method:"],
+        ["表示点ベース", "Based on displayed points"],
+        ["警告コード:", "Warning codes:"],
+        ["配点:", "Score deductions:"],
+        ["警告コードの意味", "Warning code definitions"],
+        ["CRS_MISSING: 座標参照系が不明", "CRS_MISSING: Coordinate reference system unknown"],
+        ["CLASSIFICATION_POOR: 分類品質が低い", "CLASSIFICATION_POOR: Low classification quality"],
+        ["CLASSIFICATION_LIMITED: 分類種類が限定的", "CLASSIFICATION_LIMITED: Limited classification coverage"],
+        ["DISPLAY_RATIO_LOW: 表示率が低い", "DISPLAY_RATIO_LOW: Low display ratio"],
+        ["DENSITY_HOLES: 欠測候補あり", "DENSITY_HOLES: Potential density gaps"],
+        ["DENSITY_SPIKES: 密度スパイクあり", "DENSITY_SPIKES: Density spikes detected"],
+        ["Z_OUTLIERS: Z外れ値あり", "Z_OUTLIERS: Potential Z outliers"],
+        ["ISOLATED_POINTS: 孤立候補あり", "ISOLATED_POINTS: Potential isolated points"],
+        ["このヒートマップは表示点ベースの参考表示です。元LAS/LAZ全点の厳密密度ではありません。", "The heatmap estimates density from displayed points."],
+        ["点群読込後に利用できます", "Available after loading a point cloud"],
+        ["全候補", "All candidates"],
+        ["Z外れ値", "Z outliers"],
+        ["孤立候補", "Isolated points"],
+        ["欠測セル", "Empty cells"],
+        ["密度スパイク", "Density spikes"],
+        ["選択コピー", "Copy selected"],
+        ["要約コピー", "Copy summary"],
+        ["候補サマリ:", "Candidate summary:"],
+        ["断面:", "Section:"],
+        ["2D表示時に更新", "Updates in 2D view"],
+        ["作業メモコピー", "Copy work notes"],
+        ["性能", "Performance"],
+        ["性能スコア:", "Performance score:"],
+        ["メモリ:", "Memory:"],
+        ["読込時間:", "Load time:"],
+        ["処理時間:", "Processing time:"],
+        ["メモリ使用:", "Memory usage:"],
+        ["診断情報をコピー", "Copy diagnostics"],
+        ["表示言語", "Display language"],
+        ["ファイルをドロップして選択", "Drop a file or choose one"],
+        ["LASまたはLAZファイルを選択", "Choose a LAS or LAZ file"],
+        ["正面から見る (R)", "Front view (R)"],
+        ["真上から見る (T)", "Top view (T)"],
+        ["側面から見る", "Side view"],
+        ["背面から見る", "Back view"],
+        ["計測モード", "Measurement mode"],
+        ["CAD系のZ-up座標に切替（Z=高さ）。Three.js標準のY-upと見た目が変わります。", "Switch to CAD axes (Z-up) from the Three.js default (Y-up)."],
+        ["表示点ベース密度ヒートマップ", "Density heatmap for displayed points"],
+        ["密度ヒートマップ overlay 透明度", "Density heatmap overlay opacity"],
+        ["密度ヒートマップ凡例", "Density heatmap legend"],
+        ["異常候補フィルター", "Anomaly candidate filter"],
+        ["異常候補一覧", "Anomaly candidates"],
+        ["断面プロファイル", "Section profile"],
+        ["解除する", "Clear"],
+        ["強度表示", "Intensity colors"],
+        ["RGB表示", "RGB colors"],
+        ["RGB情報が利用可能で、最も自然な表示が可能です", "The file contains RGB values for natural colors."],
+        ["強度情報による表示が適しています", "The file contains intensity values."],
+        ["地形の高低差を確認するのに最適です", "Elevation colors help show differences in terrain height."],
+        ["ホームに戻る", "Return home"],
+        ["ファイル選択に戻る", "Return to file selection"],
+        ["サンプルファイル選択", "Choose a sample file"],
+        ["テスト用小規模モデル", "Small test model"],
+        ["動作確認用の汎用小規模3Dモデルです（5万点）", "Small synthetic 3D model (50,000 points)"],
+        ["GitHub Pages で即確認できる軽量な合成 LAS サンプルです（4,096点）", "Bundled synthetic LAS sample (4,096 points)"],
+        ["スライス設定", "Slice settings"],
+        ["点群を切断して断面や内部構造を確認できます", "Slice the point cloud to inspect cross-sections and internal features."],
+        ["X軸で切断（左右方向）", "Slice on X (left/right)"],
+        ["Y軸で切断（高さ方向）", "Slice on Y (height)"],
+        ["Z軸で切断（前後方向）", "Slice on Z (front/back)"],
+        ["最小", "Min"],
+        ["最大", "Max"],
+        ["チェックを入れてスライダーを動かしてください", "Enable an axis and move its slider."],
+        ["2D断面ビューを開く", "Open 2D slice view"],
+        ["リセット", "Reset"],
+        ["ファイルが選択されていません", "Choose a file first."],
+        ["点群データが読み込まれていません", "Load a point cloud first."],
+        ["スライスを有効にしてください（X・Y・Z軸のチェックボックスをオン）", "Enable slicing on at least one axis."],
+        ["読み込みをキャンセルしました", "Loading canceled."],
+        ["ファイル読み込み準備中...", "Preparing to read the file..."],
+        ["読み込み完了!", "Load complete!"],
+        ["ヘッダー解析中...", "Reading the header..."],
+        ["LAZヘッダー解析中...", "Reading the LAZ header..."],
+        ["点データ解析中...", "Decoding point records..."],
+        ["点群生成中...", "Building the point cloud..."],
+        ["表示設定中...", "Preparing the view..."],
+        ["ファイルを選択してください。", "Choose a file."],
+        ["コピーに失敗しました", "Copy failed."],
+        ["計測完了", "Measurement complete"],
+        ["計測結果を履歴に追加しました", "Measurement added to history."],
+        ["計測結果をコピーしました", "Measurement copied."],
+        ["計測CSVをコピーしました", "Measurement CSV copied."],
+        ["計測履歴を削除しました", "Measurement removed."],
+        ["ファイル検証エラー", "Invalid file"],
+        ["ファイル選択エラー", "File selection failed"],
+        ["ファイル読み込み失敗", "Could not read the file"],
+        ["読み込み失敗", "Load failed"],
+        ["LASファイル形式ではありません", "Invalid LAS signature."],
+        ["ファイルサイズ警告", "File size warning"],
+        ["LOW品質で試す", "Try Low quality"],
+        ["このファイルは読み込めません。別のファイルを選択してください。", "Choose another file to continue."],
+        ["エラー", "Error"],
+        ["統計非表示", "Hide statistics"],
+        ["サンプル生成", "Sample data"],
+        ["LAS chunked 読み込み", "Chunked LAS read"],
+        ["LAZ chunked + WASM ヒープ", "Chunked LAZ read into WASM"],
+        ["ヘッダー先読み後、点データを chunk 単位で解析します。", "Reads the header first, then decodes point records in chunks."],
+        ["圧縮データを chunk ごとに WASM ヒープへ転送して展開します。", "Transfers compressed data to WASM memory in chunks and decompresses it there."],
+        ["CRS 不明のため、地球上の位置は特定できません", "The geographic location is unavailable because the CRS is unknown."],
+        ["位置特定に使える可能性があります", "May be usable for locating the point cloud."],
+        ["平面位置は確認できますが、高さ基準は不明です", "Horizontal location is available. The height datum is unknown."],
+        ["水平位置と高さ基準を確認できます", "Horizontal location and height datum are available."],
+        ["WKTなし", "No WKT"],
+        ["WKTあり", "WKT available"],
+        ["GeoTIFFなし", "No GeoTIFF"],
+        ["GeoTIFFあり", "GeoTIFF available"],
+        ["Math Transform WKTあり", "Math Transform WKT available"],
+        ["座標範囲なし", "missing bounds"],
+        ["水平EPSGなし", "missing horizontal EPSG code"],
+        ["EPSG候補が複数", "multiple EPSG candidates"],
+        ["未対応EPSG", "unsupported EPSG code"],
+        ["変換ライブラリ未読込", "conversion library unavailable"],
+        ["変換結果不正", "invalid conversion result"],
+        ["変換失敗", "conversion failed"],
+        ["理由不明", "unknown reason"],
+        ["なし", "None"],
+        ["良好", "Good"],
+        ["限定的", "Limited"],
+        ["不良", "Poor"],
+        ["p05推定", "5th-percentile estimate"],
+        ["CRS確認", "Check CRS"],
+        ["大きな注意なし", "No major warnings"],
+        ["2D断面ビュー", "2D slice view"],
+        ["マウス座標:", "Pointer coordinates:"],
+        ["スライス厚さ:", "Slice thickness:"],
+        ["自動調整", "Auto-adjust"],
+        ["点サイズ:", "Point size:"],
+        ["画像保存", "Save image"],
+        ["点数", "Point count"],
+        ["区間数", "Segments"],
+        ["累計3D距離", "Total 3D distance"],
+        ["累計水平距離", "Total horizontal distance"],
+        ["始点終点高低差", "Endpoint elevation change"],
+        ["平均勾配", "Average slope"],
+        ["XY投影面積", "XY projected area"],
+        ["周長", "Perimeter"],
+        ["水平距離", "Horizontal distance"],
+        ["水平", "Horizontal"],
+        ["高さ差", "Elevation difference"],
+        ["勾配", "Slope"],
+        ["点数:", "Point count:"],
+        ["スケール:", "Scale:"],
+        ["2D断面で更新", "Updates in 2D view"],
+        ["面積はXY投影面積です。斜面表面積ではありません。", "Area is projected onto the XY plane."],
+        ["無効なファイルオブジェクト", "Invalid file."],
+        ["ファイル名が無効です", "Invalid file name."],
+        ["LASまたはLAZファイルのみ対応しています", "Only LAS and LAZ files are supported."],
+        ["ファイルサイズが無効です", "The file is empty or its size is invalid."],
+        ["ファイルを選択してください", "Choose a file."],
+        ["品質レベルを選択してください。", "Choose a quality level."],
+        ["3D表示の初期化に失敗しました。ブラウザを更新してみてください。", "Unable to initialize 3D rendering. Try updating your browser."],
+        ["メモリ不足です。LOW品質を選択するか、ブラウザを再起動してください。", "Out of memory. Select Low quality or restart your browser."],
+        ["有効な点データが見つかりませんでした", "No valid points were found."],
+        ["データが大きすぎます。より小さなファイルを使用してください。", "The data is too large. Choose a smaller file."],
+        ["品質選択画面への移行に失敗しました", "Unable to open quality settings."],
+        ["ファイル選択でエラーが発生しました", "File selection failed."],
+        ["初期化エラーが発生しました。ページを再読み込みしてください。", "Initialization failed. Reload the page."],
+        ["診断情報をコピーしました。Issueに貼り付けできます。", "Diagnostics copied. You can paste them into an issue."],
+        ["作業メモをコピーしました。現場確認メモに貼り付けできます。", "Work notes copied."],
+        ["座標系の確認文をコピーしました", "CRS inquiry copied."],
+        ["コピーできる計測結果がありません", "There is no measurement to copy."],
+        ["計測履歴をコピーしました", "Measurement history copied."],
+        ["計測履歴CSVをコピーしました", "Measurement history CSV copied."],
+        ["取り消せる計測点がありません", "There is no point to undo."],
+        ["点群表示を終了しますか？", "Close the current point cloud?"],
+        ["初期化中...", "Initializing..."],
+        ["3D環境初期化中...", "Initializing 3D rendering..."],
+        ["Three.js初期化中...", "Initializing Three.js..."],
+        ["LAZデコーダ初期化中...", "Initializing the LAZ decoder..."],
+        ["ファイル読み込み中...", "Reading the file..."],
+        ["ファイル読み込みに失敗しました", "Could not read the file."],
+        ["ファイル読み込み結果が不正です", "The file could not be read correctly."],
+        ["ファイルサイズを確認できませんでした。", "Could not determine the file size."],
+        ["処理中...", "Processing..."],
+        ["不明なファイル", "Unknown file"],
+        ["有効な点データが見つかりません（ヘッダー情報）", "The header reports no valid points."],
+        ["この位置に点がありません", "No points at this position"],
+        ["スライス厚さを増やしてください", "Increase the slice thickness"],
+        ["現在の点群データは破棄されます。ファイル選択画面に戻りますか？", "Return to file selection and close the current point cloud?"],
+        ["分類データが不適切です", "Poor classification data"],
+        ["分類データが限定的です", "Limited classification data"],
+        ["検出された問題：", "Detected issues:"],
+        ["検出された制限：", "Detected limitations:"],
+        ["• 種類で色分けでは、ほぼ単色（グレー）で表示されます", "• Classification colors will be almost entirely gray."],
+        ["• 種類で色分けでは単色で表示されます", "• Classification mode uses a single color."],
+        ["• 地形の詳細を確認するには適していません", "• Terrain details may be hard to see."],
+        ["標高で色分けまたは強度表示の使用を強くお勧めします。", "Use elevation colors to inspect the terrain."],
+        ["標高で色分けでの地形確認をお勧めします。", "Use elevation colors to inspect the terrain."],
+        ["データが読み込まれていません", "No data loaded."],
+        ["分類データがありません", "No classification data."],
+        ["未作成", "Created, never classified"],
+        ["未分類", "Unclassified"],
+        ["地面", "Ground"],
+        ["低植生", "Low vegetation"],
+        ["中植生", "Medium vegetation"],
+        ["高植生", "High vegetation"],
+        ["建物", "Building"],
+        ["低ノイズ", "Low noise"],
+        ["予約済み", "Reserved"],
+        ["水面", "Water"],
+        ["レール", "Rail"],
+        ["道路面", "Road surface"],
+        ["ワイヤ-保護", "Shield wire"],
+        ["ワイヤ-導体", "Conductor wire"],
+        ["送電塔", "Transmission tower"],
+        ["ワイヤ-接続", "Wire connector"],
+        ["橋梁", "Bridge deck"],
+        ["高ノイズ", "High noise"],
+        ["LAZ は内部デコーダ用メモリを使うため、LAS より安全域が狭い形式です。", "LAZ needs extra decoder memory, so it has less headroom than LAS."],
+        ["LAZ は内部デコーダ保持ぶんの安全域が狭いです。", "LAZ needs extra decoder memory."],
+      ]);
+
+      // Translate the UI at the DOM boundary. Data, diagnostics payloads,
+      // point decoding and rendering coordinates keep their original values.
+      const englishUiPatterns = [
+        [/^断面対象: ([\d,]+)点$/, "Section: $1 points"],
+        [/^幅 ([\d.]+)m相当$/, "Width: $1 m equivalent"],
+        [/^([\d,]+)点 \(([\d.]+)%\)$/, "$1 points ($2%)"],
+        [/^適度な分類（(\d+)種類）データが利用可能$/, "$1 usable classes are available."],
+        [/^多様な分類（(\d+)種類）と高品質データ（未分類([\d.]+)%）$/, "$1 classes, with only $2% unclassified."],
+        [/^(標高で色分け|種類で色分け|RGB表示|強度表示)を適用中$/, (_, mode) =>
+          `Active mode: ${translateAppUi(mode)}`],
+        [/^(標高で色分け|種類で色分け|RGB表示|強度表示)を(強く)?お勧めします$/, (_, mode, strong) =>
+          `${strong ? "Strong recommendation" : "Recommended mode"}: ${translateAppUi(mode)}`],
+        [/^進捗 (\d+%): (.+)$/, (_, percent, status) => `Progress ${percent}: ${translateAppUi(status)}`],
+        [/^推定ピークRAM 約(.+)$/, "Estimated peak RAM: approx. $1"],
+        [/^計測用座標 約(.+)保持$/, "Measurement coordinates: approx. $1"],
+        [/^適切なファイルサイズです \((.+)\)。$/, "File size is within limits ($1)."],
+        [/^(LAS|LAZ|ファイル) ファイルサイズが大きすぎます \((.+)\)。この形式は最大 (.+) まで対応しています。(.*)$/, (_, kind, size, limit, hint) =>
+          `${kind === "ファイル" ? "File" : kind} exceeds the ${limit} limit (${size}).${translateAppUi(hint)}`],
+        [/^非常に大きな (LAS|LAZ|ファイル) ファイルです \((.+)\)。LOW品質から始めることを強く推奨します。(.*)$/, (_, kind, size, hint) =>
+          `Very large ${kind === "ファイル" ? "input" : kind + " file"} (${size}). Start with Low quality.${translateAppUi(hint)}`],
+        [/^大容量の (LAS|LAZ|ファイル) ファイルです \((.+)\)。LOW〜MEDIUM品質での開始を推奨します。(.*)$/, (_, kind, size, hint) =>
+          `Large ${kind === "ファイル" ? "input" : kind + " file"} (${size}). Start with Low or Medium quality.${translateAppUi(hint)}`],
+        [/^大きな (LAS|LAZ|ファイル) ファイルです \((.+)\)。品質設定を慎重に選択してください。$/, (_, kind, size) =>
+          `Large ${kind === "ファイル" ? "input" : kind + " file"} (${size}). Choose the quality level carefully.`],
+        [/^ファイル読み込みがタイムアウトしました（(\d+)秒）$/, "File read timed out after $1 seconds."],
+        [/^タイプ(\d+)$/, "Class $1"],
+        [/^• 未分類データが ([\d.]+)% を占めています$/, "• $1% of points are unclassified."],
+        [/^• 有効な分類は (\d+) 種類のみです$/, "• Valid classes: $1."],
+        [/^• 全ての点が同じ分類（(\d+)）です$/, "• All points belong to class $1."],
+        [/^~(\d+)MB · ~(\d+)秒$/, "~$1 MB · ~$2 s"],
+        [/^([\d.]+)秒$/, "$1 s"],
+        [/^(LOW|MEDIUM|HIGH|MAX(?:IMUM)?) \(\d+万点\)$/, "$1"],
+        [/^([\d,.]+)%（([\d,]+)点 \/ ([\d,]+)点）$/, "$1% ($2 / $3 points)"],
+        [/^([\d,]+)点 \/ ([\d,]+)点 \(([\d.]+)%\)$/, "$1 / $2 points ($3%)"],
+        [/^最大 ([\d,]+)点$/, "Up to $1 points"],
+        [/^危険度 (低|注意|高|非常に高い) \/ 推定ピークRAM 約(.+)$/, (_, risk, memory) =>
+          `Risk: ${{ 低: "low", 注意: "moderate", 高: "high", 非常に高い: "very high" }[risk]} / Estimated peak RAM: approx. ${memory}`],
+        [/^目標(\d+)FPS基準で (.+?) を推奨（推定 (\d+)FPS）。(?:ただし現在は手動選択 (.+?) を維持しています。)?判定内訳: FPS候補=(\w+) \/ スコア上限=(\w+) \/ ハード上限=(\w+)$/, (_, target, quality, estimate, manual, fps, score, hardware) =>
+          `Recommended: ${translateAppUi(quality)} (estimated ${estimate} FPS, target ${target} FPS). ${manual ? `Keeping your selection: ${translateAppUi(manual)}. ` : ""}FPS candidate: ${fps} / score cap: ${score} / hardware cap: ${hardware}`],
+        [/^未変換（([^）]+)）$/, (_, reason) => `Unavailable (${translateAppUi(reason)})`],
+        [/^平均 ([\d.]+)点\/m²$/, "Mean: $1 points/m²"],
+        [/^([\d,]+)点$/, "$1 points"],
+        [/^([\d,]+)セル$/, "$1 cells"],
+        [/^([\d,]+)コア$/, "$1 cores"],
+        [/^参考 \/ (\w+) \/ 有効([\d.]+)%$/, "Estimate / $1 confidence / $2% valid"],
+        [/^表示点ベース \/ (.+)$/, (_, warnings) =>
+          `Based on displayed points / ${warnings.split(", ").map(translateAppUi).join(", ")}`],
+        [/^信(\d+)\/基(\d+)\/密(\d+)\/分(\d+)\/地(\d+)\/測(\d+)\/異(\d+)$/, "Reliability $1 / Basics $2 / Density $3 / Classification $4 / Terrain $5 / Measurement $6 / Anomalies $7"],
+        [/^(#\d+) 近傍(\d+)$/, "$1 · $2 neighbors"],
+        [/^(r\d+ c\d+) ([\d,]+)点$/, "$1 · $2 points"],
+        [/^(全候補|\w+) ([\d,]+)件$/, (_, kind, count) => `${translateAppUi(kind)}: ${count}`],
+        [/^([\d,]+)点 \/ ground ([\d.]+)% \/ Z幅 ([\d.]+)m相当$/, "$1 points / $2% ground / Z range $3 m equivalent"],
+        [/^([XYZ]{2})平面 \(([XYZ])軸スライス\) @ (.+)$/, "$1 plane ($2 slice) @ $3"],
+        [/^マウス座標: (.+)$/, "Pointer coordinates: $1"],
+        [/^点数: ([\d,]+)$/, "Point count: $1"],
+        [/^スケール: (.+)$/, "Scale: $1"],
+        [/^ファイルサイズが大きすぎます \((.+)超\)$/, "File exceeds the $1 limit."],
+        [/^推定表示: (.+)$/, (_, counts) => `Estimated display: ${translateAppUi(counts)}`],
+        [/^最大表示点数: ([\d,]+)点$/, "Display limit: $1 points"],
+        [/^VRAM目安:\s*(.+)$/, "Estimated VRAM: $1"],
+        [/^([\d.]+)\s*ピクセル$/, "$1 px"],
+        [/^(-?[\d.]+)\s*(m²?)相当$/, "$1 $2 equivalent"],
+        [/^(距離|折れ線|面積) (-?[\d.]+)\s*(m²?)相当$/, (_, mode, value, unit) =>
+          `${englishUiText.get(mode)} ${value} ${unit} equivalent`],
+        [/^(水平|高さ差|周長) (-?[\d.]+) m相当$/, (_, metric, value) =>
+          `${englishUiText.get(metric)} ${value} m equivalent`],
+        [/^(勾配|平均勾配) ([+-]?[\d.]+ %|-)$/, (_, metric, value) =>
+          `${englishUiText.get(metric)} ${value}`],
+        [/^ファイルサイズ: (.+)$/, "File size: $1"],
+        [/^数値範囲: (.+)$/, "Value range: $1"],
+        [/^約\s*(\S.*)$/, (_, detail) => `Approx. ${translateAppUi(detail)}`],
+        [/^([\d,.]+)点\/m²$/, "$1 points/m²"],
+        [/^([\d,]+)種類$/, "$1 classes"],
+        [/^(距離|折れ線|面積|計測): 1点目をクリック$/, (_, mode) =>
+          `${englishUiText.get(mode)}: Click the first point`],
+        [/^(距離|折れ線|面積): (\d+)点選択中。確定またはEnterで保存$/, (_, mode, count) =>
+          `${englishUiText.get(mode)}: ${count} points selected. Use Finish or Enter to save.`],
+        [/^(距離|折れ線|面積): (\d+)点選択中。点を追加してください$/, (_, mode, count) =>
+          `${englishUiText.get(mode)}: ${count} points selected. Add another point.`],
+        [/^([\s\S]*?)読み込み完了(?:\s*[（(]([\d,]+)点[）)])?$/, (_, name, count) =>
+          `Load complete${name.trim() ? `: ${name.trim()}` : ""}${count ? ` (${count} points)` : ""}`],
+        [/^(ファイル検証エラー|ファイル選択エラー|ファイル読み込み失敗|読み込み失敗|エラー):\s*(.+)$/, (_, kind, detail) =>
+          `${englishUiText.get(kind)}: ${translateAppUi(detail)}`],
+      ];
+      const uiTextAttributes = ["title", "aria-label", "placeholder", "alt"];
+      const untranslatedUiSelector = "script, style, textarea, [data-pcw-source-text]";
+      const originalUiText = new WeakMap();
+      const originalUiAttributes = new WeakMap();
+      let englishUiObserver;
+
+      function translateAppUi(value) {
+        const text = value.trim().replace(/\s+/g, " ");
+        if (!/[\u3040-\u30ff\u3400-\u9fff]/.test(text)) return value;
+        const translation = englishUiText.get(text) ||
+          (text.startsWith(MEASUREMENT_NOTE + " ")
+            ? englishUiText.get(MEASUREMENT_NOTE) + " " + englishUiText.get(MEASUREMENT_AREA_NOTE)
+            : null);
+        if (translation) return value.replace(/\S[\s\S]*\S|\S/, translation);
+        for (const [pattern, replacement] of englishUiPatterns) {
+          if (pattern.test(text)) {
+            return value.replace(/\S[\s\S]*\S|\S/, () => text.replace(pattern, replacement));
+          }
+        }
+        const parts = value.split(" / ");
+        if (parts.length > 1) return parts.map(translateAppUi).join(" / ");
+        return value;
+      }
+
+      function appUiText(value) {
+        return document.documentElement?.lang === "en" ? translateAppUi(value) : value;
+      }
+
+      function updateLocalizedUi(root, english) {
+        if (root.nodeType === Node.TEXT_NODE) {
+          if (root.parentElement?.closest(untranslatedUiSelector)) return;
+          const previous = originalUiText.get(root);
+          if (previous && root.data === previous.translation) {
+            if (!english) root.data = previous.source;
+            return;
+          }
+          const translated = english ? translateAppUi(root.data) : root.data;
+          if (translated !== root.data) {
+            originalUiText.set(root, { source: root.data, translation: translated });
+            root.data = translated;
+          }
+          return;
+        }
+        if (root.nodeType !== Node.ELEMENT_NODE ||
+            root.closest(untranslatedUiSelector)) return;
+        updateLocalizedUiAttributes(root, english);
+        for (const child of root.childNodes) updateLocalizedUi(child, english);
+      }
+
+      function updateLocalizedUiAttributes(element, english) {
+        if (element.closest(untranslatedUiSelector)) return;
+        let originals = originalUiAttributes.get(element);
+        for (const name of uiTextAttributes) {
+          const value = element.getAttribute(name);
+          if (value === null) continue;
+          const previous = originals?.get(name);
+          if (previous && value === previous.translation) {
+            if (!english) element.setAttribute(name, previous.source);
+            continue;
+          }
+          const translated = english ? translateAppUi(value) : value;
+          if (translated === value) continue;
+          if (!originals) {
+            originals = new Map();
+            originalUiAttributes.set(element, originals);
+          }
+          originals.set(name, { source: value, translation: translated });
+          element.setAttribute(name, translated);
+        }
+      }
+
+      function applyAppUiLanguage(language) {
+        if (!document.body || typeof MutationObserver === "undefined") return;
+        englishUiObserver?.disconnect();
+        const english = language === "en";
+        updateLocalizedUi(document.body, english);
+        if (!english) return;
+        englishUiObserver ??= new MutationObserver((records) => {
+          for (const record of records) {
+            if (record.type === "attributes") {
+              updateLocalizedUiAttributes(record.target, true);
+            } else if (record.type === "characterData") {
+              updateLocalizedUi(record.target, true);
+            } else {
+              for (const node of record.addedNodes) updateLocalizedUi(node, true);
+            }
+          }
+        });
+        englishUiObserver.observe(document.body, {
+          childList: true,
+          characterData: true,
+          subtree: true,
+          attributes: true,
+          attributeFilter: uiTextAttributes,
+        });
+      }
+
       function normalizeLanguage(value) {
         if (typeof value !== "string") return "ja";
         return SUPPORTED_LANGUAGES.includes(value) ? value : "ja";
@@ -9699,6 +10283,9 @@
       function setAppLanguage(value, options = { persist: true }) {
         const language = normalizeLanguage(value);
         document.documentElement.lang = language;
+        applyAppUiLanguage(language);
+        const demoButton = document.getElementById("englishDemoButton");
+        if (demoButton) demoButton.hidden = language !== "en";
 
         const selector = document.getElementById("languageSelector");
         if (selector && selector.value !== language) {
@@ -9721,7 +10308,12 @@
         } catch (error) {
           console.warn("言語設定の読み込みに失敗:", error);
         }
-        setAppLanguage(storedLanguage, { persist: false });
+        const queryLanguage = typeof URLSearchParams === "function"
+          ? new URLSearchParams(window.location?.search || "").get("lang")
+          : null;
+        const hasLanguageOverride = SUPPORTED_LANGUAGES.includes(queryLanguage) || queryLanguage === "zh";
+        const language = hasLanguageOverride ? queryLanguage : storedLanguage;
+        setAppLanguage(language, { persist: false });
       }
 
       function isHighEndForMaximum(specs, benchmarkFPS, score) {
@@ -10788,7 +11380,19 @@
         document.getElementById("fileInfo").style.display = "none";
       }
 
-      window.loadSampleData = function () {
+      const demoSample = {
+        path: "./demo/pointcloud-demo-sample.las",
+        name: "Pages Demo Sample",
+        size: 114915,
+        pointCount: 4096,
+      };
+
+      window.loadSampleData = function (sample) {
+        if (sample === "demo") {
+          window.selectSampleFile(demoSample.path, demoSample.name, demoSample.size, demoSample.pointCount);
+          window.proceedToQualitySelection();
+          return;
+        }
         console.log("サンプルデータ選択");
 
         // サンプルファイル選択モーダルを表示
@@ -10809,7 +11413,7 @@
                                     <div class="sample-file-title">テスト用小規模モデル</div>
                                     <div class="sample-file-desc">動作確認用の汎用小規模3Dモデルです（5万点）</div>
                                 </div>
-                                <div class="sample-file-item" onclick="selectSampleFile('./demo/pointcloud-demo-sample.las', 'Pages Demo Sample', 114915, 4096)">
+                                <div class="sample-file-item" onclick="selectSampleFile('${demoSample.path}', '${demoSample.name}', ${demoSample.size}, ${demoSample.pointCount})">
                                     <div class="sample-file-title">Pages Demo Sample</div>
                                     <div class="sample-file-desc">GitHub Pages で即確認できる軽量な合成 LAS サンプルです（4,096点）</div>
                                 </div>
@@ -18310,12 +18914,12 @@
           ctx.font = "14px Arial";
           ctx.textAlign = "center";
           ctx.fillText(
-            "この位置に点がありません",
+            appUiText("この位置に点がありません"),
             canvas.width / 2,
             canvas.height / 2 - 10,
           );
           ctx.fillText(
-            "スライス厚さを増やしてください",
+            appUiText("スライス厚さを増やしてください"),
             canvas.width / 2,
             canvas.height / 2 + 10,
           );
@@ -18385,8 +18989,8 @@
         ctx.fillStyle = "#333";
         ctx.font = `${Math.max(12, canvas.width / 50)}px Arial`;
         ctx.textAlign = "left";
-        ctx.fillText(`点数: ${projectedPoints.length}`, 15, 25);
-        ctx.fillText(`スケール: ${scale.toFixed(2)}x`, 15, 45);
+        ctx.fillText(appUiText(`点数: ${projectedPoints.length}`), 15, 25);
+        ctx.fillText(appUiText(`スケール: ${scale.toFixed(2)}x`), 15, 45);
 
         // スケールバーを表示
         const scaleBarLength = 100;

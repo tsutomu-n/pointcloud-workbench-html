@@ -1,6 +1,6 @@
 # PointCloudWorkbench
 
-Last updated: 2026-06-02_11:41 JST
+timestamp="2026-11-20(金)_15:38 JST"
 
 Browser-native LAS/LAZ point cloud workbench delivered as a single HTML file.
 
@@ -9,9 +9,9 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 ## Live Demo
 
 - Landing Page: `https://tsutomu-n.github.io/pointcloud-workbench-html/`
-- Launch App Directly: `https://tsutomu-n.github.io/pointcloud-workbench-html/PointCloudWorkbench.html`
+- [Launch the English demo](https://tsutomu-n.github.io/pointcloud-workbench-html/PointCloudWorkbench.html?lang=en)
 - Bundled Sample LAS: `https://tsutomu-n.github.io/pointcloud-workbench-html/demo/pointcloud-demo-sample.las`
-- The landing page can adapt to your browser language (`ja` / `en` / `zh`) and still exposes a manual language switcher.
+- The landing page passes the selected language to the app. The app offers Japanese and English, with Japanese as the fallback for Chinese landing-page links.
 
 ## Visual Tour
 
@@ -44,10 +44,10 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 
 ## Try It In 60 Seconds
 
-1. Open the GitHub Pages landing page or launch the app directly.
-2. In the app, choose `サンプルデータを使用` and select the bundled Pages sample, or load your own `.las` / `.laz`.
-3. Review the pre-flight panel for load path, risk level, and estimated display ratio.
-4. Inspect the cloud in 3D / 2D, measure displayed-point distances, try slice mode, and review statistics and classification output.
+1. Open the English demo in Chrome or Edge.
+2. Select **Load demo sample** to open quality settings for the bundled 4,096-point LAS file. **Choose file** accepts your own `.las` or `.laz`.
+3. Review the load strategy, risk estimate, and display ratio, then select **Start loading**.
+4. Try **2D top**, **Start measuring**, **Enable slicing**, and **Statistics**.
 
 ## Key Capabilities
 
@@ -133,6 +133,7 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 - Restart-time minimum verification order:
   - `bun test scripts/pointcloud-workbench.test.js`
   - `bun scripts/check-readme.js`
+- With Playwright installed, run `PCW_CHROME=/path/to/chrome node scripts/e2e/run-english-demo-smoke.mjs` to verify the English sample workflow locally. Omit `PCW_CHROME` to use Playwright’s bundled Chromium.
   - `bunx --package playwright node scripts/e2e/run-diagnostics-smoke.mjs --las samples/test.las --laz samples/test.laz`
 - `bun test scripts/pointcloud-workbench.test.js scripts/documentation-consistency.test.js scripts/gitignore.test.js scripts/repository-metadata.test.js scripts/public-repo-readiness.test.js scripts/landing-page-i18n.test.js`
 - `bun scripts/check-readme.js`

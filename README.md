@@ -1,6 +1,6 @@
 # PointCloudWorkbench
 
-最終更新: 2026-06-02_11:41 JST
+timestamp="2026-11-20(金)_15:38 JST"
 
 ブラウザーで動く LAS/LAZ 点群ワークベンチです。単一の HTML ファイルとして配布します。
 
@@ -12,6 +12,7 @@
 
 - ランディングページ: `https://tsutomu-n.github.io/pointcloud-workbench-html/`
 - アプリを直接開く: `https://tsutomu-n.github.io/pointcloud-workbench-html/PointCloudWorkbench.html`
+- [審査用の英語デモ](https://tsutomu-n.github.io/pointcloud-workbench-html/PointCloudWorkbench.html?lang=en) は **Load demo sample → Start loading** で同梱点群を表示します。
 - 同梱サンプル LAS: `https://tsutomu-n.github.io/pointcloud-workbench-html/demo/pointcloud-demo-sample.las`
 - ランディングページはブラウザ言語（`ja` / `en` / `zh`）に合わせて表示を切り替えられ、手動の言語切替もできます。
 

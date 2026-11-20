@@ -1164,6 +1164,10 @@
         setLandingHtml("docsNote", copy.docsNote);
         setLandingText("footerLicense", copy.footerLicense);
 
+        for (const link of document.querySelectorAll?.('a[href^="./PointCloudWorkbench.html"]') || []) {
+          link.setAttribute("href", `./PointCloudWorkbench.html?lang=${normalized}`);
+        }
+
         const selector = document.getElementById("landingLanguageSelector");
         if (selector) {
           selector.value = normalized;
