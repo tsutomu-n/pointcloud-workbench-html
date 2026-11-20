@@ -1,10 +1,10 @@
 # River and bridge demo
 
-timestamp="2026-11-20(金)_23:40 JST"
+timestamp="2026-11-21(土)_00:04 JST"
 
-[English README](../README.md) · [日本語ガイド](./quickstart.ja.md)
+[English README](../README.md) · [日本語ガイド](./quickstart.ja.md) · [中文快速入门](./quickstart.zh.md)
 
-Open the [river and bridge demo](https://tsutomu-n.github.io/pointcloud-workbench-html/PointCloudWorkbench.html?lang=en&demo=river) in Chrome or Edge. The app loads a synthetic point cloud in local metre coordinates. On a phone in portrait, tap **Tools** above the model to open the sidebar.
+Open the [river and bridge demo](https://tsutomu-n.github.io/pointcloud-workbench-html/PointCloudWorkbench.html?lang=en&demo=river) in Chrome or Edge. The app loads a synthetic point cloud in local metre coordinates. Use the upper-right language selector to switch between English, Japanese, and Simplified Chinese. On a phone in portrait, tap **Tools** above the model to open the sidebar.
 
 1. Choose **See the bridge cross-section**. Change the thickness to see how the band and its point count change.
 2. Choose **Measure bridge** and select **A** and **B**. The expected horizontal distance is 60 m. Use **Copy CSV** to keep the result from this session.

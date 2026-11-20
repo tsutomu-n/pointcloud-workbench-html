@@ -73,6 +73,7 @@ function buildContext({
   const nodes = {
     landingLanguageSelector: selector,
     themeToggle,
+    docThreeTitle: { ...textNode(), href: "" },
   };
 
   const documentElement = {
@@ -201,7 +202,7 @@ test("landing page normalizes language tags and persists only explicit selection
 });
 
 test("landing app links preserve the sample and all three languages", () => {
-  const { api, appLinks } = loadApi();
+  const { api, appLinks, nodes } = loadApi();
 
   for (const language of ["zh", "ja", "en"]) {
     api.applyLandingLanguage(language);
@@ -210,6 +211,9 @@ test("landing app links preserve the sample and all three languages", () => {
       `./PointCloudWorkbench.html?lang=${language}&demo=river`,
       `./PointCloudWorkbench.html?lang=${language}`,
     ]);
+    expect(nodes.docThreeTitle.href).toBe(
+      `https://github.com/tsutomu-n/pointcloud-workbench-html/blob/main/docs/quickstart.${language}.md`,
+    );
   }
 });
 

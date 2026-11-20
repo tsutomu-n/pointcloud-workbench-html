@@ -1,10 +1,12 @@
 # PointCloudWorkbench
 
-[日本語](./docs/README.ja.md) · [Project website](https://tsutomu-n.github.io/pointcloud-workbench-html/)
+[日本語](./docs/README.ja.md) · [中文快速入门](./docs/quickstart.zh.md) · [Project website](https://tsutomu-n.github.io/pointcloud-workbench-html/)
 
 Inspect LAS and LAZ point clouds in your browser. Use 3D and 2D views, cross-sections, measurements, and density overlays to explore your data. No installation or build step is required.
 
 ## Quick start
+
+The app supports Japanese, English, and Simplified Chinese. Select a language in the upper-right corner or open the [Chinese river demo](https://tsutomu-n.github.io/pointcloud-workbench-html/PointCloudWorkbench.html?lang=zh&demo=river).
 
 - [Try the river and bridge sample](https://tsutomu-n.github.io/pointcloud-workbench-html/PointCloudWorkbench.html?lang=en&demo=river) in the latest Chrome or Edge. Open the bridge cross-section, measure between A and B, or use **Explore density** to find the gap on the right bank.
 - [Open your own LAS or LAZ file](https://tsutomu-n.github.io/pointcloud-workbench-html/PointCloudWorkbench.html?lang=en). Select a file, review the estimated memory use and display ratio, then choose a quality preset.

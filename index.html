@@ -771,10 +771,9 @@
               </span>
             </div>
             <div class="doc-item">
-              <strong id="docThreeTitle">README.md</strong>
+              <strong><a id="docThreeTitle" href="https://github.com/tsutomu-n/pointcloud-workbench-html/blob/main/docs/quickstart.en.md">English demo guide</a></strong>
               <span id="docThreeDesc">
-                Public entry document with live demo links, constraints, and workflow
-                summary.
+                Try cross-sections, measurements, and density with the river sample.
               </span>
             </div>
             <div class="doc-item">
@@ -863,9 +862,8 @@
           docTwoTitle: "demo/river-bridge-demo.las",
           docTwoDesc:
             "River and bridge sample for cross-sections and measurements.",
-          docThreeTitle: "README.md",
-          docThreeDesc:
-            "Public entry document with live demo links, constraints, and workflow summary.",
+          docThreeTitle: "English demo guide",
+          docThreeDesc: "Try cross-sections, measurements, and density with the river sample.",
           docFourTitle: "scripts/*.test.js",
           docFourDesc:
             "Regression coverage for runtime behavior, repo metadata, and public presentation.",
@@ -917,8 +915,8 @@
           docOneDesc: "単一 HTML の実行本体。ビルド工程はありません。",
           docTwoTitle: "demo/river-bridge-demo.las",
           docTwoDesc: "断面確認と計測を試すための河川と橋の LAS サンプルです。",
-          docThreeTitle: "README.md",
-          docThreeDesc: "公開向けの入口文書。Live Demo、制約、開発情報をまとめています。",
+          docThreeTitle: "クイックスタート",
+          docThreeDesc: "河川サンプルの操作と手元のファイルの開き方を案内します。",
           docFourTitle: "scripts/*.test.js",
           docFourDesc: "挙動回帰、公開面、リポジトリ整合性を Bun で検証します。",
           docsNote:
@@ -969,8 +967,8 @@
           docOneDesc: "单文件运行主体，无需构建。",
           docTwoTitle: "demo/river-bridge-demo.las",
           docTwoDesc: "用于查看剖面和测量距离的河流和桥梁 LAS 样本。",
-          docThreeTitle: "README.md",
-          docThreeDesc: "公共入口文档，汇总 Live Demo、限制与开发说明。",
+          docThreeTitle: "中文快速入门",
+          docThreeDesc: "试用河流示例，或打开自己的 LAS 和 LAZ 文件。",
           docFourTitle: "scripts/*.test.js",
           docFourDesc: "使用 Bun 验证运行行为、仓库元数据与公开展示面。",
           docsNote:
@@ -1107,6 +1105,10 @@
         setLandingText("docTwoTitle", copy.docTwoTitle);
         setLandingText("docTwoDesc", copy.docTwoDesc);
         setLandingText("docThreeTitle", copy.docThreeTitle);
+        const guideLink = document.getElementById("docThreeTitle");
+        if (guideLink) {
+          guideLink.href = `https://github.com/tsutomu-n/pointcloud-workbench-html/blob/main/docs/quickstart.${normalized}.md`;
+        }
         setLandingText("docThreeDesc", copy.docThreeDesc);
         setLandingText("docFourTitle", copy.docFourTitle);
         setLandingText("docFourDesc", copy.docFourDesc);

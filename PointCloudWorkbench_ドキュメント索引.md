@@ -1,11 +1,11 @@
 # PointCloudWorkbench ドキュメント索引
 
-timestamp="2026-11-20(金)_22:54 JST"
+timestamp="2026-11-21(土)_00:04 JST"
 
 ## 使う
 
 - [日本語 README](./docs/README.ja.md) / [English README](./README.md) — 概要と公開デモ
-- [クイックスタート](./docs/quickstart.ja.md) / [English demo guide](./docs/quickstart.en.md) — 河川デモと手元のファイル
+- [クイックスタート](./docs/quickstart.ja.md) / [English demo guide](./docs/quickstart.en.md) / [中文快速入门](./docs/quickstart.zh.md) — 河川デモと手元のファイル
 - [運用手順書](./PointCloudWorkbench_運用手順書.md) — 操作、ファイルサイズ、警告と計測値の扱い
 - [トラブルシューティング](./docs/troubleshooting.ja.md) / [FAQ](./docs/faq.ja.md) / [用語集](./docs/glossary.ja.md)
 

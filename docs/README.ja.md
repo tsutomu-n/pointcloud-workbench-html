@@ -1,8 +1,8 @@
 # PointCloudWorkbench
 
-timestamp="2026-11-20(金)_23:35 JST"
+timestamp="2026-11-21(土)_00:04 JST"
 
-[English](../README.md) · [公開サイト](https://tsutomu-n.github.io/pointcloud-workbench-html/)
+[English](../README.md) · [中文快速入门](./quickstart.zh.md) · [公開サイト](https://tsutomu-n.github.io/pointcloud-workbench-html/)
 
 ブラウザーでLAS・LAZ点群を開き、3D・2D表示、断面、計測、密度で確認できるツールです。インストールやビルドは不要です。
 
