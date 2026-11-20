@@ -4085,3 +4085,42 @@ test("initThreeJS replaces the previous renderer canvas and binds context listen
   expect(context.__controlsDisposed).toBe(1);
   expect(context.__removedWindowEvents).toContain("resize");
 });
+
+test("river demo regenerates exactly with bridge endpoints, four classes and a density gap", () => {
+  const { execFileSync } = require("node:child_process");
+  const os = require("node:os");
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "pcw-river-"));
+  try {
+    const output = path.join(tmp, "river.las");
+    execFileSync(process.execPath, [path.join(__dirname, "generate-river-demo.mjs"), output]);
+    const las = fs.readFileSync(output);
+    expect(las.equals(fs.readFileSync(path.join(__dirname, "../demo/river-bridge-demo.las")))).toBe(true);
+    expect(las.length).toBeLessThan(1024 * 1024);
+    expect(las.subarray(0, 4).toString()).toBe("LASF");
+    expect([las[24], las[25], las[104]]).toEqual([1, 4, 6]);
+    const start = las.readUInt32LE(96);
+    const recordSize = las.readUInt16LE(105);
+    expect(las.subarray(429, start).toString()).toContain('LOCAL_CS["Synthetic river and bridge"');
+    expect(las.readBigUInt64LE(247)).toBe(23746n);
+    expect(las.length).toBe(start + 23746 * recordSize);
+    const classes = new Set();
+    const bridgeEnds = new Set();
+    let inGap = 0;
+    let syntheticCount = 0;
+    for (let i = start; i < las.length; i += recordSize) {
+      const x = las.readInt32LE(i) / 100;
+      const y = las.readInt32LE(i + 4) / 100;
+      const z = las.readInt32LE(i + 8) / 100;
+      classes.add(las[i + 16]);
+      if (las[i + 15] & 1) syntheticCount++;
+      if (las[i + 16] === 17 && y === 0 && z === 9 && Math.abs(x) === 30) bridgeEnds.add(x);
+      if (x >= 42 && x < 54 && y >= 30 && y < 42) inGap++;
+    }
+    expect([...classes].sort((a, b) => a - b)).toEqual([2, 5, 9, 17]);
+    expect(syntheticCount).toBe(23746);
+    expect([...bridgeEnds]).toEqual([-30, 30]);
+    expect(inGap).toBe(0);
+  } finally {
+    fs.rmSync(tmp, { recursive: true });
+  }
+});

@@ -1,6 +1,6 @@
 # PointCloudWorkbench
 
-timestamp="2026-11-20(金)_15:38 JST"
+timestamp="2026-11-20(金)_16:09 JST"
 
 Browser-native LAS/LAZ point cloud workbench delivered as a single HTML file.
 
@@ -9,8 +9,8 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 ## Live Demo
 
 - Landing Page: `https://tsutomu-n.github.io/pointcloud-workbench-html/`
-- [Launch the English demo](https://tsutomu-n.github.io/pointcloud-workbench-html/PointCloudWorkbench.html?lang=en)
-- Bundled Sample LAS: `https://tsutomu-n.github.io/pointcloud-workbench-html/demo/pointcloud-demo-sample.las`
+- [Launch the English demo](https://tsutomu-n.github.io/pointcloud-workbench-html/PointCloudWorkbench.html?lang=en&demo=river)
+- Bundled Sample LAS: `https://tsutomu-n.github.io/pointcloud-workbench-html/demo/river-bridge-demo.las`
 - The landing page passes the selected language to the app. The app offers Japanese and English, with Japanese as the fallback for Chinese landing-page links.
 
 ## Visual Tour
@@ -45,9 +45,11 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 ## Try It In 60 Seconds
 
 1. Open the English demo in Chrome or Edge.
-2. Select **Load demo sample** to open quality settings for the bundled 4,096-point LAS file. **Choose file** accepts your own `.las` or `.laz`.
-3. Review the load strategy, risk estimate, and display ratio, then select **Start loading**.
-4. Try **2D top**, **Start measuring**, **Enable slicing**, and **Statistics**.
+2. The 23,746-point synthetic river sample opens directly. From the normal app entry, select **Try the river sample**.
+3. Use the sample guide to open **Bridge section**, select endpoints A and B with **Measure bridge**, or compare the gap in **Explore density**.
+4. Select **Open your own file** to return to file selection.
+
+The bundled LAS uses local metre coordinates with no geographic location. Regenerate it with `node scripts/generate-river-demo.mjs`.
 
 ## Key Capabilities
 
@@ -108,7 +110,8 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 - `index.html`: GitHub Pages landing page for the public demo
 - `PointCloudWorkbench.html`: single-file application
 - `assets/`: screenshot and visual asset directory for README / Pages presentation
-- `demo/pointcloud-demo-sample.las`: bundled LAS sample for Pages demo
+- `demo/river-bridge-demo.las`: guided river and bridge sample
+- `demo/pointcloud-demo-sample.las`: LAS regression fixture
 - `scripts/`: regression tests and README consistency checks
 - `PointCloudWorkbench_ドキュメント索引.md`: Japanese document entry point
 - `PointCloudWorkbench_運用手順書.md`: Japanese operations guide

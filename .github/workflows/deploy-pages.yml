@@ -54,6 +54,7 @@ jobs:
           cp assets/latest/manifest.json site/assets/latest/manifest.json
           cp assets/v1.0.0/manifest.json site/assets/v1.0.0/manifest.json
           cp demo/pointcloud-demo-sample.las site/demo/pointcloud-demo-sample.las
+          cp demo/river-bridge-demo.las site/demo/river-bridge-demo.las
           touch site/.nojekyll
 
       - name: Verify Pages artifact
@@ -67,6 +68,7 @@ jobs:
           test -f site/demo/pointcloud-demo-sample.las
           test -f site/.nojekyll
           test "$(head -c 4 site/demo/pointcloud-demo-sample.las)" = "LASF"
+          test "$(head -c 4 site/demo/river-bridge-demo.las)" = "LASF"
           grep -q "PointCloudWorkbench" site/index.html
           grep -q "MEASUREMENT_HISTORY_LIMIT" site/PointCloudWorkbench.html
           grep -q "client-max-server-zero" site/assets/latest/manifest.json

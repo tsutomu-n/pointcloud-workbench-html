@@ -152,7 +152,7 @@ test("Pages demo assets and deployment workflow are present", () => {
 
   const index = fs.readFileSync(indexPath, "utf8");
   expect(index).toContain("PointCloudWorkbench | Native LAS/LAZ Viewer");
-  expect(index).toContain("[ EXECUTE // 実アプリを起動 ]");
+  expect(index).toContain("河川サンプルを試す");
   expect(index).toContain("./PointCloudWorkbench.html");
   expect(index).toContain("01 // SYSTEM CAPABILITIES");
   expect(index).toContain("02 // CONSTRAINTS &amp; REQUIREMENTS");
@@ -204,6 +204,7 @@ test("Pages demo assets and deployment workflow are present", () => {
   expect(workflow).toContain("cp _headers site/_headers");
   expect(workflow).toContain("cp assets/latest/manifest.json site/assets/latest/manifest.json");
   expect(workflow).toContain("pointcloud-demo-sample.las");
+  expect(workflow).toContain("cp demo/river-bridge-demo.las site/demo/river-bridge-demo.las");
   expect(workflow).toContain(".nojekyll");
   expect(workflow).toContain("Verify Pages artifact");
   expect(workflow).toContain('test "$(head -c 4 site/demo/pointcloud-demo-sample.las)" = "LASF"');

@@ -801,7 +801,7 @@
         min-width: 0;
         width: min(92vw, 800px);
         max-width: 800px;
-        max-height: 90vh;
+        max-height: min(90vh, calc(100% - 16px));
         overflow-y: auto;
         box-sizing: border-box;
       }
@@ -907,7 +907,7 @@
       }
 
       .quality-option.recommended::after {
-        content: "推奨";
+        content: attr(data-recommended-label);
         position: absolute;
         top: 10px;
         right: 15px;
@@ -1813,6 +1813,24 @@
         .quality-option input[type="radio"] {
           transform: scale(1.2);
         }
+      }
+      .river-demo-entry { margin-bottom: 1rem; }
+      .river-demo-entry p, .river-demo-mode p { margin: .5rem 0; color: var(--ec-muted); }
+      .river-demo-mode { padding: 12px; }
+      .river-demo-mode h2 { font-size: 1rem; margin: 0; }
+      .river-demo-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+      .river-demo-actions button { padding: 6px 10px; }
+      [data-sample-step][data-complete]::after { content: " ✓"; }
+      #bridgeEndMarkers button {
+        position: fixed; z-index: 40; transform: translate(-50%, -50%);
+        width: 36px; height: 36px; border-radius: 50%;
+        border: 2px solid var(--ec-accent); background: var(--ec-bg);
+        color: var(--ec-text); font-weight: bold; cursor: pointer;
+      }
+      @media (max-width: 500px) {
+        .ec-topbar__brand, .ec-topbar__back { white-space: nowrap; }
+        .ec-topbar__back > span { display: none; }
+        .ec-topbar__brand { font-size: .8rem; }
       }
     </style>
     <style id="ec-theme">
@@ -3024,7 +3042,7 @@
         pointer-events: none;
       }
       .quality-option.recommended::after {
-        content: "推奨";
+        content: attr(data-recommended-label);
         position: absolute;
         top: 8px;
         right: 10px;
@@ -3662,7 +3680,7 @@
     </style>
   </head>
   <body>
-    <div class="ec-shell">
+    <div class="ec-shell is-right-hidden">
       <header class="ec-topbar" role="banner">
         <button
           class="ec-topbar__brand"
@@ -3704,6 +3722,15 @@
               ドラッグ&ドロップ、またはボタンから選択できます
             </div>
 
+            <div class="river-demo-entry">
+              <button id="englishDemoButton" class="ec-button ec-button--primary" type="button" onclick="loadRiverDemo()">河川サンプルを試す</button>
+              <p>ファイル不要。河川・堤防・橋の点群で断面と計測を試せます。</p>
+              <div id="sampleLoadError" hidden>
+                <p id="sampleLoadErrorMessage" role="alert"></p>
+                <button id="retrySampleLoad" class="ec-button ec-button--secondary" onclick="loadRiverDemo()">再試行</button>
+                <button class="link-btn" onclick="document.getElementById('fileInput').click()">ファイルを選択</button>
+              </div>
+            </div>
             <!-- 前回のセッション（リロード後のみ表示） -->
             <div class="last-session-hint" id="lastFileInfo" style="display: none">
               <div class="last-session-hint__icon"></div>
@@ -3768,7 +3795,10 @@
                   <span class="runtime-status__value" id="runtimeBrowser">-</span>
                 </div>
                 <div class="runtime-status__item">
-                  <span>Renderer</span>
+                  <span>Rendering engine</span><span class="runtime-status__value">Three.js WebGL</span>
+                </div>
+                <div class="runtime-status__item">
+                  <span>GPU capability</span>
                   <span class="runtime-status__value" id="runtimeRenderer">-</span>
                 </div>
                 <div class="runtime-status__item">
@@ -3793,15 +3823,6 @@
             </div>
 
             <div class="panel-footer">
-              <button
-                id="englishDemoButton"
-                class="link-btn"
-                type="button"
-                onclick="loadSampleData('demo')"
-                hidden
-              >
-                Load demo sample
-              </button>
               <button
                 id="sampleDataButton"
                 class="link-btn"
@@ -3844,7 +3865,7 @@
               aria-labelledby="qualitySelectionTitle"
               aria-describedby="estimatedTime estimatedMemory estimatedFPS"
             >
-              <label class="quality-option" data-quality="low">
+              <label data-recommended-label="推奨" class="quality-option" data-quality="low">
                 <input
                   type="radio"
                   name="quality"
@@ -3864,7 +3885,7 @@
               </label>
 
               <label
-                class="quality-option selected recommended"
+                data-recommended-label="推奨" class="quality-option selected recommended"
                 data-quality="medium"
               >
                 <input
@@ -3886,7 +3907,7 @@
                 </div>
               </label>
 
-              <label class="quality-option" data-quality="high">
+              <label data-recommended-label="推奨" class="quality-option" data-quality="high">
                 <input
                   type="radio"
                   name="quality"
@@ -3905,7 +3926,7 @@
                 </div>
               </label>
 
-              <label class="quality-option" data-quality="maximum">
+              <label data-recommended-label="推奨" class="quality-option" data-quality="maximum">
                 <input
                   type="radio"
                   name="quality"
@@ -4046,9 +4067,33 @@
             </div>
           </div>
         </div>
+        <div id="bridgeEndMarkers" hidden>
+          <button type="button" aria-label="橋の端 A" onclick="selectBridgeEnd(0)">A</button>
+          <button type="button" aria-label="橋の端 B" onclick="selectBridgeEnd(1)">B</button>
+        </div>
       </main>
-      <aside class="ec-right" id="rightPanel">
+      <aside class="ec-right is-hidden" id="rightPanel">
         <div class="panel-stack">
+          <section id="riverDemoMode" class="panel-card river-demo-mode" hidden>
+            <h2>サンプルモード · 河川と橋</h2>
+            <p>合成データ · ローカル座標（m）</p>
+            <div class="river-demo-actions">
+              <button class="ec-button ec-button--secondary" onclick="if (is2DMode) exit2DView(); else set2DView('top')">3D / 上面</button>
+              <button class="ec-button ec-button--secondary" onclick="if (!statsVisible) toggleStatsPanel(); document.getElementById('statsPanel').scrollIntoView({block:'nearest'})">統計情報</button>
+            </div>
+            <div id="sampleGuide">
+              <p>橋の断面から始めるか、試したい操作を選んでください。</p>
+              <div class="river-demo-actions">
+                <button class="ec-button ec-button--primary" data-sample-step="section" onclick="openBridgeSection()">橋の断面を見る</button>
+                <button class="ec-button ec-button--secondary" data-sample-step="measure" onclick="startBridgeMeasurement()">橋の両端を測る</button>
+                <button class="ec-button ec-button--secondary" data-sample-step="density" onclick="exploreSampleDensity()">密度を見る</button>
+              </div>
+              <p id="bridgeGuideHint" hidden>橋の両端 A と B を選択してください。</p>
+            </div>
+            <button id="hideSampleGuide" class="link-btn" onclick="setSampleGuideVisible(false)">サンプルガイドを閉じる</button>
+            <button id="showSampleGuide" class="link-btn" onclick="setSampleGuideVisible(true)" hidden>サンプルガイドを表示</button>
+            <button class="link-btn" onclick="goHome()">自分のファイルを開く</button>
+          </section>
           <!-- 操作ガイド（上部に配置） -->
           <details class="panel-card guide-panel" id="guidePanel" style="overflow: hidden">
             <summary
@@ -4714,7 +4759,7 @@
                   <div class="measurement-status" id="measurementStatus">
                     1点目をクリック
                   </div>
-                  <div class="measurement-summary" id="measurementSummary">
+                  <div class="measurement-summary" id="measurementSummary" tabindex="-1">
                     -
                   </div>
                   <dl class="measurement-results" id="measurementResults"></dl>
@@ -9276,6 +9321,13 @@
         const extension = resolveFileExtension(file?.name || "");
         const isLocalBlob = !!file && typeof file.slice === "function";
 
+        if (file?.isSample && file.samplePath && file.samplePath !== "synthetic") {
+          return {
+            key: "bundled-las",
+            label: "同梱LASの読み込み",
+            detail: "配布先からサンプルLASを取得し、ブラウザ内で解析します。",
+          };
+        }
         if (file?.isSample) {
           return {
             key: "sample-generated",
@@ -9700,6 +9752,50 @@
       }
 
       const englishUiText = new Map([
+        ["河川サンプルを試す", "Try the river sample"],
+        ["ファイル不要。河川・堤防・橋の点群で断面と計測を試せます。", "No file needed. Explore a river, levees, and a bridge with slicing and measurement tools."],
+        ["サンプルモード · 河川と橋", "Sample mode · River and bridge"],
+        ["合成データ · ローカル座標（m）", "Synthetic sample · Local coordinates in meters"],
+        ["橋の断面から始めるか、試したい操作を選んでください。", "Start with the bridge section or choose another tool to try."],
+        ["橋の断面を見る", "Bridge section"],
+        ["橋の両端を測る", "Measure bridge"],
+        ["密度を見る", "Explore density"],
+        ["橋の両端 A と B を選択してください。", "Select endpoints A and B on the bridge."],
+        ["橋の端 A", "Bridge end A"],
+        ["橋の端 B", "Bridge end B"],
+        ["3D / 上面", "3D / Top view"],
+        ["サンプルガイドを閉じる", "Hide sample guide"],
+        ["サンプルガイドを表示", "Show sample guide"],
+        ["自分のファイルを開く", "Open your own file"],
+        ["再試行", "Retry"],
+        ["サンプルLASを取得中...", "Fetching the sample LAS..."],
+        ["サンプルLASを取得できませんでした。", "Could not fetch the sample LAS."],
+        ["サンプルLASを読み込めませんでした。", "Could not read the sample LAS."],
+        ["完了！", "Complete!"],
+        ["橋面", "Bridge deck"],
+        ["推奨", "Recommended"],
+        ["同梱LASの読み込み", "Bundled LAS read"],
+        ["操作ガイド — キーボード・マウス", "Keyboard and mouse controls"],
+        ["マウス", "Mouse"],
+        ["左ドラッグ: 回転 | 右ドラッグ: 平行移動 | ホイール: ズーム", "Left drag: Orbit | Right drag: Pan | Wheel: Zoom"],
+        ["移動", "Movement"],
+        ["前後左右移動", "Move forward, back, left, and right"],
+        ["十字キー", "Arrow keys"],
+        ["カメラ回転", "Rotate the camera"],
+        ["上昇", "Move up"],
+        ["Shift+移動", "Shift + movement"],
+        ["高速移動（2倍）", "Move at double speed"],
+        ["正面ビュー", "Front view"],
+        ["真上ビュー", "Top view"],
+        ["側面ビュー", "Side view"],
+        ["背面ビュー", "Back view"],
+        ["表示", "Display"],
+        ["点サイズ拡大/縮小", "Increase/decrease point size"],
+        ["その他", "Other"],
+        ["統計情報 表示/非表示", "Show/hide statistics"],
+        ["このヘルプ", "Show this help"],
+        ["読み込みキャンセル", "Cancel loading"],
+        ["モード", "Mode"],
         ["ファイル選択", "File selection"],
         ["ドラッグ&ドロップ、またはボタンから選択できます", "Drop a LAS or LAZ file here, or choose one below."],
         ["前回使用（再選択が必要です）", "Previously opened (select the file again)"],
@@ -10097,6 +10193,10 @@
       // Translate the UI at the DOM boundary. Data, diagnostics payloads,
       // point decoding and rendering coordinates keep their original values.
       const englishUiPatterns = [
+        [/^(モード|距離|累計3D距離|面積|水平距離|高さ差|勾配|点数|区間数|累計水平距離|始点終点高低差|平均勾配|XY投影面積|周長|d[XYZ]): (.+)$/, (_, label, detail) =>
+          `${translateAppUi(label)}: ${translateAppUi(detail)}`],
+        [/^点([12]) 元LAS座標: (.+)$/, "Point $1 source LAS coordinates: $2"],
+        [/^点データ解析: (.+)$/, "Decoding points: $1"],
         [/^断面対象: ([\d,]+)点$/, "Section: $1 points"],
         [/^幅 ([\d.]+)m相当$/, "Width: $1 m equivalent"],
         [/^([\d,]+)点 \(([\d.]+)%\)$/, "$1 points ($2%)"],
@@ -10178,7 +10278,7 @@
         [/^(ファイル検証エラー|ファイル選択エラー|ファイル読み込み失敗|読み込み失敗|エラー):\s*(.+)$/, (_, kind, detail) =>
           `${englishUiText.get(kind)}: ${translateAppUi(detail)}`],
       ];
-      const uiTextAttributes = ["title", "aria-label", "placeholder", "alt"];
+      const uiTextAttributes = ["title", "aria-label", "placeholder", "alt", "data-recommended-label"];
       const untranslatedUiSelector = "script, style, textarea, [data-pcw-source-text]";
       const originalUiText = new WeakMap();
       const originalUiAttributes = new WeakMap();
@@ -10284,8 +10384,6 @@
         const language = normalizeLanguage(value);
         document.documentElement.lang = language;
         applyAppUiLanguage(language);
-        const demoButton = document.getElementById("englishDemoButton");
-        if (demoButton) demoButton.hidden = language !== "en";
 
         const selector = document.getElementById("languageSelector");
         if (selector && selector.value !== language) {
@@ -10360,6 +10458,10 @@
           updateRightPanelVisibility();
 
           console.log("初期化完了 - ファイル選択待ち");
+          if (new URLSearchParams(location.search).get("demo") === "river" &&
+              workflowState.step === "file-select" && !workflowState.selectedFile) {
+            void loadRiverDemo();
+          }
         } catch (error) {
           errorTracker.logError("Initialization Error", {
             error: error.message,
@@ -11387,12 +11489,146 @@
         pointCount: 4096,
       };
 
-      window.loadSampleData = function (sample) {
-        if (sample === "demo") {
-          window.selectSampleFile(demoSample.path, demoSample.name, demoSample.size, demoSample.pointCount);
-          window.proceedToQualitySelection();
+      const riverDemo = {
+        path: "./demo/river-bridge-demo.las",
+        name: "river-bridge-demo.las",
+        size: 712947,
+        pointCount: 23746,
+      };
+      const bridgeEnds = [-30, 30];
+      let sampleFetchController = null;
+      let bridgeGuideActive = false;
+
+      function demoAssetUrl(path) {
+        return location.pathname.startsWith("/app/") ? path.slice(1) : path;
+      }
+
+      function isRiverDemo(file = workflowState.selectedFile) {
+        return file?.isSample === true && file.samplePath === riverDemo.path;
+      }
+
+      function loadRiverDemo() {
+        if (workflowState.step === "loading") return;
+        showSampleLoadError("");
+        window.selectSampleFile(riverDemo.path, riverDemo.name, riverDemo.size, riverDemo.pointCount);
+        workflowState.selectedQuality = "low";
+        document.getElementById("fileSelectPanel").classList.add("hidden");
+        return window.startDataLoading();
+      }
+
+      function setSampleGuideVisible(visible) {
+        document.getElementById("sampleGuide").hidden = !visible;
+        document.getElementById("hideSampleGuide").hidden = !visible;
+        document.getElementById("showSampleGuide").hidden = visible;
+      }
+
+      function showRiverDemoMode() {
+        const mode = document.getElementById("riverDemoMode");
+        mode.hidden = false;
+        document.getElementById("guidePanel").open = false;
+        setSampleGuideVisible(true);
+        mode.querySelectorAll("[data-sample-step]").forEach(button => button.removeAttribute("data-complete"));
+        window.setColorMode("classification");
+        const target = controls.target.clone();
+        const distance = camera.position.distanceTo(target) * 1.2;
+        const direction = new THREE.Vector3(0.65, 1.05, 1).normalize();
+        camera.position.copy(target).addScaledVector(direction, distance);
+        controls.update();
+        setRiverDemoSceneHelpers(false);
+      }
+
+      function setRiverDemoSceneHelpers(visible) {
+        for (const name of ["gridHelper", "axisHelper"]) {
+          const helper = scene?.getObjectByName?.(name);
+          if (helper) helper.visible = visible;
+        }
+      }
+
+      function endBridgeGuide() {
+        bridgeGuideActive = false;
+        document.getElementById("bridgeGuideHint")?.setAttribute("hidden", "");
+        document.getElementById("bridgeEndMarkers")?.setAttribute("hidden", "");
+      }
+
+      function markSampleStep(step) {
+        if (!isRiverDemo()) return;
+        const button = document.querySelector(`[data-sample-step="${step}"]`);
+        if (button) button.dataset.complete = "true";
+      }
+
+      function openBridgeSection() {
+        endBridgeGuide();
+        if (isCADMode) window.toggleCADMode();
+        window.resetSlicing();
+        create2DSliceModal([{ axis: "Z", position: 0 }], 5);
+        markSampleStep("section");
+      }
+
+      function startBridgeMeasurement() {
+        if (isCADMode) window.toggleCADMode();
+        window.resetSlicing();
+        window.set2DView("top");
+        setMeasurementMode("distance");
+        resetMeasurementDraft();
+        measurementState.enabled = true;
+        bridgeGuideActive = true;
+        document.getElementById("bridgeGuideHint").hidden = false;
+        updateMeasurementUi();
+        document.getElementById("bridgeEndMarkers").hidden = false;
+        updateBridgeEndMarkers();
+      }
+
+      function updateBridgeEndMarkers() {
+        if (!bridgeGuideActive) return;
+        if (!is2DMode || current2DView !== "top" || !measurementState.enabled ||
+            measurementState.mode !== "distance" || isCADMode) {
+          endBridgeGuide();
           return;
         }
+        const rect = renderer.domElement.getBoundingClientRect();
+        camera.updateMatrixWorld();
+        document.querySelectorAll("#bridgeEndMarkers button").forEach((button, index) => {
+          const projected = sourceToDisplayPoint({ x: bridgeEnds[index], y: 0, z: 9 }).project(camera);
+          button.style.left = `${rect.left + (projected.x + 1) * rect.width / 2}px`;
+          button.style.top = `${rect.top + (1 - projected.y) * rect.height / 2}px`;
+          button.style.visibility = Math.abs(projected.x) <= 1 && Math.abs(projected.y) <= 1 ? "visible" : "hidden";
+        });
+      }
+
+      function selectBridgeEnd(end) {
+        if (!bridgeGuideActive || !pointCloud) return;
+        const wanted = bridgeEnds[end];
+        const coordinates = pointCloud.userData.sourcePositions;
+        for (let i = 0; i < coordinates.length; i += 3) {
+          if (coordinates[i] !== wanted || coordinates[i + 1] !== 0 || coordinates[i + 2] !== 9) continue;
+          const index = i / 3;
+          if (measurementState.selectedPoints.some(point => point.index === index)) return;
+          const source = getSourcePointAtIndex(index);
+          handleMeasurementPoint({ index, source, display: sourceToDisplayPoint(source) });
+          if (!bridgeGuideActive) document.getElementById("measurementSummary").focus({ preventScroll: true });
+          return;
+        }
+      }
+
+      function exploreSampleDensity() {
+        endBridgeGuide();
+        window.resetSlicing();
+        window.set2DView("top");
+        if (!statsVisible) window.toggleStatsPanel();
+        if (window.setDensityOverlayEnabled(true)) markSampleStep("density");
+        document.getElementById("densityHeatmapCanvas").scrollIntoView({ block: "nearest" });
+      }
+
+      function showSampleLoadError(message) {
+        const error = document.getElementById("sampleLoadError");
+        error.hidden = !message;
+        if (message) {
+          document.getElementById("sampleLoadErrorMessage").textContent = message;
+          document.getElementById("retrySampleLoad").focus();
+        }
+      }
+
+      window.loadSampleData = function () {
         console.log("サンプルデータ選択");
 
         // サンプルファイル選択モーダルを表示
@@ -11409,6 +11645,7 @@
                         </div>
                         <div class="modal-body">
                             <div class="sample-file-list">
+                                <button class="sample-file-item" type="button" onclick="loadRiverDemo()">河川サンプルを試す</button>
                                 <div class="sample-file-item" onclick="selectSampleFile('synthetic', 'テスト用小規模モデル', 50000)">
                                     <div class="sample-file-title">テスト用小規模モデル</div>
                                     <div class="sample-file-desc">動作確認用の汎用小規模3Dモデルです（5万点）</div>
@@ -11440,7 +11677,7 @@
         previewPointCount = sizeBytes,
       ) {
         console.log("サンプルファイル選択:", fileName);
-        saveLastFileName(fileName);
+        if (filePath !== riverDemo.path) saveLastFileName(fileName);
 
         // サンプルデータを仮想的にセット
         clearSelectedFilePreview();
@@ -12906,6 +13143,8 @@
           measurementState.selectedPoints.length === modeConfig.autoFinalizePointCount
         ) {
           addMeasurementRecord(measurementState.selectedPoints, measurementState.mode);
+          if (bridgeGuideActive) markSampleStep("measure");
+          endBridgeGuide();
           resetMeasurementDraft();
         }
 
@@ -12976,7 +13215,7 @@
           showToast("コピーできる計測結果がありません", "warning");
           return;
         }
-        const text = formatMeasurementCopyText(record.metrics);
+        const text = formatMeasurementCopyText(record.metrics).split("\n").map(appUiText).join("\n");
         try {
           await copyTextToClipboard(text);
           showToast("計測結果をコピーしました", "success");
@@ -12995,7 +13234,7 @@
           showToast("コピーできる計測履歴がありません", "warning");
           return;
         }
-        const text = formatMeasurementCopyText(record.metrics);
+        const text = formatMeasurementCopyText(record.metrics).split("\n").map(appUiText).join("\n");
         try {
           await copyTextToClipboard(text);
           showToast("計測履歴をコピーしました", "success");
@@ -13094,6 +13333,12 @@
       };
 
       function clearPointCloud() {
+        endBridgeGuide();
+        const demoMode = document.getElementById("riverDemoMode");
+        if (demoMode && !demoMode.hidden) {
+          demoMode.hidden = true;
+          setRiverDemoSceneHelpers(true);
+        }
         try {
           clearMeasurement();
           disposeDiagnosticCandidateMarker();
@@ -13139,6 +13384,8 @@
 
       function _doGoHome() {
         try {
+          sampleFetchController?.abort();
+          showSampleLoadError("");
           // Stop monitoring
           if (memoryMonitor) {
             memoryMonitor.stopMonitoring();
@@ -13324,6 +13571,13 @@
           }
 
           console.error("データ読み込みエラー:", error);
+          if (workflowState.selectedFile?.isSample && workflowState.selectedFile.samplePath !== "synthetic") {
+            const river = isRiverDemo();
+            _doGoHome();
+            if (river) showSampleLoadError(error.message);
+            else showToast(`読み込み失敗: ${error.message}`, "error");
+            return;
+          }
 
           // エラー詳細表示
           updateProgress(0, `エラー: ${error.message}`);
@@ -13365,6 +13619,11 @@
       };
 
       window.cancelLoading = function () {
+        sampleFetchController?.abort();
+        if (isRiverDemo()) {
+          _doGoHome();
+          return;
+        }
         window._loadingCancelled = true;
         abortActiveFileRead();
         const cancelledLoadSessionId = activeLoadSessionId;
@@ -13850,115 +14109,41 @@
       }
 
       // URLからLASファイルを読み込む
-      async function loadLASFileFromURL(url) {
-        console.log(" URLからLASファイル読み込み:", url);
-
-        // targetPointsを定義
-        const targetPoints =
-          qualitySettings[workflowState.selectedQuality].maxPoints;
-
+      async function loadLASFileFromURL(file) {
+        const loadSessionId = activeLoadSessionId;
+        const controller = new AbortController();
+        sampleFetchController = controller;
+        const timeout = setTimeout(() => controller.abort(), 15000);
+        let buffer;
         try {
-          updateProgress(20, "LASファイルダウンロード中...");
-
-          const response = await fetch(url);
-          if (!response.ok) {
-            throw new Error(`ファイルの取得に失敗しました: ${response.status}`);
-          }
-
-          updateProgress(40, "LASファイル解析中...");
-
-          const arrayBuffer = await response.arrayBuffer();
-
-          updateProgress(60, "点群データ処理中...");
-
-          updateProgress(80, "3D可視化準備中...");
-
-          await buildPointCloudFromArrayBuffer(
-            arrayBuffer,
-            url,
-            arrayBuffer.byteLength,
-          );
-
-          updateProgress(100, "読み込み完了!");
-
-          console.log("URLからのLASファイル読み込み完了");
+          updateProgress(20, "サンプルLASを取得中...");
+          const response = await fetch(demoAssetUrl(file.samplePath), { signal: controller.signal });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          buffer = await response.arrayBuffer();
         } catch (error) {
-          console.error("URLからのLASファイル読み込みエラー:", error);
-
-          // フォールバック: 合成データを生成
-          console.log("フォールバック: 合成データ生成");
-          await generateFallbackSyntheticData(targetPoints);
-        }
-      }
-
-      // フォールバック用合成データ生成
-      async function generateFallbackSyntheticData(targetPoints) {
-        updateProgress(50, "フォールバック用サンプルデータ生成中...");
-
-        const points = [];
-        const pointCount = Math.min(targetPoints, 10000);
-
-        for (let i = 0; i < pointCount; i++) {
-          if (i % 1000 === 0) {
-            updateProgress(
-              50 + (i / pointCount) * 30,
-              `サンプル生成中: ${i}/${pointCount}`,
-            );
-            await new Promise((resolve) => setTimeout(resolve, 1));
-          }
-
-          const t = (i / pointCount) * Math.PI * 4;
-          const x = Math.sin(t) * 30 + (Math.random() - 0.5) * 60;
-          const z = t * 8 + (Math.random() - 0.5) * 40;
-          const y = Math.random() * 15 + Math.sin(x * 0.1) * 3;
-
-          // 汎用的な地形分類を生成
-          let classification;
-          const height = y / 15; // 正規化された高さ
-
-          if (height < 0.3) {
-            classification = 2; // 地面（低い部分）
-          } else if (height < 0.7) {
-            classification = Math.random() < 0.7 ? 2 : 3; // 地面または低植生
-          } else {
-            classification = Math.random() < 0.6 ? 3 : 5; // 低植生または高植生
-          }
-
-          points.push({
-            x: x,
-            y: y,
-            z: z,
-            intensity: Math.floor(Math.random() * 255),
-            classification: classification,
-            r: Math.floor(128 + Math.random() * 127),
-            g: Math.floor(100 + Math.random() * 100),
-            b: Math.floor(80 + Math.random() * 80),
-          });
+          ensureLoadSessionActive(loadSessionId);
+          console.warn("Sample LAS fetch failed:", error);
+          throw new Error("サンプルLASを取得できませんでした。");
+        } finally {
+          clearTimeout(timeout);
+          if (sampleFetchController === controller) sampleFetchController = null;
         }
 
-        updateProgress(80, "3D可視化準備中...");
-
-        // 統計情報を生成
-        const mockHeader = {
-          pointDataRecordLength: 28,
-          numberOfPointRecords: points.length,
-          xScale: 0.01,
-          yScale: 0.01,
-          zScale: 0.01,
-          xOffset: 0,
-          yOffset: 0,
-          zOffset: 0,
-          maxX: Math.max(...points.map((p) => p.x)),
-          minX: Math.min(...points.map((p) => p.x)),
-          maxY: Math.max(...points.map((p) => p.y)),
-          minY: Math.min(...points.map((p) => p.y)),
-          maxZ: Math.max(...points.map((p) => p.z)),
-          minZ: Math.min(...points.map((p) => p.z)),
-        };
-
-        setupPointCloudVisualization(points, mockHeader, "サンプルデータ.las");
-
-        updateProgress(100, "テストデータ読み込み完了!");
+        ensureLoadSessionActive(loadSessionId);
+        try {
+          const { header, points } = await parsePointsFromArrayBuffer(buffer, file.name);
+          ensureLoadSessionActive(loadSessionId);
+          if (buffer.byteLength < header.pointDataOffset +
+              header.numberOfPointRecords * header.pointDataRecordLength ||
+              (isRiverDemo(file) && points.length !== riverDemo.pointCount)) {
+            throw new Error("Incomplete sample");
+          }
+          finalizePointCloudData(header, points, file.name, buffer.byteLength);
+        } catch (error) {
+          ensureLoadSessionActive(loadSessionId);
+          console.warn("Sample LAS decode failed:", error);
+          throw new Error("サンプルLASを読み込めませんでした。");
+        }
       }
 
       // サンプルデータ読み込み
@@ -13974,7 +14159,7 @@
         // 実際のLASファイルを読み込む場合
         if (file.samplePath && file.samplePath !== "synthetic") {
           console.log("実際のサンプルファイル読み込み:", file.samplePath);
-          await loadLASFileFromURL(file.samplePath);
+          await loadLASFileFromURL(file);
           return;
         }
 
@@ -16922,6 +17107,7 @@
 
           // 統計情報パネル表示
           showStatsToggle();
+          if (isRiverDemo()) showRiverDemoMode();
 
           // 読み込み完了トースト
           const loadedFile = workflowState.selectedFile;
@@ -17522,7 +17708,7 @@
           14: { name: "ワイヤ-導体", color: "#FFA500" },
           15: { name: "送電塔", color: "#8B0000" },
           16: { name: "ワイヤ-接続", color: "#DC143C" },
-          17: { name: "橋梁", color: "#708090" },
+          17: { name: "橋面", color: "#ffb840" },
           18: { name: "高ノイズ", color: "#FF1493" },
         };
 
@@ -17778,6 +17964,7 @@
           6: { r: 1.0, g: 0.2, b: 0.2 }, // 建物（赤）
           7: { r: 1.0, g: 1.0, b: 0.0 }, // ノイズ（黄色）
           8: { r: 1.0, g: 0.0, b: 1.0 }, // モデルキー（マゼンタ）
+          17: { r: 1, g: 0.72, b: 0.25 },
           9: { r: 0.0, g: 0.4, b: 1.0 }, // 水域（青）
         };
 
@@ -18401,7 +18588,7 @@
         create2DSliceModal(activeSlices);
       };
 
-      function create2DSliceModal(activeSlices) {
+      function create2DSliceModal(activeSlices, initialThickness = null) {
         // 既存のモーダルを削除
         const existing = document.getElementById("slice2DModal");
         if (existing) existing.remove();
@@ -18410,7 +18597,7 @@
         const box = pointCloud.geometry.boundingBox;
         const size = box.getSize(new THREE.Vector3());
         const avgSize = (size.x + size.y + size.z) / 3;
-        const autoThickness = Math.max(avgSize * 0.05, 5); // 平均サイズの5%または最小5
+        const autoThickness = initialThickness ?? Math.max(avgSize * 0.05, 5); // 平均サイズの5%または最小5
         const maxThickness = avgSize * 0.3; // 最大は30%
 
         // モーダルコンテナを作成
@@ -20323,8 +20510,9 @@
         const rightPanel = document.getElementById("rightPanel");
         if (!shell || !rightPanel) return;
 
-        shell.classList.remove("is-right-hidden");
-        rightPanel.classList.remove("is-hidden");
+        const showTools = workflowState.step === "complete";
+        shell.classList.toggle("is-right-hidden", !showTools);
+        rightPanel.classList.toggle("is-hidden", !showTools);
       }
 
       function updateStatsPanelLayout() {
@@ -20760,6 +20948,7 @@
           animationFrameCount++;
         }
 
+        updateBridgeEndMarkers();
         renderer.render(scene, camera);
       }
 

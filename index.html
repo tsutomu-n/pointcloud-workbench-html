@@ -677,17 +677,17 @@
 
           <aside class="hero-slab">
             <p class="hero-slab-label" id="heroSlabLabel">Demo Payload</p>
-            <strong id="heroSlabPoints">4096 pts</strong>
+            <strong id="heroSlabPoints">23,746 pts</strong>
             <span id="heroSlabDesc">
               Bundled LAS sample included for fast first-run validation.
             </span>
           </aside>
 
           <nav class="trigger-matrix">
-            <a class="terminal-btn primary" href="./PointCloudWorkbench.html">
-              <span id="ctaLaunch">[ EXECUTE // OPEN APP ]</span>
+            <a class="terminal-btn primary" href="./PointCloudWorkbench.html?lang=en&amp;demo=river">
+              <span id="ctaLaunch">Try the river sample</span>
             </a>
-            <a class="terminal-btn ghost" href="./demo/pointcloud-demo-sample.las">
+            <a class="terminal-btn ghost" href="./demo/river-bridge-demo.las">
               <span id="ctaSample">DATA // SAMPLE LAS</span>
             </a>
             <a
@@ -817,7 +817,7 @@
           <div id="footerLicense">LICENSE // MIT. SYSTEM DISTRIBUTED AS SINGLE HTML.</div>
           <nav class="footer-links">
             <a href="./PointCloudWorkbench.html">EXECUTE_APP</a>
-            <a href="./demo/pointcloud-demo-sample.las">SAMPLE_LAS</a>
+            <a href="./demo/river-bridge-demo.las">SAMPLE_LAS</a>
             <a
               href="https://github.com/tsutomu-n/pointcloud-workbench-html/blob/main/README.md"
               rel="noopener noreferrer"
@@ -849,11 +849,11 @@
           heroLead:
             "Browser-native LAS/LAZ point cloud workbench delivered as a single HTML file.",
           heroDesc:
-            "Open the GitHub Pages landing page, launch the real app, and inspect point clouds in 3D/2D without a build step. The runtime artifact stays in <code>PointCloudWorkbench.html</code>.",
+            "No file needed. Open the river and bridge sample to try a cross-section, measure the bridge, and explore point density.",
           heroSlabLabel: "Demo Payload",
-          heroSlabPoints: "4096 pts",
+          heroSlabPoints: "23,746 pts",
           heroSlabDesc: "Bundled LAS sample included for fast first-run validation.",
-          ctaLaunch: "[ EXECUTE // OPEN APP ]",
+          ctaLaunch: "Try the river sample",
           ctaSample: "DATA // SAMPLE LAS",
           ctaRepository: "REPOSITORY // GITHUB",
           sectionCapabilities: "01 // SYSTEM CAPABILITIES",
@@ -912,11 +912,11 @@
           heroLead:
             "ブラウザで動く、LAS/LAZ 対応の単一 HTML 点群ワークベンチです。",
           heroDesc:
-            "GitHub Pages の入口からそのまま実アプリを起動し、ビルドなしで 3D / 2D の点群確認に入れます。実行本体は <code>PointCloudWorkbench.html</code> のままです。",
+            "ファイル不要。河川と橋の点群を開いて、橋の断面・両端の計測・点の密度を確認できます。",
           heroSlabLabel: "デモ内容",
-          heroSlabPoints: "4096 点",
+          heroSlabPoints: "23,746 点",
           heroSlabDesc: "初回確認用に軽量な同梱 LAS サンプルを用意しています。",
-          ctaLaunch: "[ EXECUTE // 実アプリを起動 ]",
+          ctaLaunch: "河川サンプルを試す",
           ctaSample: "DATA // SAMPLE LAS",
           ctaRepository: "REPOSITORY // GITHUB",
           sectionCapabilities: "01 // 主な機能",
@@ -974,9 +974,9 @@
           heroDesc:
             "从 GitHub Pages 入口即可启动真实应用，无需构建步骤，就能进入 3D / 2D 点云检查流程。运行主体保持为 <code>PointCloudWorkbench.html</code>。",
           heroSlabLabel: "演示载荷",
-          heroSlabPoints: "4096 点",
+          heroSlabPoints: "23,746 点",
           heroSlabDesc: "内置轻量 LAS 样本，便于首次快速验证。",
-          ctaLaunch: "[ EXECUTE // 打开应用 ]",
+          ctaLaunch: "试用河流样本",
           ctaSample: "DATA // SAMPLE LAS",
           ctaRepository: "REPOSITORY // GITHUB",
           sectionCapabilities: "01 // 核心能力",
@@ -1165,7 +1165,8 @@
         setLandingText("footerLicense", copy.footerLicense);
 
         for (const link of document.querySelectorAll?.('a[href^="./PointCloudWorkbench.html"]') || []) {
-          link.setAttribute("href", `./PointCloudWorkbench.html?lang=${normalized}`);
+          const demo = link.classList.contains("primary") ? "&demo=river" : "";
+          link.setAttribute("href", `./PointCloudWorkbench.html?lang=${normalized}${demo}`);
         }
 
         const selector = document.getElementById("landingLanguageSelector");

@@ -1,6 +1,6 @@
 # PointCloudWorkbench
 
-timestamp="2026-11-20(金)_15:38 JST"
+timestamp="2026-11-20(金)_16:09 JST"
 
 ブラウザーで動く LAS/LAZ 点群ワークベンチです。単一の HTML ファイルとして配布します。
 
@@ -12,8 +12,8 @@ timestamp="2026-11-20(金)_15:38 JST"
 
 - ランディングページ: `https://tsutomu-n.github.io/pointcloud-workbench-html/`
 - アプリを直接開く: `https://tsutomu-n.github.io/pointcloud-workbench-html/PointCloudWorkbench.html`
-- [審査用の英語デモ](https://tsutomu-n.github.io/pointcloud-workbench-html/PointCloudWorkbench.html?lang=en) は **Load demo sample → Start loading** で同梱点群を表示します。
-- 同梱サンプル LAS: `https://tsutomu-n.github.io/pointcloud-workbench-html/demo/pointcloud-demo-sample.las`
+- [審査用の英語デモ](https://tsutomu-n.github.io/pointcloud-workbench-html/PointCloudWorkbench.html?lang=en&demo=river) を開くと河川サンプルを自動で読み込みます。アプリの起動画面からは **河川サンプルを試す** で始められます。
+- 同梱サンプル LAS: `https://tsutomu-n.github.io/pointcloud-workbench-html/demo/river-bridge-demo.las`
 - ランディングページはブラウザ言語（`ja` / `en` / `zh`）に合わせて表示を切り替えられ、手動の言語切替もできます。
 
 ## ビジュアルツアー
@@ -48,10 +48,11 @@ timestamp="2026-11-20(金)_15:38 JST"
 
 ## 60秒で試す
 
-1. GitHub Pages のランディングページを開くか、アプリを直接開きます。
-2. アプリで `サンプルデータを使用` を選び、同梱 Pages サンプルを選択します。手元の `.las` / `.laz` も読み込めます。
-3. Preflight 画面で、読み込み経路、リスク、推定表示率を確認します。
-4. 3D/2D で点群を確認し、表示点ベースの距離計測、スライス、統計、分類結果を確認します。
+1. ランディングページまたはアプリで **河川サンプルを試す** を選びます。
+2. サンプルモードから **橋の断面を見る**、**橋の両端を測る**、**密度を見る** を試します。
+3. 手元のLAS／LAZを試すときは **自分のファイルを開く** からファイルを選び、品質を設定します。
+
+河川サンプルは地理位置を持たない合成LASです。 `node scripts/generate-river-demo.mjs` で再生成できます。
 
 ## 主な機能
 
@@ -113,7 +114,8 @@ timestamp="2026-11-20(金)_15:38 JST"
 - `index.html`: GitHub Pages 用ランディングページ
 - `PointCloudWorkbench.html`: 単一ファイルアプリ本体
 - `assets/`: README / Pages 表示用のスクリーンショット・画像素材ディレクトリ
-- `demo/pointcloud-demo-sample.las`: Pages demo 用の同梱 LAS サンプル
+- `demo/river-bridge-demo.las`: 河川と橋の公開デモ用LAS
+- `demo/pointcloud-demo-sample.las`: 読み込みの回帰確認用LAS
 - `scripts/`: regression tests と README consistency checks
 - `PointCloudWorkbench_ドキュメント索引.md`: 日本語ドキュメント入口
 - `PointCloudWorkbench_運用手順書.md`: 日本語運用ガイド
