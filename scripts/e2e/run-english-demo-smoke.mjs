@@ -59,6 +59,25 @@ try {
   await page.getByText("Sample mode · River and bridge", { exact: true }).waitFor();
   assert.equal(await page.evaluate(() => statsData.displayPoints), 23746);
   assert.equal(await page.locator("#qualitySelectPanel").isVisible(), false);
+  const sampleHelp = page.locator("#riverDemoMode button[data-sample-help]");
+  assert.equal(await sampleHelp.count(), 5);
+  const helpState = () => page.evaluate(() => ({
+    is2DMode, statsVisible, measuring: measurementState.enabled,
+    density: densityOverlayState.enabled, sliceOpen: !!document.getElementById("slice2DModal")?.open,
+  }));
+  const beforeHelp = await helpState();
+  for (const title of ["3D / Top view", "Statistics", "Bridge cross-section", "Measure the bridge", "Explore density"]) {
+    const trigger = page.getByRole("button", { name: `Help: ${title}`, exact: true });
+    await trigger.press("Enter");
+    const help = page.getByRole("dialog", { name: title, exact: true });
+    await help.waitFor();
+    assert.equal(await help.getByRole("button", { name: "Close", exact: true })
+      .evaluate(button => document.activeElement === button), true);
+    assert.deepEqual(await helpState(), beforeHelp);
+    await page.keyboard.press("Escape");
+    await help.waitFor({ state: "hidden" });
+    assert.equal(await trigger.evaluate(button => document.activeElement === button), true);
+  }
   await page.keyboard.press("h");
   await page.getByRole("heading", { name: "Keyboard and mouse controls" }).waitFor();
   await page.keyboard.press("Escape");
@@ -225,6 +244,11 @@ try {
   const mobileMode = touchPage.getByText("サンプルモード · 河川と橋", { exact: true });
   await mobileMode.waitFor();
   assert.ok((await mobileMode.boundingBox()).y < 844);
+  const mobileHelp = touchPage.getByRole("button", { name: "ヘルプ: 橋の断面", exact: true });
+  await mobileHelp.tap();
+  const mobileHelpDialog = touchPage.getByRole("dialog", { name: "橋の断面", exact: true });
+  await mobileHelpDialog.getByRole("button", { name: "閉じる", exact: true }).tap();
+  await mobileHelpDialog.waitFor({ state: "hidden" });
   await touchPage.locator("#languageSelector").selectOption("en");
   const sectionLayout = await touchPage.locator(".section-width-control").evaluate(element => {
     const box = element.getBoundingClientRect();
@@ -268,6 +292,7 @@ try {
   await touchPage.getByRole("button", { name: "読み込み開始", exact: true }).click();
   await touchPage.waitForFunction(() => workflowState.step === "complete" && statsData.displayPoints === 4096);
   assert.equal(await mobileMode.isVisible(), false);
+  assert.equal(await touchPage.getByRole("button", { name: /^ヘルプ:/ }).count(), 0);
   // Use a real gap between displayed X coordinates in the ordinary LAS.
   const gapWidth = await touchPage.evaluate(() => {
     const coordinates = pointCloud.geometry.getAttribute("position").array;

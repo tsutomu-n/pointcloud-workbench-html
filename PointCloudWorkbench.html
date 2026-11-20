@@ -1873,6 +1873,53 @@
       .river-demo-mode h2 { font-size: 1rem; margin: 0; }
       .river-demo-actions { display: flex; flex-wrap: wrap; gap: 6px; }
       .river-demo-actions button { padding: 6px 10px; }
+      .sample-help-symbol { position: absolute; pointer-events: none; }
+      .sample-feature {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: stretch;
+        flex: 1 1 132px;
+        min-width: 0;
+      }
+      .sample-feature > .ec-button {
+        min-width: 0;
+        min-height: 40px;
+        height: auto;
+        justify-content: flex-start;
+        padding-inline: 8px;
+        border-start-end-radius: 0;
+        border-end-end-radius: 0;
+        text-align: start;
+        white-space: normal;
+      }
+      .sample-feature > .sample-help-button {
+        display: grid;
+        place-items: start center;
+        width: 40px;
+        min-height: 40px;
+        padding: 9px 0 0;
+        color: var(--ec-text);
+        background: var(--ec-surface);
+        border: 1px solid var(--ec-border);
+        border-inline-start: 0;
+        border-radius: 0 6px 6px 0;
+        cursor: pointer;
+      }
+      .sample-help-button svg { width: 20px; height: 20px; }
+      .sample-help-button:hover { background: var(--ec-hover); }
+      .sample-help-button:focus-visible { outline: 2px solid var(--ec-focus); outline-offset: -3px; }
+      #sampleHelpDialog {
+        width: min(92vw, 420px);
+        max-height: 90dvh;
+        padding: 0;
+        margin: auto;
+        color: var(--ec-text);
+        background: var(--ec-bg);
+        border: 1px solid var(--ec-border);
+        border-radius: 8px;
+      }
+      #sampleHelpDialog::backdrop { background: #020617cc; }
+      #sampleHelpDialog p { margin: 0; padding: 16px; line-height: 1.6; }
       [data-sample-step][data-complete]::after {
         content: ""; display: inline-block; width: .35em; height: .65em;
         margin-inline-start: .6em; border: solid currentColor; border-width: 0 2px 2px 0;
@@ -4268,19 +4315,49 @@
       </main>
       <aside class="ec-right is-hidden" id="rightPanel">
         <div class="panel-stack">
+          <svg width="0" height="0" class="sample-help-symbol" aria-hidden="true" focusable="false">
+            <symbol id="sampleHelpIcon" viewBox="0 0 24 24">
+              <path fill="currentColor" d="M12.838 17.638q.362-.363.362-.888t-.362-.888t-.888-.362t-.887.363t-.363.887t.363.888t.887.362t.888-.363M12 22q-2.075 0-3.9-.788t-3.175-2.137T2.788 15.9T2 12t.788-3.9t2.137-3.175T8.1 2.788T12 2t3.9.788t3.175 2.137T21.213 8.1T22 12t-.788 3.9t-2.137 3.175T12 22m0-2q3.35 0 5.675-2.325T20 12t-2.325-5.675T12 4T6.325 6.325T4 12t2.325 5.675T12 20m.1-12.3q.625 0 1.088.4t.462 1q0 .55-.337.975t-.763.8q-.575.5-1.012 1.1t-.438 1.35q0 .35.263.588t.612.237q.375 0 .638-.25t.337-.625q.1-.525.45-.937t.75-.788q.575-.55.988-1.2t.412-1.45q0-1.275-1.037-2.087T12.1 6q-.95 0-1.812.4T8.975 7.625q-.175.3-.112.638t.337.512q.35.2.725.125t.625-.425q.275-.375.688-.575t.862-.2"/>
+            </symbol>
+          </svg>
           <section id="riverDemoMode" class="panel-card river-demo-mode" hidden>
             <h2>サンプルモード · 河川と橋</h2>
             <p>合成データ · ローカル座標（m）</p>
             <div class="river-demo-actions">
-              <button class="ec-button ec-button--secondary" onclick="if (is2DMode) exit2DView(); else set2DView('top')">3D / 上面</button>
-              <button class="ec-button ec-button--secondary" onclick="if (!statsVisible) toggleStatsPanel(); document.getElementById('statsPanel').scrollIntoView({block:'nearest'})">統計情報</button>
+              <div class="sample-feature">
+                <button class="ec-button ec-button--secondary" onclick="if (is2DMode) exit2DView(); else set2DView('top')">3D / 上面</button>
+                <button class="sample-help-button" type="button" data-sample-help="view" aria-label="ヘルプ: 3D / 上面" aria-haspopup="dialog" onclick="showSampleFeatureHelp('view', this)">
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sampleHelpIcon"/></svg>
+                </button>
+              </div>
+              <div class="sample-feature">
+                <button class="ec-button ec-button--secondary" onclick="if (!statsVisible) toggleStatsPanel(); document.getElementById('statsPanel').scrollIntoView({block:'nearest'})">統計情報</button>
+                <button class="sample-help-button" type="button" data-sample-help="statistics" aria-label="ヘルプ: 統計情報" aria-haspopup="dialog" onclick="showSampleFeatureHelp('statistics', this)">
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sampleHelpIcon"/></svg>
+                </button>
+              </div>
             </div>
             <div id="sampleGuide">
               <p>橋面と水面の高さはどう違うでしょう？ 断面を開いて確かめましょう。</p>
               <div class="river-demo-actions">
-                <button class="ec-button ec-button--primary" data-sample-step="section" onclick="openBridgeSection()">橋を横切る断面を見る</button>
-                <button class="ec-button ec-button--secondary" data-sample-step="measure" onclick="startBridgeMeasurement()">橋の両端を測る</button>
-                <button class="ec-button ec-button--secondary" data-sample-step="density" onclick="exploreSampleDensity()">密度を見る</button>
+                <div class="sample-feature">
+                  <button class="ec-button ec-button--primary" data-sample-step="section" onclick="openBridgeSection()">橋を横切る断面を見る</button>
+                  <button class="sample-help-button" type="button" data-sample-help="section" aria-label="ヘルプ: 橋の断面" aria-haspopup="dialog" onclick="showSampleFeatureHelp('section', this)">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sampleHelpIcon"/></svg>
+                  </button>
+                </div>
+                <div class="sample-feature">
+                  <button class="ec-button ec-button--secondary" data-sample-step="measure" onclick="startBridgeMeasurement()">橋の両端を測る</button>
+                  <button class="sample-help-button" type="button" data-sample-help="measure" aria-label="ヘルプ: 橋の計測" aria-haspopup="dialog" onclick="showSampleFeatureHelp('measure', this)">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sampleHelpIcon"/></svg>
+                  </button>
+                </div>
+                <div class="sample-feature">
+                  <button class="ec-button ec-button--secondary" data-sample-step="density" onclick="exploreSampleDensity()">密度を見る</button>
+                  <button class="sample-help-button" type="button" data-sample-help="density" aria-label="ヘルプ: 密度を見る" aria-haspopup="dialog" onclick="showSampleFeatureHelp('density', this)">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sampleHelpIcon"/></svg>
+                  </button>
+                </div>
               </div>
               <div id="bridgeGuideHint" hidden>
                 <p>橋の両端 A と B を選択してください。</p>
@@ -9968,6 +10045,18 @@
       }
 
       const englishUiText = new Map([
+        ["ヘルプ: 3D / 上面", "Help: 3D / Top view"],
+        ["上面に切り替えると、河道の曲がりと橋の位置を真上から確認できます。もう一度押すと3Dに戻ります。", "Switch to a top view to see the river’s bend and the bridge’s position. Press the same control again to return to 3D."],
+        ["ヘルプ: 統計情報", "Help: Statistics"],
+        ["読み込んだ点数と表示中の点数、分類の内訳、診断結果を確認できます。間引きがある場合は、元の点数と表示中の点数が異なります。", "See the source and displayed point counts, classification breakdown, and diagnostics. When the cloud is sampled, the displayed count is lower than the source count."],
+        ["ヘルプ: 橋の断面", "Help: Bridge cross-section"],
+        ["橋の断面", "Bridge cross-section"],
+        ["橋の中央を通る断面が開きます。上面図の帯が切断位置を示し、A・Bが両方の図で対応します。厚さを変えると帯と断面が更新されます。", "Open a cross-section through the middle of the bridge. The band in the top view marks the cut, and A and B match the same places in both views. Changing the thickness updates both views."],
+        ["ヘルプ: 橋の計測", "Help: Measure the bridge"],
+        ["橋の計測", "Measure the bridge"],
+        ["上面図で橋の両端 A・B を選ぶと、水平距離が計測履歴に保存されます。このサンプルの両端間は60 mです。", "Select the bridge endpoints A and B in the top view. The horizontal distance is saved in the measurement history. The endpoints in this sample are 60 m apart."],
+        ["ヘルプ: 密度を見る", "Help: Explore density"],
+        ["色は表示点の密度を示します。右岸の輪郭は0点のセルです。「0点のセルを調べる」で点数と面積を確認できます。", "Colors show displayed-point density. The outline on the right bank marks a cell with zero points. Use Inspect the empty cell to see its point count and area."],
         ["計測を保存", "Save measurement"],
         ["選択した点を取り消す", "Clear draft points"],
         ["保存済みの結果", "Saved result"],
@@ -11772,6 +11861,40 @@
         workflowState.selectedQuality = "low";
         document.getElementById("fileSelectPanel").classList.add("hidden");
         return window.startDataLoading();
+      }
+
+      const sampleFeatureHelp = {
+        view: { title: "3D / 上面", description: "上面に切り替えると、河道の曲がりと橋の位置を真上から確認できます。もう一度押すと3Dに戻ります。" },
+        statistics: { title: "統計情報", description: "読み込んだ点数と表示中の点数、分類の内訳、診断結果を確認できます。間引きがある場合は、元の点数と表示中の点数が異なります。" },
+        section: { title: "橋の断面", description: "橋の中央を通る断面が開きます。上面図の帯が切断位置を示し、A・Bが両方の図で対応します。厚さを変えると帯と断面が更新されます。" },
+        measure: { title: "橋の計測", description: "上面図で橋の両端 A・B を選ぶと、水平距離が計測履歴に保存されます。このサンプルの両端間は60 mです。" },
+        density: { title: "密度を見る", description: "色は表示点の密度を示します。右岸の輪郭は0点のセルです。「0点のセルを調べる」で点数と面積を確認できます。" },
+      };
+
+      function showSampleFeatureHelp(key, trigger) {
+        const help = sampleFeatureHelp[key];
+        if (!isRiverDemo() || !help || document.getElementById("sampleHelpDialog")) return;
+        const dialog = document.createElement("dialog");
+        dialog.id = "sampleHelpDialog";
+        dialog.setAttribute("aria-labelledby", "sampleHelpTitle");
+        dialog.setAttribute("aria-describedby", "sampleHelpDescription");
+        dialog.innerHTML = `
+          <header class="slice-dialog-header">
+            <h2 id="sampleHelpTitle"></h2>
+            <button class="ec-button ec-button--secondary" type="button" autofocus>閉じる</button>
+          </header>
+          <p id="sampleHelpDescription"></p>`;
+        dialog.querySelector("h2").textContent = help.title;
+        dialog.querySelector("p").textContent = help.description;
+        const close = dialog.querySelector("button");
+        close.addEventListener("click", () => dialog.close());
+        dialog.addEventListener("keydown", event => event.stopPropagation());
+        dialog.addEventListener("close", () => {
+          dialog.remove();
+          if (trigger.isConnected) trigger.focus({ preventScroll: true });
+        }, { once: true });
+        document.body.appendChild(dialog);
+        dialog.showModal();
       }
 
       function setSampleGuideVisible(visible, moveFocus = false) {
