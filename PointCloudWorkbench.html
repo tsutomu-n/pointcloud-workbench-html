@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>PointCloudWorkbench</title>
+    <link rel="icon" type="image/svg+xml" sizes="any" href="data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%2024%2024%22%3E%3Crect%20width=%2224%22%20height=%2224%22%20rx=%225%22%20fill=%22%23132630%22/%3E%3Cg%20transform=%22translate%282%201%29%20scale%28.83%29%22%20fill=%22none%22%20stroke=%22%238de4d5%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22%20stroke-width=%221.9%22%3E%3Cpath%20d=%22M3%2014c1-4.5%203.5-6.5%205.75-3.75C10.5%204.5%2015%202.5%2017.25%209.5C19%209%2020.5%2011%2021%2014v3.5l-9%204l-9-4Z%22/%3E%3Cpath%20d=%22m3%2014l9%204l9-4m-9%204v3.5%22/%3E%3C/g%3E%3C/svg%3E" />
 
     <!-- Three.js r128 + OrbitControls -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -1886,7 +1887,6 @@
       @media (max-width: 500px) {
         .ec-topbar__brand, .ec-topbar__back { white-space: nowrap; }
         .ec-topbar__back > span { display: none; }
-        .ec-topbar__brand { font-size: .8rem; }
       }
     </style>
     <style id="ec-theme">
@@ -3754,6 +3754,133 @@
       #sliceControlPanel .slice-side, .slice-control-note { color: var(--ec-muted); }
       .slice-control-note { font-size: var(--font-size-xs); }
       #sliceControlPanel [disabled] { opacity: .45; cursor: default; }
+      /*
+       * Barlow Semi Condensed Semibold, a WOFF2 subset for the wordmark.
+       * Copyright 2017 The Barlow Project Authors (https://github.com/jpt/barlow)
+       *
+       * This Font Software is licensed under the SIL Open Font License, Version 1.1.
+       * This license is copied below, and is also available with a FAQ at:
+       * http://scripts.sil.org/OFL
+       *
+       *
+       * -----------------------------------------------------------
+       * SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
+       * -----------------------------------------------------------
+       *
+       * PREAMBLE
+       * The goals of the Open Font License (OFL) are to stimulate worldwide
+       * development of collaborative font projects, to support the font creation
+       * efforts of academic and linguistic communities, and to provide a free and
+       * open framework in which fonts may be shared and improved in partnership
+       * with others.
+       *
+       * The OFL allows the licensed fonts to be used, studied, modified and
+       * redistributed freely as long as they are not sold by themselves. The
+       * fonts, including any derivative works, can be bundled, embedded,
+       * redistributed and/or sold with any software provided that any reserved
+       * names are not used by derivative works. The fonts and derivatives,
+       * however, cannot be released under any other type of license. The
+       * requirement for fonts to remain under this license does not apply
+       * to any document created using the fonts or their derivatives.
+       *
+       * DEFINITIONS
+       * "Font Software" refers to the set of files released by the Copyright
+       * Holder(s) under this license and clearly marked as such. This may
+       * include source files, build scripts and documentation.
+       *
+       * "Reserved Font Name" refers to any names specified as such after the
+       * copyright statement(s).
+       *
+       * "Original Version" refers to the collection of Font Software components as
+       * distributed by the Copyright Holder(s).
+       *
+       * "Modified Version" refers to any derivative made by adding to, deleting,
+       * or substituting -- in part or in whole -- any of the components of the
+       * Original Version, by changing formats or by porting the Font Software to a
+       * new environment.
+       *
+       * "Author" refers to any designer, engineer, programmer, technical
+       * writer or other person who contributed to the Font Software.
+       *
+       * PERMISSION & CONDITIONS
+       * Permission is hereby granted, free of charge, to any person obtaining
+       * a copy of the Font Software, to use, study, copy, merge, embed, modify,
+       * redistribute, and sell modified and unmodified copies of the Font
+       * Software, subject to the following conditions:
+       *
+       * 1) Neither the Font Software nor any of its individual components,
+       * in Original or Modified Versions, may be sold by itself.
+       *
+       * 2) Original or Modified Versions of the Font Software may be bundled,
+       * redistributed and/or sold with any software, provided that each copy
+       * contains the above copyright notice and this license. These can be
+       * included either as stand-alone text files, human-readable headers or
+       * in the appropriate machine-readable metadata fields within text or
+       * binary files as long as those fields can be easily viewed by the user.
+       *
+       * 3) No Modified Version of the Font Software may use the Reserved Font
+       * Name(s) unless explicit written permission is granted by the corresponding
+       * Copyright Holder. This restriction only applies to the primary font name as
+       * presented to the users.
+       *
+       * 4) The name(s) of the Copyright Holder(s) or the Author(s) of the Font
+       * Software shall not be used to promote, endorse or advertise any
+       * Modified Version, except to acknowledge the contribution(s) of the
+       * Copyright Holder(s) and the Author(s) or with their explicit written
+       * permission.
+       *
+       * 5) The Font Software, modified or unmodified, in part or in whole,
+       * must be distributed entirely under this license, and must not be
+       * distributed under any other license. The requirement for fonts to
+       * remain under this license does not apply to any document created
+       * using the Font Software.
+       *
+       * TERMINATION
+       * This license becomes null and void if any of the above conditions are
+       * not met.
+       *
+       * DISCLAIMER
+       * THE FONT SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF
+       * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
+       * OF COPYRIGHT, PATENT, TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL THE
+       * COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+       * INCLUDING ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL
+       * DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+       * FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
+       * OTHER DEALINGS IN THE FONT SOFTWARE.
+       */
+      @font-face {
+        font-family: "Barlow Semi Condensed";
+        font-style: normal;
+        font-weight: 600;
+        font-display: swap;
+        src: url("data:font/woff2;base64,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") format("woff2");
+        unicode-range: U+43, U+50, U+57, U+62-65, U+68-69, U+6B-6C, U+6E-6F, U+72, U+74-75;
+      }
+      .ec-topbar__brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        white-space: nowrap;
+        font: 600 22px/1 "Barlow Semi Condensed", "Aptos Narrow", "Arial Narrow", system-ui, sans-serif;
+        letter-spacing: .01em;
+      }
+      .ec-topbar__brand .brand-mark { width: 30px; height: 30px; flex: none; }
+      .ec-topbar__actions { flex: none; }
+
+      @media (max-width: 500px) {
+        .ec-topbar { padding-inline: 12px; }
+        .ec-topbar__brand { font-size: 18px; gap: 6px; }
+        .ec-topbar__brand .brand-mark { width: 24px; height: 24px; }
+      }
+
+      @media (max-width: 360px) {
+        .ec-topbar { padding-inline: 8px; }
+        .ec-topbar__brand { font-size: 15px; }
+        .ec-topbar__actions { gap: 6px; }
+        .ec-topbar__select { padding-inline: 8px 24px; background-position: right 7px center; }
+      }
     </style>
   </head>
   <body>
@@ -3766,7 +3893,8 @@
           onclick="goHome()"
           title="ホームに戻る"
         >
-          PointCloudWorkbench
+          <img class="brand-mark" src="data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%2024%2024%22%3E%3Crect%20width=%2224%22%20height=%2224%22%20rx=%225%22%20fill=%22%23132630%22/%3E%3Cg%20transform=%22translate%282%201%29%20scale%28.83%29%22%20fill=%22none%22%20stroke=%22%238de4d5%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22%20stroke-width=%221.9%22%3E%3Cpath%20d=%22M3%2014c1-4.5%203.5-6.5%205.75-3.75C10.5%204.5%2015%202.5%2017.25%209.5C19%209%2020.5%2011%2021%2014v3.5l-9%204l-9-4Z%22/%3E%3Cpath%20d=%22m3%2014l9%204l9-4m-9%204v3.5%22/%3E%3C/g%3E%3C/svg%3E" width="32" height="32" alt="" />
+          <span class="brand-wordmark">PointCloudWorkbench</span>
         </button>
         <div class="ec-topbar__actions" aria-label="Top actions">
           <button

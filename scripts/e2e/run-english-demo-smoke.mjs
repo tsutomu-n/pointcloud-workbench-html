@@ -33,6 +33,14 @@ try {
   const base = `http://127.0.0.1:${server.address().port}`;
   await page.addInitScript(() => localStorage.setItem("lastLasFileName", "テスト用小規模モデル"));
   await page.goto(`${base}/PointCloudWorkbench.html?lang=en`);
+  const appBrand = page.getByRole("button", { name: "PointCloudWorkbench", exact: true });
+  const favicon = await page.locator('link[rel="icon"]').getAttribute("href", { timeout: 1500 });
+  assert.ok(favicon?.startsWith("data:image/svg+xml,"));
+  assert.equal(await appBrand.locator("img").evaluate(img => img.complete && img.naturalWidth > 0), true);
+  assert.equal(await page.evaluate(async () => {
+    const loaded = await document.fonts.load('600 16px "Barlow Semi Condensed"', "PointCloudWorkbench");
+    return loaded.length === 1 && loaded[0].status === "loaded";
+  }), true);
   await page.getByRole("button", { name: "Try the river sample", exact: true }).waitFor();
   assert.equal(await page.getByRole("button", { name: "Choose sample data", exact: true }).count(), 0);
   assert.equal(await page.locator("#lastFileInfo").isVisible(), false);
@@ -43,6 +51,10 @@ try {
   });
   assert.equal(await page.locator("#lastFileName").innerText(), "調査.las");
   await page.goto(`${base}/index.html?lang=en`);
+  const heading = page.getByRole("heading", { level: 1, name: "PointCloudWorkbench", exact: true });
+  await heading.waitFor();
+  assert.equal(await page.locator('link[rel="icon"]').getAttribute("href"), favicon);
+  assert.equal(await heading.locator("img").evaluate(img => img.complete && img.naturalWidth > 0), true);
   await page.getByRole("link", { name: "Try the river sample", exact: true }).click();
   await page.getByText("Sample mode · River and bridge", { exact: true }).waitFor();
   assert.equal(await page.evaluate(() => statsData.displayPoints), 23746);
@@ -226,6 +238,13 @@ try {
 
   for (const width of [390, 320]) {
     await touchPage.setViewportSize({ width, height: 844 });
+    const brandFits = await touchPage.locator("#appTitle").evaluate(element => {
+      const wordmark = element.querySelector(".brand-wordmark");
+      const actions = document.querySelector(".ec-topbar__actions");
+      return wordmark.clientWidth === wordmark.scrollWidth &&
+        element.getBoundingClientRect().right + 5 <= actions.getBoundingClientRect().left;
+    });
+    assert.equal(brandFits, true);
     await touchPage.getByRole("button", { name: "橋を横切る断面を見る", exact: true }).click();
     const dialog = touchPage.getByRole("dialog", { name: "橋を横切る断面" });
     const close = dialog.getByRole("button", { name: "閉じる", exact: true });
