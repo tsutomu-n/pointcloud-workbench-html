@@ -27,8 +27,10 @@ try {
   browser = await chromium.launch({
     executablePath: process.env.PCW_CHROME || undefined,
     args: ["--enable-unsafe-swiftshader"],
+    ignoreDefaultArgs: ["--disable-back-forward-cache"],
   });
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, colorScheme: "dark", permissions: ["clipboard-read", "clipboard-write"] });
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: "dark", permissions: ["clipboard-read", "clipboard-write"] });
+  const page = await context.newPage();
   page.setDefaultTimeout(10000);
   const base = `http://127.0.0.1:${server.address().port}`;
   await page.addInitScript(() => localStorage.setItem("lastLasFileName", "テスト用小規模モデル"));
@@ -69,6 +71,25 @@ try {
   await appTheme.press("Space");
   assert.equal(await page.locator("html").getAttribute("data-theme"), "dark");
   await page.waitForFunction(background => scene.background.getHexString() !== background, lightBackground);
+  const otherTab = await context.newPage();
+  await otherTab.addInitScript(() => {
+    window.addEventListener("pageshow", event => {
+      document.documentElement.dataset.restoredFromCache = String(event.persisted);
+    });
+  });
+  const landingUrl = `${base}/index.html?lang=en`;
+  await otherTab.goto(landingUrl);
+  await otherTab.getByRole("button", { name: "Light theme", exact: true }).press("Space");
+  await page.waitForFunction(background =>
+    document.documentElement.dataset.theme === "light" && scene.background.getHexString() === background,
+    lightBackground);
+  await otherTab.getByRole("link", { name: "Open LAS / LAZ", exact: true }).click();
+  await otherTab.getByRole("button", { name: "Light theme", exact: true }).press("Space");
+  await otherTab.evaluate(() => history.back());
+  await otherTab.waitForURL(landingUrl, { waitUntil: "commit" });
+  await otherTab.waitForFunction(() => document.documentElement.dataset.restoredFromCache === "true");
+  assert.equal(await otherTab.locator("html").getAttribute("data-theme"), "dark");
+  await otherTab.close();
   assert.equal(await page.evaluate(() => statsData.displayPoints), 23746);
   assert.equal(await page.locator("#qualitySelectPanel").isVisible(), false);
   const sampleHelp = page.locator("#riverDemoMode button[data-sample-help]");
@@ -98,7 +119,10 @@ try {
   await sampleStats.click();
   assert.match(await page.locator("#statsPanel").innerText(), /Potential density gaps/);
   assert.doesNotMatch(await page.locator("#statsPanel").innerText(), /欠測候補/);
-  await page.locator("#statsPanel").getByRole("button", { name: "Close", exact: true }).click();
+  const statsClose = page.locator("#statsPanel").getByRole("button", { name: "Close", exact: true });
+  assert.equal(await statsClose.evaluate(button => document.activeElement === button), true);
+  await page.locator("#densityOverlayToggle").press("Escape");
+  assert.equal(await page.locator("#statsPanel").isVisible(), false);
   assert.equal(await sampleStats.evaluate(button => document.activeElement === button), true);
   const sectionTrigger = page.getByRole("button", { name: "See the bridge cross-section", exact: true });
   await sectionTrigger.click();
@@ -232,6 +256,14 @@ try {
   await page.getByRole("button", { name: "Fit to view", exact: true }).click();
   assert.equal(await page.evaluate(() => camera.zoom), originalZoom);
   await page.getByRole("button", { name: "Select A", exact: true }).click();
+  const openFile = page.getByRole("button", { name: "Open your own file", exact: true });
+  await openFile.click();
+  const confirm = page.getByRole("alertdialog");
+  await confirm.waitFor();
+  await page.keyboard.press("Escape");
+  assert.equal(await confirm.isVisible(), false);
+  assert.equal(await page.evaluate(() => measurementState.selectedPoints.length), 1);
+  assert.equal(await openFile.evaluate(button => document.activeElement === button), true);
   await measureBridge.click();
   assert.equal(await page.getByRole("button", { name: "Select B", exact: true }).evaluate(button => button === document.activeElement), true);
   await page.getByRole("button", { name: "Help: Measure the bridge", exact: true }).click();
@@ -349,6 +381,26 @@ try {
     await close.tap();
     await dialog.waitFor({ state: "hidden" });
   }
+  await touchPage.setViewportSize({ width: 320, height: 568 });
+  await touchPage.getByRole("button", { name: "橋を横切る断面を見る", exact: true }).tap();
+  const shortDialog = touchPage.locator("#slice2DModal");
+  const shortSlider = shortDialog.locator("#sliceThickness");
+  const initialSliderY = (await shortSlider.boundingBox()).y;
+  const scrollAndPlotFit = await shortDialog.evaluate(dialog => {
+    const bounds = dialog.getBoundingClientRect();
+    const chart = dialog.querySelector(".slice-dialog-plots canvas");
+    dialog.scrollTop = Math.ceil(chart.getBoundingClientRect().bottom - bounds.bottom + 8);
+    const chartBounds = chart.getBoundingClientRect();
+    const controls = dialog.querySelector(".slice-dialog-top").getBoundingClientRect();
+    return dialog.scrollTop > 0 && chartBounds.top >= controls.bottom && chartBounds.bottom <= bounds.bottom;
+  });
+  assert.equal(scrollAndPlotFit, true);
+  assert.ok(Math.abs((await shortSlider.boundingBox()).y - initialSliderY) <= 1);
+  const shortThickness = Number(await shortSlider.inputValue());
+  await shortDialog.getByRole("button", { name: "断面を広くする" }).tap();
+  assert.ok(Number(await shortSlider.inputValue()) > shortThickness);
+  await shortDialog.getByRole("button", { name: "閉じる", exact: true }).tap();
+  await shortDialog.waitFor({ state: "hidden" });
   await touchPage.setViewportSize({ width: 320, height: 720 });
   await touchPage.getByRole("button", { name: "橋を測る", exact: true }).tap();
   const bridgeChoicesFit = await touchPage.locator("#bridgeGuideChoices").evaluate(choices => {

@@ -1,6 +1,6 @@
 # PointCloudWorkbench
 
-timestamp="2026-11-20(金)_20:46 JST"
+timestamp="2026-11-20(金)_21:00 JST"
 
 ブラウザーで動く LAS/LAZ 点群ワークベンチです。単一の HTML ファイルとして配布します。
 
@@ -14,7 +14,7 @@ timestamp="2026-11-20(金)_20:46 JST"
 - アプリを直接開く: `https://tsutomu-n.github.io/pointcloud-workbench-html/PointCloudWorkbench.html`
 - 同梱サンプル LAS: `https://tsutomu-n.github.io/pointcloud-workbench-html/demo/pointcloud-demo-sample.las`
 - ランディングページで **河川サンプルを試す** または **LAS / LAZ を開く** を選べます。アプリは日本語と英語に対応し、中国語のランディングページからは英語で開きます。
-- 右上の月と太陽のボタンでライトとダークを切り替えられます。初回は端末の設定に従い、選択後はランディングページとアプリで同じテーマを使います。
+- 右上の月と太陽のボタンでライトとダークを切り替えられます。初回は端末の設定に従い、切り替え後はブラウザで前のページに戻ったときや、同じサイトの別タブにも選択が反映されます。
 
 ## ビジュアルツアー
 

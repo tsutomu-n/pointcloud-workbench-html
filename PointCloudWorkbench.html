@@ -9,42 +9,56 @@
     <script>
       (() => {
         const key = "pcw-theme";
+        const root = document.documentElement;
         const system = window.matchMedia?.("(prefers-color-scheme: light)");
         let preference;
-        try {
-          const stored = localStorage.getItem(key);
-          if (stored === "light" || stored === "dark") preference = stored;
-        } catch {
-          // Storage can be unavailable for local files or private browsing.
+        let localOnly = false;
+
+        function readPreference() {
+          try {
+            const stored = localStorage.getItem(key);
+            preference = stored === "light" || stored === "dark" ? stored : undefined;
+          } catch {
+            // Keep the current choice if storage is unavailable.
+          }
         }
 
-        const root = document.documentElement;
-        root.dataset.theme = preference || (system?.matches ? "light" : "dark");
+        const getTheme = () => preference || (system?.matches ? "light" : "dark");
+        readPreference();
+        root.dataset.theme = getTheme();
 
         document.addEventListener("DOMContentLoaded", () => {
           const toggle = document.getElementById("themeToggle");
-          const syncButton = () => {
-            toggle.setAttribute("aria-pressed", String(root.dataset.theme === "light"));
-          };
-          const applyTheme = (theme) => {
-            if (root.dataset.theme === theme) return;
+          function applyTheme() {
+            const theme = getTheme();
+            const changed = root.dataset.theme !== theme;
             root.dataset.theme = theme;
-            syncButton();
-            root.dispatchEvent(new Event("pcw-theme-change", { bubbles: true }));
-          };
-          syncButton();
+            toggle.setAttribute("aria-pressed", String(theme === "light"));
+            if (changed) root.dispatchEvent(new Event("pcw-theme-change", { bubbles: true }));
+          }
 
+          function refreshTheme() {
+            if (!localOnly) readPreference();
+            applyTheme();
+          }
+
+          refreshTheme();
           toggle.addEventListener("click", () => {
             preference = root.dataset.theme === "light" ? "dark" : "light";
-            applyTheme(preference);
             try {
               localStorage.setItem(key, preference);
+              localOnly = false;
             } catch {
-              // The current page can still switch theme without storage.
+              localOnly = true;
             }
+            applyTheme();
           });
-          system?.addEventListener?.("change", (event) => {
-            if (!preference) applyTheme(event.matches ? "light" : "dark");
+          system?.addEventListener?.("change", applyTheme);
+          window.addEventListener("pageshow", event => {
+            if (event.persisted) refreshTheme();
+          });
+          window.addEventListener("storage", event => {
+            if (event.key === key || event.key === null) refreshTheme();
           });
         });
       })();
@@ -1878,6 +1892,13 @@
         border-bottom: 1px solid var(--ec-border);
       }
       .slice-dialog-header h2 { margin: 0; font-size: 1.05rem; }
+      .slice-dialog-top {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background: var(--ec-bg);
+      }
+      .slice-dialog-top .slice-dialog-header { position: static; }
       .slice-dialog-body {
         display: flex; align-items: flex-start; justify-content: center;
         flex-wrap: wrap; gap: 12px; padding: 12px;
@@ -19371,16 +19392,18 @@
             </div>
           </div>`;
         modal.innerHTML = `
-          <header class="slice-dialog-header">
-            <h2 id="sliceDialogTitle">${bridge ? "橋を横切る断面" : "2D断面ビュー"}</h2>
-            <button class="ec-button ec-button--secondary" data-close autofocus>閉じる</button>
-          </header>
-          ${bridge ? `
-            <div class="bridge-slice-tools">
-              ${thicknessControl}
-              <p class="bridge-slice-count"><span>断面内の表示点:</span> <output id="bridgeSlicePointCount"></output></p>
-              <p id="bridgeSliceThicknessHint" class="bridge-slice-thickness-hint">厚さを変えると、上面図の切断帯の幅と、断面に含まれる点数が変わります。</p>
-            </div>` : ""}
+          <div class="slice-dialog-top">
+            <header class="slice-dialog-header">
+              <h2 id="sliceDialogTitle">${bridge ? "橋を横切る断面" : "2D断面ビュー"}</h2>
+              <button class="ec-button ec-button--secondary" data-close autofocus>閉じる</button>
+            </header>
+            ${bridge ? `
+              <div class="bridge-slice-tools">
+                ${thicknessControl}
+                <p class="bridge-slice-count"><span>断面内の表示点:</span> <output id="bridgeSlicePointCount"></output></p>
+                <p id="bridgeSliceThicknessHint" class="bridge-slice-thickness-hint">厚さを変えると、上面図の切断帯の幅と、断面に含まれる点数が変わります。</p>
+              </div>` : ""}
+          </div>
           <div class="slice-dialog-body">
             ${bridge ? `
               <figure class="bridge-slice-map">
@@ -20532,10 +20555,15 @@
           prevFocus?.focus();  // fix1: フォーカス復元
         }
 
+        function cancelDialog() {
+          closeDialog();
+          opts.onCancel?.();
+        }
+
         const cancelBtn = document.createElement('button');
         cancelBtn.style.cssText = 'background:transparent;border:1px solid var(--ec-border);color:var(--ec-text);border-radius:6px;padding:8px 16px;cursor:pointer;font-size:13px;';
         cancelBtn.textContent = cancelLabel;
-        cancelBtn.onclick = () => { closeDialog(); if (opts.onCancel) opts.onCancel(); };
+        cancelBtn.onclick = cancelDialog;
 
         const confirmBtn = document.createElement('button');
         confirmBtn.style.cssText = `background:${isDanger ? 'var(--ec-warning)' : 'var(--ec-accent)'};border:none;color:var(--ec-accent-text);border-radius:6px;padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600;`;
@@ -20556,6 +20584,12 @@
 
         // fix1: フォーカストラップ — Tab/Shift+Tab をダイアログ内でループ
         overlay.addEventListener('keydown', (e) => {
+          e.stopPropagation();
+          if (e.key === 'Escape') {
+            e.preventDefault();
+            cancelDialog();
+            return;
+          }
           if (e.key !== 'Tab') return;
           const focusable = overlay.querySelectorAll('button:not([disabled])');
           const first = focusable[0];
@@ -20568,7 +20602,7 @@
         });
 
         // fix1b: ESCキーハンドラからフォーカス復元付きで閉じられるよう関数を保存
-        overlay._close = closeDialog;
+        overlay._close = cancelDialog;
 
         cancelBtn.focus();
       }
@@ -20693,17 +20727,20 @@
       }
 
       function handleKeyDown(event) {
+        const key = event.key.toLowerCase();
+        const statsHasFocus = key === "escape" && statsVisible &&
+          document.getElementById("statsPanel").contains(event.target);
         // 読み込み中はEscapeのみ通過させる
-        if (isEditableKeyboardTarget(event.target)) return;
+        if (isEditableKeyboardTarget(event.target) &&
+            !(statsHasFocus && event.target.matches("input[type=checkbox], input[type=range]"))) return;
         if (workflowState.step === "loading") {
-          if (event.key.toLowerCase() === "escape") {
+          if (key === "escape") {
             window.cancelLoading();
           }
           return;
         }
         if (workflowState.step !== "complete") return;
 
-        const key = event.key.toLowerCase();
         if ((key === " " || key === "enter") &&
             event.target?.closest?.("button, a[href], summary, [role=button]")) return;
         if (measurementState.enabled && event.ctrlKey && key === "z") {
@@ -20805,11 +20842,28 @@
             toggleStatsPanel();
             break;
 
-          // パネル閉じる（モーダル優先）
-          case "escape":
-            // 読み込み中はキャンセル
-            if (workflowState.step === "loading") {
-              window.cancelLoading();
+          case "escape": {
+            const confirmDialog = document.getElementById("confirmDialog");
+            if (confirmDialog) {
+              confirmDialog._close();
+              event.preventDefault();
+              break;
+            }
+            const helpModal = document.getElementById("keyboardHelpModal");
+            if (helpModal) {
+              helpModal._close ? helpModal._close() : helpModal.remove();
+              event.preventDefault();
+              break;
+            }
+            const warningModal = document.getElementById("classificationWarningModal");
+            if (warningModal?.classList.contains("show")) {
+              hideClassificationWarningModal();
+              event.preventDefault();
+              break;
+            }
+            if (statsHasFocus) {
+              toggleStatsPanel(true);
+              event.preventDefault();
               break;
             }
             if (measurementState.enabled && measurementState.selectedPoints.length > 0) {
@@ -20825,20 +20879,9 @@
               event.preventDefault();
               break;
             }
-            // ヘルプモーダルが表示されている場合は閉じる（fix1b: フォーカス復元付き）
-            const helpModal = document.getElementById('keyboardHelpModal');
-            if (helpModal) { helpModal._close ? helpModal._close() : helpModal.remove(); break; }
-            // 確認ダイアログが表示されている場合は閉じる（fix1b: フォーカス復元付き）
-            const confirmDlg = document.getElementById('confirmDialog');
-            if (confirmDlg) { confirmDlg._close ? confirmDlg._close() : confirmDlg.remove(); break; }
-            // 警告モーダルが表示されている場合は優先的に閉じる
-            const modal = document.getElementById("classificationWarningModal");
-            if (modal && modal.classList.contains("show")) {
-              hideClassificationWarningModal();
-            } else {
-              hideAllPanels();
-            }
+            if (statsVisible) toggleStatsPanel(true);
             break;
+          }
         }
       }
 

@@ -58,6 +58,7 @@ function buildContext({
   });
 
   const documentListeners = {};
+  const windowListeners = {};
   const themeListeners = {};
   const themeToggle = {
     ...textNode(),
@@ -78,15 +79,19 @@ function buildContext({
   const documentElement = {
     lang: "en",
     dataset: {},
+    dispatchEvent() {},
   };
 
   const context = {
     console,
+    Event,
     URL,
     URLSearchParams,
     window: {
       location: { search: query },
-      addEventListener() {},
+      addEventListener(type, listener) {
+        windowListeners[type] = listener;
+      },
       matchMedia: systemTheme
         ? () => ({ matches: systemTheme === "light", addEventListener() {} })
         : undefined,
@@ -125,7 +130,7 @@ function buildContext({
   context.window.navigator = context.navigator;
   context.window.localStorage = context.localStorage;
 
-  return { appLinks, context, storage, nodes, documentElement, documentListeners, themeListeners };
+  return { appLinks, context, storage, nodes, documentElement, documentListeners, themeListeners, windowListeners };
 }
 
 function loadApi(options = {}) {
@@ -211,8 +216,8 @@ test("landing app links preserve the sample and use English for Chinese", () => 
   }
 });
 
-test("landing theme uses the saved choice ahead of system and persists a click", () => {
-  const { context, html, storage, nodes, documentElement, documentListeners, themeListeners } =
+test("landing theme restores the saved choice on click, page restore, and other-tab changes", () => {
+  const { context, html, storage, nodes, documentElement, documentListeners, themeListeners, windowListeners } =
     loadApi({ storedTheme: "dark", systemTheme: "light" });
   vm.runInContext(extractInlineScript(html, "pcw-theme"), context);
 
@@ -224,4 +229,13 @@ test("landing theme uses the saved choice ahead of system and persists a click",
   expect(documentElement.dataset.theme).toBe("light");
   expect(nodes.themeToggle["aria-pressed"]).toBe("true");
   expect(storage.get("pcw-theme")).toBe("light");
+
+  storage.set("pcw-theme", "dark");
+  windowListeners.pageshow({ persisted: true });
+  expect(documentElement.dataset.theme).toBe("dark");
+  expect(nodes.themeToggle["aria-pressed"]).toBe("false");
+
+  storage.delete("pcw-theme");
+  windowListeners.storage({ key: null });
+  expect(documentElement.dataset.theme).toBe("light");
 });

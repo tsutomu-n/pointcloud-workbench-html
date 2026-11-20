@@ -1,6 +1,6 @@
 # PointCloudWorkbench
 
-timestamp="2026-11-20(金)_20:46 JST"
+timestamp="2026-11-20(金)_21:00 JST"
 
 Browser-native LAS/LAZ point cloud workbench delivered as a single HTML file.
 
@@ -12,7 +12,7 @@ No install. No build. Open the live demo, load a bundled sample LAS, and inspect
 - [Launch the English demo](https://tsutomu-n.github.io/pointcloud-workbench-html/PointCloudWorkbench.html?lang=en&demo=river)
 - Bundled Sample LAS: `https://tsutomu-n.github.io/pointcloud-workbench-html/demo/river-bridge-demo.las`
 - Choose **Try the river sample** or **Open LAS / LAZ** on the landing page. The app supports Japanese and English and opens in English from the Chinese landing page.
-- Use the moon-and-sun button at the upper right to switch themes. The initial theme follows your device. Your selection applies to both the landing page and the app.
+- Use the moon-and-sun button at the upper right to switch themes. The initial theme follows your device. Your selection applies when you go back to an earlier page and syncs across open tabs on the same site.
 
 ## Visual Tour
 

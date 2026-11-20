@@ -5,39 +5,57 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script>
       (() => {
-        const storageKey = "pcw-theme";
+        const key = "pcw-theme";
         const root = document.documentElement;
-        const systemTheme = window.matchMedia?.("(prefers-color-scheme: light)");
-        let choice;
-        try {
-          choice = localStorage.getItem(storageKey);
-        } catch {
-          // Theme selection still works when storage is unavailable.
+        const system = window.matchMedia?.("(prefers-color-scheme: light)");
+        let preference;
+        let localOnly = false;
+
+        function readPreference() {
+          try {
+            const stored = localStorage.getItem(key);
+            preference = stored === "light" || stored === "dark" ? stored : undefined;
+          } catch {
+            // Keep the current choice if storage is unavailable.
+          }
         }
-        let manual = choice === "light" || choice === "dark";
-        const preferredTheme = () => systemTheme?.matches ? "light" : "dark";
-        root.dataset.theme = manual ? choice : preferredTheme();
+
+        const getTheme = () => preference || (system?.matches ? "light" : "dark");
+        readPreference();
+        root.dataset.theme = getTheme();
 
         document.addEventListener("DOMContentLoaded", () => {
-          const button = document.getElementById("themeToggle");
-          const applyTheme = (theme) => {
+          const toggle = document.getElementById("themeToggle");
+          function applyTheme() {
+            const theme = getTheme();
+            const changed = root.dataset.theme !== theme;
             root.dataset.theme = theme;
-            button.setAttribute("aria-pressed", String(theme === "light"));
-          };
+            toggle.setAttribute("aria-pressed", String(theme === "light"));
+            if (changed) root.dispatchEvent(new Event("pcw-theme-change", { bubbles: true }));
+          }
 
-          applyTheme(root.dataset.theme);
-          button.addEventListener("click", () => {
-            manual = true;
-            const theme = root.dataset.theme === "light" ? "dark" : "light";
-            applyTheme(theme);
+          function refreshTheme() {
+            if (!localOnly) readPreference();
+            applyTheme();
+          }
+
+          refreshTheme();
+          toggle.addEventListener("click", () => {
+            preference = root.dataset.theme === "light" ? "dark" : "light";
             try {
-              localStorage.setItem(storageKey, theme);
+              localStorage.setItem(key, preference);
+              localOnly = false;
             } catch {
-              // Keep the current theme for this page.
+              localOnly = true;
             }
+            applyTheme();
           });
-          systemTheme?.addEventListener?.("change", () => {
-            if (!manual) applyTheme(preferredTheme());
+          system?.addEventListener?.("change", applyTheme);
+          window.addEventListener("pageshow", event => {
+            if (event.persisted) refreshTheme();
+          });
+          window.addEventListener("storage", event => {
+            if (event.key === key || event.key === null) refreshTheme();
           });
         });
       })();
