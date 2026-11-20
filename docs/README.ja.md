@@ -1,6 +1,6 @@
 # PointCloudWorkbench
 
-timestamp="2026-11-21(土)_00:04 JST"
+timestamp="2026-11-21(土)_00:33 JST"
 
 [English](../README.md) · [中文快速入门](./quickstart.zh.md) · [公開サイト](https://tsutomu-n.github.io/pointcloud-workbench-html/)
 
@@ -9,7 +9,7 @@ timestamp="2026-11-21(土)_00:04 JST"
 ## すぐに試す
 
 - 最新のChromeまたはEdgeで[河川と橋のサンプル](https://tsutomu-n.github.io/pointcloud-workbench-html/PointCloudWorkbench.html?lang=ja&demo=river)を開きます。橋を横切る断面を見たり、橋の両端A・Bの距離を測ったり、「密度を見る」で右岸の点が抜けた箇所を確認したりできます。
-- [自分のLAS・LAZを開く](https://tsutomu-n.github.io/pointcloud-workbench-html/PointCloudWorkbench.html?lang=ja)場合は、ファイルを選択し、推定メモリと表示点の割合を確認して品質を選びます。
+- [自分のLAS・LAZを開く](https://tsutomu-n.github.io/pointcloud-workbench-html/PointCloudWorkbench.html?lang=ja&open=file)場合は、ファイルを選択し、推定メモリと表示点の割合を確認し、推奨設定で開くか、品質を変更します。
 - スマホでは、1本指で3Dを回転または2Dを移動し、2本指で移動・拡大縮小できます。モデル右上の「2D上面」「3D」「全体」「ツール」から表示や操作欄を切り替えます。
 
 ## 主な機能

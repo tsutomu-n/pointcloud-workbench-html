@@ -1,6 +1,6 @@
 # PointCloudWorkbench 運用手順書
 
-timestamp="2026-11-21(土)_00:00 JST"
+timestamp="2026-11-21(土)_00:33 JST"
 
 ## 1. 目的
 - 対象: `PointCloudWorkbench.html` の日常運用を担当する利用者、運用担当、検証担当
@@ -17,7 +17,7 @@ timestamp="2026-11-21(土)_00:00 JST"
 - Cloudflare / Pages は静的配信を基本とし、通常経路で Workers、Pages Functions、API、telemetry、DB、サーバー側点群処理を使わない
 
 ## 3. 起動手順
-1. [公開アプリ](https://tsutomu-n.github.io/pointcloud-workbench-html/PointCloudWorkbench.html?lang=ja)を開く。手元のファイルを処理する場合は、ダウンロードした `PointCloudWorkbench.html` を Chrome または Edge で開く方法もある。
+1. [公開アプリ](https://tsutomu-n.github.io/pointcloud-workbench-html/PointCloudWorkbench.html?lang=ja&open=file)を開く。手元のファイルを処理する場合は、ダウンロードした `PointCloudWorkbench.html` を Chrome または Edge で開く方法もある。
 2. 初期画面で「ファイル選択」パネルが表示されることを確認する
 3. アプリ右上の言語セレクタで日本語・English・中文（簡体字）を選ぶ。ランディングページで選んだ言語はアプリにも引き継がれる。
 4. ファイルなしで試す場合は「河川サンプルを試す」を選ぶ。最初の操作は[クイックスタート](./docs/quickstart.ja.md)を参照。
@@ -27,7 +27,7 @@ timestamp="2026-11-21(土)_00:00 JST"
 ### 4.1 ファイル選択
 1. ドラッグ&ドロップ、または「ファイルを選択」で LAS/LAZ を選ぶ
 2. ファイル情報と警告表示を確認する
-3. 「品質設定へ」を押す
+3. 「推奨設定で開く」を押す。品質を自分で選ぶ場合は「設定を変更」を押す
 
 ### 4.2 品質設定
 1. `LOW / MEDIUM / HIGH / MAX` から品質を選択する

@@ -62,6 +62,12 @@ try {
   const page = await context.newPage();
   page.setDefaultTimeout(10000);
   const base = `http://127.0.0.1:${server.address().port}`;
+  const ownEntry = await context.newPage();
+  await ownEntry.goto(`${base}/PointCloudWorkbench.html?lang=en&open=file`);
+  await ownEntry.locator("#fileInput").setInputFiles(new URL("../../demo/pointcloud-demo-sample.las", import.meta.url).pathname);
+  await ownEntry.getByText(/^Estimated display:.*4,096/).waitFor({ timeout: 10000 });
+  assert.equal(await ownEntry.getByRole("button", { name: "Open with recommended settings" }).isEnabled(), true);
+  await ownEntry.close();
   await page.addInitScript(() => localStorage.setItem("lastLasFileName", "テスト用小規模モデル"));
   await page.goto(`${base}/PointCloudWorkbench.html?lang=zh`);
   const appBrand = page.getByRole("button", { name: "PointCloudWorkbench", exact: true });
@@ -760,12 +766,26 @@ try {
   await touchPage.getByRole("alertdialog").getByRole("button", { name: "戻る", exact: true }).click();
   await mobileMode.waitFor({ state: "hidden" });
   await touchPage.locator("#fileInput").setInputFiles(new URL("../../demo/pointcloud-demo-sample.las", import.meta.url).pathname);
-  await touchPage.locator("#proceedToQuality").click();
-  await touchPage.locator("#qualitySelectPanel").waitFor();
-  await touchPage.getByRole("button", { name: "読み込み開始", exact: true }).click();
+  await touchPage.getByRole("button", { name: "推奨設定で開く", exact: true }).click();
   await touchPage.waitForFunction(() => workflowState.step === "complete" && statsData.displayPoints === 4096);
   assert.equal(await mobileMode.isVisible(), false);
   assert.equal(await touchPage.getByRole("button", { name: /^ヘルプ:/ }).count(), 0);
+  if (await toolsToggle.getAttribute("aria-expanded") === "false") await toolsToggle.tap();
+  await touchPage.getByRole("button", { name: "点を選んで計測", exact: true }).tap();
+  await toolsToggle.tap();
+  const overlay = touchPage.locator("#measureOverlay");
+  assert.equal(await overlay.isVisible(), true);
+  assert.match(await overlay.innerText(), /1点目/);
+  assert.equal(await touchPage.locator("#mobileTouchHint").isVisible(), false);
+  await overlay.getByRole("button", { name: "計測を終了", exact: true }).tap();
+  assert.equal(await overlay.isVisible(), false);
+  await toolsToggle.tap();
+  await touchPage.getByRole("button", { name: "中央の断面を見る", exact: true }).tap();
+  const locatorMap = touchPage.locator(".slice-location canvas");
+  const initialBand = await locatorMap.evaluate(canvas => canvas.toDataURL());
+  await touchPage.locator(".slice-location input").fill("35");
+  assert.notEqual(await locatorMap.evaluate(canvas => canvas.toDataURL()), initialBand);
+  await touchPage.getByRole("dialog").getByRole("button", { name: "閉じる", exact: true }).tap();
   // Use a real gap between displayed X coordinates in the ordinary LAS.
   const gapWidth = await touchPage.evaluate(() => {
     const coordinates = pointCloud.geometry.getAttribute("position").array;
@@ -783,6 +803,7 @@ try {
     return width;
   });
   assert.ok(gapWidth > 0.1);
+  assert.equal(await touchPage.locator(".slice-location canvas").count(), 2);
   const ordinaryThickness = touchPage.locator("#sliceThickness");
   await ordinaryThickness.fill("0.1");
   assert.equal(await ordinaryThickness.inputValue(), "0.1");

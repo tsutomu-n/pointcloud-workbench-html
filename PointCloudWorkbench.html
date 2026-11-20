@@ -3309,11 +3309,20 @@
       .panel-actions.split .btn {
         flex: 1;
       }
-      #proceedToQuality {
-        width: 100%;
-        font-size: 18px;
-        letter-spacing: 0.6px;
+      .file-load-actions, .measure-overlay-actions {
+        display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;
       }
+      #measureOverlay {
+        position: absolute; z-index: 21; bottom: 8px; left: 8px;
+        max-width: calc(100% - 16px); padding: 8px;
+        background: var(--ec-surface); border: 1px solid var(--ec-border); border-radius: 6px;
+      }
+      #recommendedLoad[hidden], #ownFileGuide[hidden], #measureOverlay[hidden], .is-right-hidden #measureOverlay,
+      #measureOverlay button[hidden], .ec-main:has(#measureOverlay:not([hidden])) #mobileTouchHint { display: none; }
+      .slice-location { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 6px 0; }
+      .slice-location canvas { width: 104px; height: auto; }
+      .slice-location label { display: grid; gap: 4px; }
+      #fileSelectPanel.file-entry .river-demo-entry p { display: none; }
       .panel-section {
         margin-top: var(--space-3);
       }
@@ -4500,6 +4509,27 @@
               ドラッグ&ドロップ、またはボタンから選択できます
             </div>
 
+            <div class="file-info" id="fileInfo" style="display: none">
+              <div><strong>選択されたファイル:</strong></div>
+              <div id="selectedFileName" data-pcw-source-text>-</div>
+              <div id="selectedFileSize">-</div>
+              <div
+                id="selectedFileWarning"
+                style="color: var(--ec-muted); margin-top: 10px"
+              ></div>
+              <div class="file-load-actions">
+                <button id="recommendedLoad" type="button" class="ec-button ec-button--primary" onclick="openRecommendedFile()" disabled>推奨設定で開く</button>
+                <button
+                  class="ec-button ec-button--secondary"
+                  id="proceedToQuality"
+                  onclick="proceedToQualitySelection()"
+                  disabled
+                  style="display: none"
+                >
+                  設定を変更
+                </button>
+              </div>
+            </div>
             <div class="river-demo-entry">
               <button id="englishDemoButton" class="ec-button ec-button--primary" type="button" onclick="loadRiverDemo()">河川サンプルを試す</button>
               <p>ファイル不要。河川・堤防・橋の点群で断面と計測を試せます。</p>
@@ -4590,27 +4620,7 @@
               </div>
             </details>
 
-            <div class="file-info" id="fileInfo" style="display: none">
-              <div><strong>選択されたファイル:</strong></div>
-              <div id="selectedFileName" data-pcw-source-text>-</div>
-              <div id="selectedFileSize">-</div>
-              <div
-                id="selectedFileWarning"
-                style="color: var(--ec-muted); margin-top: 10px"
-              ></div>
-            </div>
 
-            <div class="panel-actions">
-              <button
-                class="ec-button ec-button--primary"
-                id="proceedToQuality"
-                onclick="proceedToQualitySelection()"
-                disabled
-                style="display: none"
-              >
-                品質設定へ
-              </button>
-            </div>
           </div>
 
           <!-- ステップ2: 品質選択パネル -->
@@ -4852,6 +4862,14 @@
           </div>
           <p id="mobileTouchHint">1本指で回転 / 2本指で拡大・移動</p>
         </div>
+        <div id="measureOverlay" hidden>
+          <span id="measureOverlayStatus" role="status"></span>
+          <div class="measure-overlay-actions">
+            <button type="button" id="overlayUndo" class="ec-button ec-button--secondary" onclick="undoMeasurementPoint()">1点戻す</button>
+            <button type="button" id="overlaySave" class="ec-button ec-button--primary" onclick="finalizeMeasurementDraft()">計測を保存</button>
+            <button type="button" class="ec-button ec-button--secondary" onclick="toggleMeasurementMode()">計測を終了</button>
+          </div>
+        </div>
         <button id="mobileBridgeShortcut" type="button" class="ec-button ec-button--secondary" onclick="showMobileBridgeGuide()" hidden>橋の計測</button>
         <div id="bridgeEndMarkers" hidden>
           <button type="button" data-bridge-end="0" aria-label="橋の端 A" onclick="selectBridgeEnd(0)">A</button>
@@ -4865,6 +4883,13 @@
               <path fill="currentColor" d="M12.838 17.638q.362-.363.362-.888t-.362-.888t-.888-.362t-.887.363t-.363.887t.363.888t.887.362t.888-.363M12 22q-2.075 0-3.9-.788t-3.175-2.137T2.788 15.9T2 12t.788-3.9t2.137-3.175T8.1 2.788T12 2t3.9.788t3.175 2.137T21.213 8.1T22 12t-.788 3.9t-2.137 3.175T12 22m0-2q3.35 0 5.675-2.325T20 12t-2.325-5.675T12 4T6.325 6.325T4 12t2.325 5.675T12 20m.1-12.3q.625 0 1.088.4t.462 1q0 .55-.337.975t-.763.8q-.575.5-1.012 1.1t-.438 1.35q0 .35.263.588t.612.237q.375 0 .638-.25t.337-.625q.1-.525.45-.937t.75-.788q.575-.55.988-1.2t.412-1.45q0-1.275-1.037-2.087T12.1 6q-.95 0-1.812.4T8.975 7.625q-.175.3-.112.638t.337.512q.35.2.725.125t.625-.425q.275-.375.688-.575t.862-.2"/>
             </symbol>
           </svg>
+          <details class="panel-card tool-section" id="ownFileGuide" hidden>
+            <summary class="panel-card__header">この点群の操作</summary>
+            <div class="panel-card__body file-load-actions">
+              <button type="button" class="ec-button ec-button--secondary" onclick="openMeasurementTool()">点を選んで計測</button>
+              <button type="button" class="ec-button ec-button--secondary" onclick="create2DSliceModal([{axis:'X', position:0}])">中央の断面を見る</button>
+            </div>
+          </details>
           <section id="riverDemoMode" class="panel-card river-demo-mode" hidden>
             <h2>サンプルモード · 河川と橋</h2>
             <p>合成データ · ローカル座標（m）</p>
@@ -4947,7 +4972,7 @@
             </div>
             <button id="hideSampleGuide" type="button" class="link-btn" aria-controls="sampleGuide" aria-expanded="true" onclick="setSampleGuideVisible(false, true)">サンプルガイドを閉じる</button>
             <button id="showSampleGuide" type="button" class="link-btn" aria-controls="sampleGuide" aria-expanded="false" onclick="setSampleGuideVisible(true, true)" hidden>サンプルガイドを表示</button>
-            <button class="link-btn" onclick="goHome()">自分のファイルを開く</button>
+            <button class="link-btn" onclick="goHome(true)">自分のファイルを開く</button>
           </section>
           <!-- 制御パネル（表示完了後） -->
           <div class="controls" id="controls">
@@ -8170,7 +8195,6 @@
         return true;
       }
       let filePreviewSequence = 0;
-      let autoAdvanceAfterFileSelect = false;
       let progressAnnouncementState = {
         percent: -1,
         process: "",
@@ -10549,6 +10573,15 @@
         ["上面図で橋の両端 A・B を選ぶと、水平距離が計測履歴に保存されます。このサンプルの両端間は60 mです。", "Select the bridge endpoints A and B in the top view. The horizontal distance is saved in the measurement history. The endpoints in this sample are 60 m apart.", "在顶视图中选择桥梁两端 A 和 B。水平距离将保存到测量历史。示例中两端相距 60 米。"],
         ["ヘルプ: 密度を見る", "Help: Explore density", "帮助：查看密度"],
         ["「密度を見る」を押すと、右岸の0点のセルが輪郭で示され、点数と面積が表示されます。色は表示点の密度を示します。", "Explore density outlines the zero-point cell on the right bank and shows its point count and area. Colors show displayed-point density.", "查看密度时会勾勒右岸的零点网格，并显示点数与面积。颜色代表显示点的密度。"],
+        ["推奨設定で開く", "Open with recommended settings", "使用推荐设置打开"],
+        ["設定を変更", "Change settings", "更改设置"],
+        ["計測を終了", "End measurement", "结束本次测量"],
+        ["上面図の切断帯", "Slice band in plan view", "俯视图切片带"],
+        ["側面図の切断帯", "Slice band in side view", "侧视图切片带"],
+        ["切断位置", "Slice position", "切片位置"],
+        ["この点群の操作", "Working with this point cloud", "操作此点云"],
+        ["点を選んで計測", "Measure by picking points", "选点测量"],
+        ["中央の断面を見る", "Inspect a central slice", "查看中心切片"],
         ["計測を保存", "Save measurement", "保存测量"],
         ["選択した点を取り消す", "Clear draft points", "清除未保存选点"],
         ["保存済みの結果", "Saved result", "已保存的结果"],
@@ -11403,13 +11436,13 @@
             name: "統計パネルリセット",
             task: () => resetClassificationQualityDisplay(),
           },
+          { name: "言語設定初期化", task: () => initializeLanguagePreference() },
+          { name: "イベントリスナー設定", task: () => setupEventListeners() },
+          { name: "DOM要素検証", task: () => validateRequiredElements() },
           {
             name: "性能検出開始",
             task: () => detectSystemPerformanceBackground(),
           },
-          { name: "言語設定初期化", task: () => initializeLanguagePreference() },
-          { name: "イベントリスナー設定", task: () => setupEventListeners() },
-          { name: "DOM要素検証", task: () => validateRequiredElements() },
           {
             name: "ブラウザ機能チェック",
             task: () => checkBrowserCapabilities(),
@@ -12007,14 +12040,6 @@
                 console.error("次へボタンが見つかりません");
               }
 
-              const shouldAutoAdvance = autoAdvanceAfterFileSelect;
-              autoAdvanceAfterFileSelect = false;
-              if (shouldAutoAdvance) {
-                const fileName = (file.name || "").toLowerCase();
-                if (fileName.endsWith(".las") || fileName.endsWith(".laz")) {
-                  proceedToQualitySelection();
-                }
-              }
             } catch (error) {
               console.error("File Selection State Update Error:", error);
               resetFileSelection();
@@ -12022,7 +12047,6 @@
             }
           } else {
             // File selection cleared
-            autoAdvanceAfterFileSelect = false;
             resetFileSelection();
           }
         } catch (error) {
@@ -12319,7 +12343,6 @@
           clearSelectedFilePreview();
           workflowState.selectedFile = null;
           hideFileInfo();
-          autoAdvanceAfterFileSelect = false;
 
           const proceedBtn = document.getElementById("proceedToQuality");
           if (proceedBtn) {
@@ -12358,6 +12381,28 @@
         }
       }
 
+      function recommendedFileQuality(file) {
+        const level = checkFileSizeLimits(file).level;
+        return level === "critical" || level === "warning" ? "low" : performanceData.recommendedQuality;
+      }
+
+      function prioritizeFileEntry() {
+        const panel = document.getElementById("fileSelectPanel");
+        panel.classList.add("file-entry");
+        const drop = document.getElementById("dropZone");
+        drop.after(panel.querySelector(".river-demo-entry"));
+        drop.querySelector("button").classList.replace("ec-button--ghost", "ec-button--primary");
+        document.getElementById("englishDemoButton").className = "link-btn";
+      }
+
+      function openRecommendedFile() {
+        const file = workflowState.selectedFile;
+        if (workflowState.step !== "file-select" || !file || !workflowState.previewHeader) return;
+        applyQualitySelection(recommendedFileQuality(file), { manual: true, silent: true });
+        document.getElementById("fileSelectPanel").classList.add("hidden");
+        startDataLoading();
+      }
+
       function updateFileInfo(file) {
         const fileInfo = document.getElementById("fileInfo");
         const fileName = document.getElementById("selectedFileName");
@@ -12367,37 +12412,32 @@
           workflowState.selectedFile === file ? workflowState.previewHeader : null;
         const profile = buildLoadProfile(
           file,
-          workflowState.selectedQuality,
+          file.isSample ? workflowState.selectedQuality : recommendedFileQuality(file),
           previewHeader,
         );
 
+        const quickLoad = document.getElementById("recommendedLoad");
+        if (quickLoad) {
+          quickLoad.hidden = !!file.isSample || (!!workflowState.previewProfile && !previewHeader);
+          quickLoad.disabled = !previewHeader;
+        }
         fileName.textContent = file.name;
         fileSize.textContent = `ファイルサイズ: ${formatFileSize(file.size)}`;
 
-        // ファイルサイズによる警告表示（checkFileSizeLimits と同じ基準）
         const sizeCheck = checkFileSizeLimits(file);
-        if (
-          sizeCheck.level === "advisory" ||
-          sizeCheck.level === "warning" ||
-          sizeCheck.level === "critical" ||
-          sizeCheck.level === "maximum"
-        ) {
-          const details = [sizeCheck.message, profile.riskMessage];
-          if (profile.totalPoints) {
-            details.push(`推定表示: ${profile.pointSummary}`);
-          }
-          fileWarning.textContent = details.join(" ");
-          fileWarning.style.display = "block";
-        } else if (profile.totalPoints || profile.riskLevel !== "ok") {
-          const details = [profile.riskMessage];
-          if (profile.totalPoints) {
-            details.push(`推定表示: ${profile.pointSummary}`);
-          }
-          fileWarning.textContent = details.join(" ");
-          fileWarning.style.display = "block";
-        } else {
-          fileWarning.style.display = "none";
+        const details = [];
+        if (profile.totalPoints) details.push(`推定表示: ${profile.pointSummary}`);
+        if (sizeCheck.level !== "ok") details.push(sizeCheck.message);
+        if (profile.totalPoints || profile.riskLevel !== "ok") {
+          details.push(`危険度 ${profile.riskLabel} / 推定ピークRAM 約${formatEstimatedMemoryMB(profile.estimatedPeakMemoryMB)}`);
         }
+        fileWarning.textContent = "";
+        for (const text of details) {
+          const line = document.createElement("div");
+          line.textContent = text;
+          fileWarning.appendChild(line);
+        }
+        fileWarning.style.display = details.length ? "block" : "none";
 
         fileInfo.style.display = "block";
       }
@@ -13031,6 +13071,7 @@
 
       window.openFilePickerFromNav = function () {
         try {
+          prioritizeFileEntry();
           workflowState.step = "file-select";
           updateRightPanelVisibility();
           if (performanceMonitor) performanceMonitor.disable();
@@ -13051,17 +13092,7 @@
 
           const fileInput = document.getElementById("fileInput");
           if (!fileInput) return;
-          autoAdvanceAfterFileSelect = true;
           fileInput.value = "";
-          const clearAutoAdvanceOnFocus = () => {
-            if (autoAdvanceAfterFileSelect) {
-              const hasFiles = fileInput.files && fileInput.files.length > 0;
-              if (!hasFiles) autoAdvanceAfterFileSelect = false;
-            }
-          };
-          window.addEventListener("focus", clearAutoAdvanceOnFocus, {
-            once: true,
-          });
           fileInput.click();
         } catch (error) {
           console.error("ファイル選択起動エラー:", error);
@@ -14001,6 +14032,12 @@
         });
       }
 
+      function openMeasurementTool() {
+        document.getElementById("measurementSection").open = true;
+        if (!measurementState.enabled) toggleMeasurementMode();
+        document.getElementById("measurementToggleBtn").focus();
+      }
+
       function updateMeasurementUi() {
         if (bridgeGuideActive) {
           if (measurementState.enabled && measurementState.mode === "distance") updateBridgeGuideProgress();
@@ -14100,6 +14137,15 @@
           }
         }
 
+        const overlay = document.getElementById("measureOverlay");
+        if (overlay) {
+          overlay.hidden = !measurementState.enabled || isRiverDemo();
+          document.getElementById("measureOverlayStatus").textContent = status?.textContent || "";
+          document.getElementById("overlayUndo").disabled = !pointCount;
+          const save = document.getElementById("overlaySave");
+          save.hidden = measurementState.mode === "distance";
+          save.disabled = !canFinalizeMeasurementDraft();
+        }
         updateMeasurementResultUi();
         renderMeasurementHistoryList();
       }
@@ -14688,14 +14734,17 @@
         }
       }
 
-      window.goHome = function () {
+      window.goHome = function (preferFile = false) {
         showConfirmDialog({
           title: 'ファイル選択に戻る',
           message: '現在の点群データは破棄されます。ファイル選択画面に戻りますか？',
           confirmLabel: '戻る',
           cancelLabel: 'キャンセル',
           danger: true,
-          onConfirm: _doGoHome,
+          onConfirm: () => {
+            _doGoHome();
+            if (preferFile === true) prioritizeFileEntry();
+          },
         });
       };
 
@@ -14738,7 +14787,7 @@
             const loadingPanel = document.getElementById("loadingPanel");
 
             if (qualityPanel) qualityPanel.classList.add("hidden");
-            if (loadingPanel) loadingPanel.classList.remove("hidden");
+            if (loadingPanel) { loadingPanel.classList.remove("hidden"); loadingPanel.style.display = ""; }
           } catch (panelError) {
             console.error("パネル切り替えエラー:", panelError);
           }
@@ -18386,6 +18435,7 @@
           // 統計情報パネル表示
           showStatsToggle();
           if (isRiverDemo()) showRiverDemoMode();
+          else document.getElementById("ownFileGuide").open = true;
 
           // 読み込み完了トースト
           const loadedFile = workflowState.selectedFile;
@@ -19841,10 +19891,35 @@
           </footer>`;
 
         const plots = modal.querySelector(".slice-dialog-plots");
-        const canvases = activeSlices.map((slice) => {
+        const locationMaps = [];
+        const canvases = activeSlices.map((slice, index) => {
           const plot = createSliceCanvas(slice, activeSlices.length, bridge);
           plots.appendChild(plot);
-          return plot.querySelector("canvas");
+          const projection = plot.querySelector("canvas");
+          if (!bridge) {
+            const location = document.createElement("div");
+            location.className = "slice-location";
+            const caption = slice.axis === "Y" ? "側面図の切断帯" : "上面図の切断帯";
+            location.innerHTML = `<canvas width="208" height="124" role="img"></canvas>
+              <label><span>切断位置</span><input type="range" min="-100" max="100" step="1"></label>`;
+            const overview = location.querySelector("canvas");
+            overview.setAttribute("aria-label", caption);
+            const captionNode = document.createElement("span");
+            captionNode.textContent = caption;
+            location.prepend(captionNode);
+            const slider = location.querySelector("input");
+            location.querySelector("label").prepend(document.createTextNode(slice.axis + " · "));
+            slider.value = String(Math.round(slice.position * 100));
+            slider.addEventListener("input", () => {
+              slice.position = Number(slider.value) / 100;
+              delete slice.coordinate;
+              plot.firstElementChild.textContent = slicePlotLabel(slice);
+              redraw();
+            });
+            projection.before(location);
+            locationMaps[index] = overview;
+          }
+          return projection;
         });
         const map = modal.querySelector("#bridgeSliceMap");
         const thicknessSlider = modal.querySelector("#sliceThickness");
@@ -19859,6 +19934,7 @@
           canvases.forEach((canvas, index) =>
             drawSliceProjection(canvas, activeSlices[index], thickness, pointSize, bridge),
           );
+          locationMaps.forEach((canvas, i) => drawSliceLocation(canvas, activeSlices[i], thickness));
           if (map) {
             drawBridgeSliceMap(map, thickness);
             modal.querySelector("#bridgeSlicePointCount").textContent = countPointsInSlice(activeSlices[0], thickness).toLocaleString();
@@ -19910,6 +19986,39 @@
         redraw();
       }
 
+      function drawSliceLocation(canvas, slice, thickness) {
+        const geometry = pointCloud.geometry;
+        const positions = geometry.attributes.position.array;
+        const box = geometry.boundingBox;
+        // Display coordinates are east (X), height (Y), and negative north (Z).
+        const side = slice.axis === "Y";
+        const v = side ? "y" : "z";
+        const spanX = box.max.x - box.min.x;
+        const spanV = box.max[v] - box.min[v];
+        const scale = Math.min((canvas.width - 12) / (spanX || 1), (canvas.height - 12) / (spanV || 1));
+        const x = value => canvas.width / 2 + (value - (box.min.x + box.max.x) / 2) * scale;
+        const y = value => canvas.height / 2 + (side ? -1 : 1) * (value - (box.min[v] + box.max[v]) / 2) * scale;
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = getThemeColor("--ec-canvas", "#211f23");
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = getThemeColor("--ec-plot-point", "#a59aa4");
+        const stride = 3 * Math.max(1, Math.ceil(positions.length / (3 * 6000)));
+        for (let i = 0; i < positions.length; i += stride) {
+          ctx.fillRect(x(positions[i]), y(positions[i + (side ? 1 : 2)]), 1.4, 1.4);
+        }
+        const pos = resolveSlicePosition(slice, box);
+        const verticalBand = slice.axis === "X";
+        const half = thickness * scale / 2;
+        const left = verticalBand ? x(pos) - half : x(box.min.x);
+        const top = verticalBand ? Math.min(y(box.min[v]), y(box.max[v])) : y(pos) - half;
+        const width = Math.max(2, verticalBand ? half * 2 : spanX * scale);
+        const height = Math.max(2, verticalBand ? spanV * scale : half * 2);
+        ctx.fillStyle = getThemeColor("--ec-accent-glow", "rgba(226,188,109,.18)");
+        ctx.fillRect(left, top, width, height);
+        ctx.strokeStyle = getThemeColor("--ec-accent", "#e2bc6d");
+        ctx.strokeRect(left, top, width, height);
+      }
+
       function drawBridgeSliceMap(canvas, thickness) {
         const points = pointCloud.userData.sourcePositions;
         const { minX, maxX, minY, maxY } = statsData.header;
@@ -19946,6 +20055,15 @@
           ctx.fillText(index === 0 ? "A" : "B", px, y - 8);
         });
         ctx.restore();
+      }
+
+      function slicePlotLabel(slice) {
+        const axisLabels = {
+          X: "YZ平面 (X軸スライス)",
+          Y: "XZ平面 (Y軸スライス)",
+          Z: "XY平面 (Z軸スライス)",
+        };
+        return `${axisLabels[slice.axis]} @ ${(slice.position * 100).toFixed(0)}%`;
       }
 
       function createSliceCanvas(slice, activeSlicesCount, bridge) {
@@ -19990,12 +20108,7 @@
                 color: var(--ec-text);
                 font-size: 16px;
             `;
-        const axisLabels = {
-          X: "YZ平面 (X軸スライス)",
-          Y: "XZ平面 (Y軸スライス)",
-          Z: "XY平面 (Z軸スライス)",
-        };
-        label.textContent = bridge ? "高さ（m）" : `${axisLabels[slice.axis]} @ ${(slice.position * 100).toFixed(0)}%`;
+        label.textContent = bridge ? "高さ（m）" : slicePlotLabel(slice);
         container.appendChild(label);
 
         // キャンバス
@@ -20607,6 +20720,7 @@
           }
 
           workflowState.performanceDetected = true;
+          if (workflowState.step === "file-select" && workflowState.selectedFile) updateFileInfo(workflowState.selectedFile);
 
           console.log("性能検出完了:", {
             score: performanceData.performanceScore,
@@ -21641,6 +21755,11 @@
         if (!shell || !rightPanel) return;
 
         const showTools = workflowState.step === "complete";
+        const ownGuide = document.getElementById("ownFileGuide");
+        if (ownGuide) {
+          ownGuide.hidden = !showTools || isRiverDemo();
+          if (ownGuide.hidden) ownGuide.open = false;
+        }
         if (!showTools) mobileToolsPreference = null;
         const expanded = showTools && (mobileToolsPreference ?? Boolean(mobileSidebarMedia?.matches));
         const toggle = document.getElementById("mobileToolsToggle");
@@ -22119,6 +22238,7 @@
 
       document.addEventListener("DOMContentLoaded", () => {
         console.log("段階的ビューアー起動");
+        if (new URLSearchParams(location.search).get("open") === "file") prioritizeFileEntry();
         init();
         updateRuntimeStatusPanel();
         updateLastFileInfo();
