@@ -1,67 +1,32 @@
 const fs = require("fs");
 
-const readmePath = "README.md";
+const requiredText = new Map([
+  ["README.md", [
+    "# PointCloudWorkbench",
+    "[日本語](./docs/README.ja.md)",
+    "PointCloudWorkbench.html?lang=en&demo=river",
+    "Client-Max / Server-Zero",
+    "are not uploaded",
+    "bun test",
+  ]],
+  ["docs/README.ja.md", [
+    "# PointCloudWorkbench",
+    "[English](../README.md)",
+    "PointCloudWorkbench.html?lang=ja&demo=river",
+    "Client-Max / Server-Zero",
+    "アップロードしません",
+  ]],
+  ["docs/README.en.md", ["[English README](../README.md)"]],
+]);
 
-function fail(message) {
-  console.error(message);
-  process.exit(1);
-}
-
-if (!fs.existsSync(readmePath)) {
-  fail("README.md が存在しません");
-}
-
-const content = fs.readFileSync(readmePath, "utf8");
-
-const requiredSnippets = [
-  "# PointCloudWorkbench",
-  "ブラウザーで動く LAS/LAZ 点群ワークベンチ",
-  "インストール不要。ビルド不要。",
-  "## ライブデモ",
-  "## ビジュアルツアー",
-  "English README",
-  "./docs/README.en.md",
-  "./docs/quickstart.ja.md",
-  "./docs/for-junior-se.ja.md",
-  "./docs/runtime-model.ja.md",
-  "./docs/troubleshooting.ja.md",
-  "./docs/faq.ja.md",
-  "./docs/glossary.ja.md",
-  "ブラウザ言語",
-  "assets/landing-hero.png",
-  "assets/preflight-panel.png",
-  "assets/workspace-3d.png",
-  "assets/workspace-2d-slice-stats.png",
-  "## PointCloudWorkbench の特徴",
-  "## 60秒で試す",
-  "## ライセンス",
-  "## 開発",
-  "## テスト",
-  "## リポジトリの範囲",
-  "## CDN / ネットワーク注意",
-  "index.html",
-  "PointCloudWorkbench.html",
-  "https://tsutomu-n.github.io/pointcloud-workbench-html/",
-  "Chrome / Edge の最新版のみ",
-  "Safari and Firefox are intentionally unsupported",
-  "Client-Max / Server-Zero",
-  "not uploaded",
-  "2GB",
-  "MIT",
-  "bun",
-  "scripts/",
-  "PointCloudWorkbench_ドキュメント索引.md",
-  "PointCloudWorkbench_運用手順書.md",
-  "PointCloudWorkbench_実装リファレンス.md",
-  "CONTRIBUTING.md",
-  "SECURITY.md",
-  "CODE_OF_CONDUCT.md",
-];
-
-for (const snippet of requiredSnippets) {
-  if (!content.includes(snippet)) {
-    fail(`README.md に必要な記述がありません: ${snippet}`);
+for (const [file, snippets] of requiredText) {
+  const content = fs.readFileSync(file, "utf8");
+  for (const snippet of snippets) {
+    if (!content.includes(snippet)) {
+      console.error(`${file} に必要な記述がありません: ${snippet}`);
+      process.exitCode = 1;
+    }
   }
 }
 
-console.log("README チェック OK");
+if (!process.exitCode) console.log("README チェック OK");

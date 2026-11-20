@@ -37,45 +37,16 @@ test("README documents public repo development and runtime constraints", () => {
   for (const relativePath of ossDocPaths) {
     expect(fs.existsSync(path.join(rootDir, relativePath))).toBe(true);
   }
-  expect(readme).toContain("ブラウザーで動く LAS/LAZ 点群ワークベンチ");
-  expect(readme).toContain("インストール不要。ビルド不要。");
-  expect(readme).toContain("Client-Max / Server-Zero");
-  expect(readme).toContain("Chrome / Edge の最新版のみ");
-  expect(readme).toContain("Safari and Firefox are intentionally unsupported");
-  expect(readme).toContain("Selected LAS/LAZ files are processed locally in the browser and are not uploaded");
-  expect(readme).toContain("Runtime mode summary");
-  expect(readme).toContain("ReaderRegistry dispatch");
-  expect(readme).toContain("PointCloudData summary");
-  expect(readme).toContain("手動診断レポートコピー");
-  expect(readme).toContain("## ライブデモ");
-  expect(readme).toContain("## ビジュアルツアー");
-  expect(readme).toContain("## PointCloudWorkbench の特徴");
-  expect(readme).toContain("## 60秒で試す");
-  expect(readme).toContain("English README");
-  expect(readme).toContain("./docs/quickstart.ja.md");
-  expect(readme).toContain("./docs/for-junior-se.ja.md");
-  expect(readme).toContain("./docs/runtime-model.ja.md");
-  expect(readme).toContain("./docs/troubleshooting.ja.md");
-  expect(readme).toContain("./docs/faq.ja.md");
-  expect(readme).toContain("./docs/glossary.ja.md");
-  expect(readme).toContain("CONTRIBUTING.md");
-  expect(readme).toContain("SECURITY.md");
-  expect(readme).toContain("CODE_OF_CONDUCT.md");
-  expect(readme).toContain("ブラウザ言語");
-  expect(readme).toContain("./docs/README.en.md");
-  expect(readme).toContain("assets/landing-hero.png");
-  expect(readme).toContain("assets/preflight-panel.png");
-  expect(readme).toContain("assets/workspace-3d.png");
-  expect(readme).toContain("assets/workspace-2d-slice-stats.png");
-  expect(readme).toContain("index.html");
-  expect(readme).toContain("## ライセンス");
-  expect(readme).toContain("## 開発");
-  expect(readme).toContain("## テスト");
-  expect(readme).toContain("## リポジトリの範囲");
-  expect(readme).toContain("## CDN / ネットワーク注意");
-  expect(readme).toContain("bun");
-  expect(readme).toContain("scripts/");
+  expect(readme).toContain("[日本語](./docs/README.ja.md)");
+  expect(read("docs/README.ja.md")).toContain("[English](../README.md)");
+  expect(read("docs/README.en.md")).toContain("[English README](../README.md)");
+  expect(readme).toContain("## Quick start");
+  expect(readme).toContain("## Development");
   expect(readme).toContain("https://tsutomu-n.github.io/pointcloud-workbench-html/");
+  expect(readme).toContain("bun test");
+  for (const doc of ["CONTRIBUTING.md", "SECURITY.md", "CODE_OF_CONDUCT.md", "LICENSE"]) {
+    expect(readme).toContain(`(./${doc})`);
+  }
 });
 
 test("OSS contributor docs describe server-zero contribution boundaries", () => {
