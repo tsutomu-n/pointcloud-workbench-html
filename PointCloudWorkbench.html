@@ -4069,6 +4069,59 @@
       .tool-section {
         margin-top: 0;
       }
+      #rightPanel {
+        --sidebar-label-size: .875rem;
+        --sidebar-note-size: .8125rem;
+        --sidebar-action-height: 36px;
+      }
+      #rightPanel :is(button, input, select) { font-family: inherit; }
+      #rightPanel :is(.control-btn, .slice-view-btn) {
+        min-height: var(--sidebar-action-height);
+        min-width: 0;
+        box-sizing: border-box;
+        font-size: var(--sidebar-label-size);
+        line-height: 1.35;
+      }
+      #rightPanel :is(.tool-section > summary > span:first-child, #guidePanel > summary span, .stats-header > span) {
+        font-size: var(--sidebar-label-size);
+        font-weight: 600;
+        letter-spacing: normal;
+      }
+      #rightPanel :is(.section-ground-filter, #sliceControlPanel label, .measurement-status) {
+        font-size: var(--sidebar-label-size);
+        line-height: 1.4;
+      }
+      #rightPanel :is(.measurement-note, .slice-control-note, #sectionDiagnosticsStatus) {
+        font-size: var(--sidebar-note-size);
+        line-height: 1.5;
+      }
+      #rightPanel :is(.measurement-results dd, .measurement-history-distance) {
+        font-family: inherit;
+        font-variant-numeric: tabular-nums;
+      }
+      #statsPanel :is(.stats-item, .stats-overview) {
+        font-size: var(--sidebar-label-size);
+        line-height: 1.45;
+      }
+      #statsPanel .stats-header { margin-bottom: 0; }
+      #statsPanel .stats-value {
+        font-family: inherit;
+        font-weight: 600;
+        overflow-wrap: anywhere;
+      }
+      .stats-overview > h3 {
+        margin: 0 0 6px;
+        font-size: var(--sidebar-label-size);
+        font-weight: 600;
+      }
+      .stats-overview dl { display: grid; gap: 4px; margin: 0; }
+      .stats-overview dl > div {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) fit-content(55%);
+        gap: 8px;
+      }
+      .stats-overview dd { margin: 0; text-align: end; }
+
       .tool-section > summary, #guidePanel > summary {
         box-sizing: border-box;
         min-height: 40px;
@@ -4325,6 +4378,7 @@
           width: 44px;
           height: 44px;
         }
+        #rightPanel { --sidebar-action-height: 44px; }
         .tool-section > summary, #guidePanel > summary, #statsToggle {
           min-height: 44px;
         }
@@ -5483,23 +5537,27 @@
               </button>
             </div>
             <div class="stats-grid panel-card__body">
-              <div class="stats-tile">
-                <div class="stats-tile-title">点群概要</div>
-                <div class="stats-item">
-                  元データ点数:
-                  <span class="stats-value" id="originalPoints">-</span>
-                </div>
-                <div class="stats-item">
-                  表示中点数:
-                  <span class="stats-value" id="displayPoints">-</span>
-                </div>
-                <div class="stats-item">
-                  表示率: <span class="stats-value" id="displayRatio">-</span>
-                </div>
-                <div class="stats-item">
-                  単位: <span class="stats-value" id="crsUnits">不明</span>
-                </div>
-              </div>
+              <section class="stats-overview">
+                <h3>点群概要</h3>
+                <dl>
+                  <div>
+                    <dt>元データ点数:</dt>
+                    <dd class="stats-value" id="originalPoints">-</dd>
+                  </div>
+                  <div>
+                    <dt>表示中点数:</dt>
+                    <dd class="stats-value" id="displayPoints">-</dd>
+                  </div>
+                  <div>
+                    <dt>表示率:</dt>
+                    <dd class="stats-value" id="displayRatio">-</dd>
+                  </div>
+                  <div>
+                    <dt>単位:</dt>
+                    <dd class="stats-value" id="crsUnits">不明</dd>
+                  </div>
+                </dl>
+              </section>
               <details class="stats-tile" id="statsLoadDetails">
                 <summary class="stats-tile-title">ファイル / 品質</summary>
                 <div class="stats-item">

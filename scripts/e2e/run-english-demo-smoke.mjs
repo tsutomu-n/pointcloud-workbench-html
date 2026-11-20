@@ -188,6 +188,13 @@ try {
   assert.match(await statsOverview.innerText(), /Source point count:.*23,746/s);
   assert.match(await statsOverview.innerText(), /Display ratio:/);
   assert.equal(await statsOverview.locator("#crsUnits").count(), 1);
+  const statsType = await statsOverview.evaluate(node => ({
+    rowSize: getComputedStyle(node.querySelector("dt")).fontSize,
+    font: getComputedStyle(node).fontFamily,
+    valueFont: getComputedStyle(node.querySelector("dd")).fontFamily,
+  }));
+  assert.equal(statsType.rowSize, "14px");
+  assert.equal(statsType.font, statsType.valueFont);
   assert.equal(await page.locator("#loadStrategy").isVisible(), false);
   assert.match(await page.locator("#statsPanel").innerText(), /Potential density gaps/);
   assert.doesNotMatch(await page.locator("#statsPanel").innerText(), /欠測候補/);
@@ -560,6 +567,14 @@ try {
   const viewControlsToggle = touchPage.locator("#viewControlsToggle");
   await viewControlsToggle.tap();
   assert.equal(await touchPage.locator(".section-width-control").isVisible(), false);
+  const viewButtonType = await touchPage.locator("#view2dFrontBtn").evaluate(button => ({
+    height: button.getBoundingClientRect().height,
+    size: getComputedStyle(button).fontSize,
+    sameFont: getComputedStyle(button).fontFamily === getComputedStyle(button.closest("aside")).fontFamily,
+  }));
+  assert.ok(viewButtonType.height >= 44);
+  assert.equal(viewButtonType.size, "14px");
+  assert.equal(viewButtonType.sameFont, true);
   await touchPage.locator("#view2dFrontBtn").tap();
   assert.equal(await touchPage.evaluate(() => current2DView), "front");
   await touchPage.getByRole("button", { name: "Back to 3D", exact: true }).tap();
