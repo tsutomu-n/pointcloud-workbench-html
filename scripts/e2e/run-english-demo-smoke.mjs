@@ -123,11 +123,22 @@ try {
   assert.equal(await page.locator('link[rel="icon"]').getAttribute("href"), favicon);
   assert.equal(await heading.locator("img").evaluate(img => img.complete && img.naturalWidth > 0), true);
   const landingTheme = page.getByRole("button", { name: "Light theme", exact: true });
+  const landingFigure = page.locator(".hero-slab");
+  const figureBackground = () => landingFigure.evaluate(figure => getComputedStyle(figure).backgroundColor);
   assert.equal(await landingTheme.getAttribute("aria-pressed"), "false");
+  const darkFigureBackground = await figureBackground();
   await landingTheme.press("Enter");
   assert.equal(await landingTheme.getAttribute("aria-pressed"), "true");
+  const lightFigureBackground = await figureBackground();
+  assert.notEqual(lightFigureBackground, darkFigureBackground);
+  assert.equal(await landingFigure.locator("img").evaluate(async img => {
+    await img.decode();
+    return img.naturalWidth > 0;
+  }), true);
   const demoLink = page.getByRole("link", { name: "Try the river sample", exact: true });
   const landingAccent = await demoLink.evaluate(link => getComputedStyle(link).backgroundColor);
+  const wordmarkAccent = await heading.locator(".brand-wordmark > span").last().evaluate(node => getComputedStyle(node).color);
+  assert.equal(wordmarkAccent, landingAccent);
   const landingContrast = await themeContrast(page, [
     ["--color-ink", "--color-accent"],
     ["--color-ink", "--color-accent-hover"],
@@ -153,9 +164,12 @@ try {
     lightPointBrightness: pointCloud.material.color.r,
   }));
   assert.ok(lightPointBrightness > 0 && lightPointBrightness < 1);
+  const asSceneHex = color => page.evaluate(rgb => new THREE.Color(rgb).getHexString(), color);
+  assert.equal(await asSceneHex(lightFigureBackground), lightBackground);
   await appTheme.press("Space");
   assert.equal(await page.locator("html").getAttribute("data-theme"), "dark");
   await page.waitForFunction(background => scene.background.getHexString() !== background, lightBackground);
+  assert.equal(await page.evaluate(() => scene.background.getHexString()), await asSceneHex(darkFigureBackground));
   assert.equal(await page.evaluate(() => pointCloud.material.color.r), 1);
   const otherTab = await context.newPage();
   await otherTab.addInitScript(() => {
