@@ -3746,6 +3746,14 @@
       #runtimeStatusPanel[open] summary::before { content: "▾"; }
       .measurement-history-main { flex-wrap: wrap; }
       .measurement-history-distance { flex: 1 1 8rem; }
+      #measurementDraftActions[hidden], #measurementResultPanel[hidden], #sliceControlPanel[hidden] { display: none; }
+      .measurement-actions.measurement-actions--wide { grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); }
+      .measurement-result-label { margin: 12px 0 4px; color: var(--ec-muted); }
+      #sliceControlPanel { margin-top: 8px; }
+      #sliceControlPanel .panel-card__body { padding-inline: 0; }
+      #sliceControlPanel .slice-side, .slice-control-note { color: var(--ec-muted); }
+      .slice-control-note { font-size: var(--font-size-xs); }
+      #sliceControlPanel [disabled] { opacity: .45; cursor: default; }
     </style>
   </head>
   <body>
@@ -4844,33 +4852,28 @@
                   <div class="measurement-status" id="measurementStatus">
                     1点目をクリック
                   </div>
-                  <div class="measurement-summary" id="measurementSummary" tabindex="-1">
-                    -
+                  <div class="measurement-actions measurement-actions--wide" id="measurementDraftActions">
+                    <button class="control-btn" id="measurementFinalizeBtn" onclick="finalizeMeasurementDraft()">計測を保存</button>
+                    <button class="control-btn" id="measurementUndoBtn" onclick="undoMeasurementPoint()">1点戻す</button>
+                    <button class="control-btn" id="measurementClearDraftBtn" onclick="clearDraftMeasurement()">選択した点を取り消す</button>
                   </div>
-                  <dl class="measurement-results" id="measurementResults"></dl>
-                  <div class="measurement-actions measurement-actions--wide">
-                    <button class="control-btn" id="measurementFinalizeBtn" onclick="finalizeMeasurementDraft()">
-                      確定
-                    </button>
-                    <button class="control-btn" id="measurementUndoBtn" onclick="undoMeasurementPoint()">
-                      1点戻す
-                    </button>
-                    <button class="control-btn" onclick="copyMeasurementResultCsv()">
-                      CSVコピー
-                    </button>
-                  </div>
-                  <div class="measurement-actions">
-                    <button class="control-btn" onclick="clearMeasurement()">
-                      計測を全消去
-                    </button>
-                    <button class="control-btn" onclick="copyMeasurementResult()">
-                      コピー
-                    </button>
+                  <div id="measurementResultPanel" hidden>
+                    <p class="measurement-result-label">保存済みの結果</p>
+                    <div class="measurement-summary" id="measurementSummary" tabindex="-1">-</div>
+                    <dl class="measurement-results" id="measurementResults"></dl>
+                    <div class="measurement-actions">
+                      <button class="control-btn" onclick="copyMeasurementResult()">コピー</button>
+                      <button class="control-btn" onclick="copyMeasurementResultCsv()">CSVコピー</button>
+                    </div>
                   </div>
                   <div class="measurement-history" id="measurementHistory">
                     <div class="measurement-history-header">
                       <span>計測履歴</span>
                       <span id="measurementHistoryCount">0/20</span>
+                    </div>
+                    <div class="measurement-actions measurement-history-tools">
+                      <button class="control-btn" id="measurementDeselectBtn" onclick="deselectMeasurementRecord()">履歴の選択を解除</button>
+                      <button class="control-btn" id="measurementClearHistoryBtn" onclick="confirmClearMeasurementHistory()">履歴を全削除</button>
                     </div>
                     <div
                       class="measurement-history-list"
@@ -4900,7 +4903,7 @@
                   </svg>
                   スライス表示
                 </div>
-                <button class="control-btn slice-btn" onclick="toggleSlicing()">
+                <button class="control-btn slice-btn" id="sliceToggle" aria-expanded="false" aria-controls="sliceControlPanel" onclick="toggleSlicing()">
                   <svg
                     width="18"
                     height="18"
@@ -4913,7 +4916,7 @@
                     <path d="M12 2v20M2 12h20"></path>
                     <circle cx="12" cy="12" r="3"></circle>
                   </svg>
-                  <span>スライス表示を開始</span>
+                  <span>スライス設定を開く</span>
                 </button>
               </div>
 
@@ -9837,6 +9840,19 @@
       }
 
       const englishUiText = new Map([
+        ["計測を保存", "Save measurement"],
+        ["選択した点を取り消す", "Clear draft points"],
+        ["保存済みの結果", "Saved result"],
+        ["履歴の選択を解除", "Deselect history item"],
+        ["履歴を全削除", "Delete all history"],
+        ["計測履歴をすべて削除しますか？", "Delete all measurement history?"],
+        ["保存済みの計測結果をすべて削除します。", "This deletes all saved measurements."],
+        ["スライス設定を開く", "Open slicing controls"],
+        ["スライスを解除", "Disable slicing"],
+        ["この点はスライスで非表示です。", "This point is hidden by slicing."],
+        ["反対側を表示", "Show the opposite side"],
+        ["切断をすべて解除", "Clear all slices"],
+        ["チェックした軸で片側を非表示にします。元の点群は変更されません。", "Each checked axis hides one side. The source data stays intact."],
         ["橋面と水面の高さはどう違うでしょう？ 断面を開いて確かめましょう。", "How high is the bridge deck above the water? Open a cross-section to see."],
         ["橋を横切る断面を見る", "See the bridge cross-section"],
         ["橋を横切る断面", "Cross-section through the bridge"],
@@ -10378,8 +10394,8 @@
         [/^([\d,]+)種類$/, "$1 classes"],
         [/^(距離|折れ線|面積|計測): 1点目をクリック$/, (_, mode) =>
           `${englishUiText.get(mode)}: Click the first point`],
-        [/^(距離|折れ線|面積): (\d+)点選択中。確定またはEnterで保存$/, (_, mode, count) =>
-          `${englishUiText.get(mode)}: ${count} points selected. Use Finish or Enter to save.`],
+        [/^(距離|折れ線|面積): (\d+)点選択中。「計測を保存」またはEnterで保存$/, (_, mode, count) =>
+          `${englishUiText.get(mode)}: ${count} points selected. Use Save measurement or Enter.`],
         [/^(距離|折れ線|面積): (\d+)点選択中。点を追加してください$/, (_, mode, count) =>
           `${englishUiText.get(mode)}: ${count} points selected. Add another point.`],
         [/^(モード|距離|累計3D距離|面積|水平距離|高さ差|勾配|点数|区間数|累計水平距離|始点終点高低差|平均勾配|XY投影面積|周長|d[XYZ]): (.+)$/, (_, label, detail) =>
@@ -11726,10 +11742,12 @@
         const rect = renderer.domElement.getBoundingClientRect();
         camera.updateMatrixWorld();
         document.querySelectorAll("#bridgeEndMarkers button").forEach((button, index) => {
-          const projected = sourceToDisplayPoint({ x: bridgeEnds[index], y: 0, z: 9 }).project(camera);
+          const display = sourceToDisplayPoint({ x: bridgeEnds[index], y: 0, z: 9 });
+          const visible = isMeasurementPointVisible(display);
+          const projected = display.project(camera);
           button.style.left = `${rect.left + (projected.x + 1) * rect.width / 2}px`;
           button.style.top = `${rect.top + (1 - projected.y) * rect.height / 2}px`;
-          button.style.visibility = Math.abs(projected.x) <= 1 && Math.abs(projected.y) <= 1 ? "visible" : "hidden";
+          button.style.visibility = visible && Math.abs(projected.x) <= 1 && Math.abs(projected.y) <= 1 ? "visible" : "hidden";
         });
       }
 
@@ -11742,7 +11760,12 @@
           const index = i / 3;
           if (measurementState.selectedPoints.some(point => point.index === index)) return;
           const source = getSourcePointAtIndex(index);
-          handleMeasurementPoint({ index, source, display: sourceToDisplayPoint(source) });
+          const display = sourceToDisplayPoint(source);
+          if (!isMeasurementPointVisible(display)) {
+            showToast("この点はスライスで非表示です。", "info");
+            return;
+          }
+          handleMeasurementPoint({ index, source, display });
           if (!bridgeGuideActive) document.getElementById("bridgeGuideDistance").focus({ preventScroll: true });
           else document.querySelectorAll("#bridgeGuideChoices button")[1 - end].focus({ preventScroll: true });
           return;
@@ -12918,6 +12941,9 @@
             ? record.id
             : null;
         refreshMeasurementRecordActive(event, sourceElement);
+        const deselect = document.getElementById("measurementDeselectBtn");
+        if (deselect) deselect.disabled = measurementState.selectedRecordId == null;
+        updateMeasurementResultUi();
       }
 
       function clearMeasurementRecordSelection() {
@@ -12961,10 +12987,9 @@
         refreshMeasurementRecordActive();
       }
 
-      function getActiveOrLatestMeasurementRecord() {
-        const activeId = getActiveMeasurementRecordId(measurementState);
+      function getSelectedOrLatestMeasurementRecord() {
         return (
-          findMeasurementRecordById(activeId) ||
+          findMeasurementRecordById(measurementState.selectedRecordId) ||
           measurementState.history[measurementState.history.length - 1] ||
           null
         );
@@ -13058,12 +13083,31 @@
         refreshMeasurementRecordActive();
       }
 
+      function clearDraftMeasurement() {
+        resetMeasurementDraft();
+        updateMeasurementUi();
+      }
+
+      function deselectMeasurementRecord() {
+        clearMeasurementRecordSelection();
+        updateMeasurementUi();
+      }
+
+      function confirmClearMeasurementHistory() {
+        if (!measurementState.history.length) return;
+        showConfirmDialog({
+          title: "計測履歴をすべて削除しますか？",
+          message: "保存済みの計測結果をすべて削除します。",
+          confirmLabel: "履歴を全削除",
+          danger: true,
+          onConfirm: () => clearMeasurementHistory({ preserveDraft: true }),
+        });
+      }
+
       function updateMeasurementUi() {
         const toggleBtn = document.getElementById("measurementToggleBtn");
         const panel = document.getElementById("measurementPanel");
         const status = document.getElementById("measurementStatus");
-        const summary = document.getElementById("measurementSummary");
-        const results = document.getElementById("measurementResults");
         const note = document.getElementById("measurementNote");
         const finalizeBtn = document.getElementById("measurementFinalizeBtn");
         const undoBtn = document.getElementById("measurementUndoBtn");
@@ -13100,7 +13144,16 @@
               measurementState.selectedPoints.length > 0
           );
         }
+        const draftActions = document.getElementById("measurementDraftActions");
+        if (draftActions) draftActions.hidden = !measurementState.enabled;
+        const clearDraft = document.getElementById("measurementClearDraftBtn");
+        if (clearDraft) clearDraft.disabled = measurementState.selectedPoints.length === 0;
+        const clearHistory = document.getElementById("measurementClearHistoryBtn");
+        if (clearHistory) clearHistory.disabled = !measurementState.history.length;
+        const deselect = document.getElementById("measurementDeselectBtn");
+        if (deselect) deselect.disabled = measurementState.selectedRecordId == null;
         if (finalizeBtn) {
+          finalizeBtn.hidden = measurementState.mode === "distance";
           finalizeBtn.disabled = !canFinalizeMeasurementDraft();
         }
         if (undoBtn) {
@@ -13122,7 +13175,7 @@
               status.textContent = "2点目をクリック";
             } else if (canFinalizeMeasurementDraft()) {
               status.textContent =
-                `${modeLabel}: ${pointCount}点選択中。確定またはEnterで保存`;
+                `${modeLabel}: ${pointCount}点選択中。「計測を保存」またはEnterで保存`;
             } else {
               status.textContent =
                 `${modeLabel}: ${pointCount}点選択中。点を追加してください`;
@@ -13136,10 +13189,19 @@
           }
         }
 
-        const activeRecord = getActiveOrLatestMeasurementRecord();
+        updateMeasurementResultUi();
+        renderMeasurementHistoryList();
+      }
+
+      function updateMeasurementResultUi() {
+        const summary = document.getElementById("measurementSummary");
+        const results = document.getElementById("measurementResults");
+        const activeRecord = getSelectedOrLatestMeasurementRecord();
         const formatted = activeRecord?.metrics
           ? formatMeasurementResult(activeRecord.metrics)
           : null;
+        const resultPanel = document.getElementById("measurementResultPanel");
+        if (resultPanel) resultPanel.hidden = !formatted;
         if (summary) summary.textContent = formatted?.summary || "-";
         if (results) {
           results.innerHTML = formatted
@@ -13151,13 +13213,16 @@
                 .join("")
             : "";
         }
-        renderMeasurementHistoryList();
       }
 
       function clearMeasurementHistory(options = {}) {
         clearMeasurementRecordSelection();
-        clearMeasurementHelpers();
-        resetMeasurementDraft();
+        if (options.preserveDraft) {
+          measurementState.history.forEach(disposeMeasurementRecordHelper);
+        } else {
+          clearMeasurementHelpers();
+          resetMeasurementDraft();
+        }
         measurementState.history = [];
         measurementState.lastResult = null;
         if (options.disable) {
@@ -13229,6 +13294,12 @@
         };
       }
 
+      function isMeasurementPointVisible(point) {
+        return (pointCloud?.material?.clippingPlanes || []).every(plane =>
+          plane.distanceToPoint(point) >= 0,
+        );
+      }
+
       function pickMeasurementPoint(event) {
         if (!renderer || !camera || !pointCloud || !THREE.Raycaster) {
           return null;
@@ -13244,7 +13315,15 @@
         const intersects = raycaster.intersectObject(pointCloud, false);
         if (!intersects || intersects.length === 0) return null;
 
-        const hit = intersects[0];
+        const planes = pointCloud.material.clippingPlanes || [];
+        const positions = pointCloud.geometry.getAttribute("position");
+        const vertex = new THREE.Vector3();
+        const hit = intersects.find(({ index }) => {
+          if (!planes.length) return true;
+          vertex.fromBufferAttribute(positions, index).applyMatrix4(pointCloud.matrixWorld);
+          return isMeasurementPointVisible(vertex);
+        });
+        if (!hit) return null;
         const source = getSourcePointAtIndex(hit.index);
         if (!source) return null;
         return {
@@ -13416,7 +13495,7 @@
       };
 
       window.copyMeasurementResult = async function () {
-        const record = getActiveOrLatestMeasurementRecord();
+        const record = getSelectedOrLatestMeasurementRecord();
         if (!record?.metrics) {
           showToast("コピーできる計測結果がありません", "warning");
           return;
@@ -13451,7 +13530,7 @@
       };
 
       window.copyMeasurementResultCsv = async function () {
-        const record = getActiveOrLatestMeasurementRecord();
+        const record = getSelectedOrLatestMeasurementRecord();
         if (!record?.metrics) {
           showToast("CSVコピーできる計測結果がありません", "warning");
           return;
@@ -13629,6 +13708,7 @@
           const slicePanel = document.getElementById("sliceControlPanel");
           if (slicePanel && slicePanel.parentElement) {
             slicePanel.parentElement.removeChild(slicePanel);
+            setSliceControlsVisible(false);
           }
 
           const sliceModal = document.getElementById("slice2DModal");
@@ -18191,19 +18271,32 @@
         zPosition: 0,
       };
 
+      function setSliceControlsVisible(visible) {
+        const panel = document.getElementById("sliceControlPanel");
+        if (panel) panel.hidden = !visible;
+        const toggle = document.getElementById("sliceToggle");
+        if (!toggle) return;
+        toggle.setAttribute("aria-expanded", String(visible));
+        toggle.querySelector("span").textContent = visible ? "スライスを解除" : "スライス設定を開く";
+      }
+
       window.toggleSlicing = function () {
         const existingPanel = document.getElementById("sliceControlPanel");
         if (existingPanel) {
-          existingPanel.classList.toggle("visible");
+          if (!existingPanel.hidden) {
+            window.resetSlicing();
+            setSliceControlsVisible(false);
+          } else {
+            setSliceControlsVisible(true);
+          }
           return;
         }
 
         // スライスパネルを動的に作成
         const slicePanel = document.createElement("div");
         slicePanel.id = "sliceControlPanel";
-        slicePanel.className = "controls slice-panel visible panel-card";
+        slicePanel.className = "slice-panel";
         slicePanel.innerHTML = `
-                <div class="panel-card__header"><span>スライス設定</span></div>
                 <div class="panel-card__body">
                     <div class="slice-row">
                         <label style="display: block; margin-bottom: 5px;">
@@ -18215,6 +18308,7 @@
                             <span class="slice-range-label">最大</span>
                         </div>
                         <span id="sliceXValue" class="slice-value">0%</span>
+                        <label class="slice-side"><input type="checkbox" id="sliceXReverse" disabled> 反対側を表示</label>
                     </div>
                     <div class="slice-row">
                         <label style="display: block; margin-bottom: 5px;">
@@ -18226,6 +18320,7 @@
                             <span class="slice-range-label">最大</span>
                         </div>
                         <span id="sliceYValue" class="slice-value">0%</span>
+                        <label class="slice-side"><input type="checkbox" id="sliceYReverse" disabled> 反対側を表示</label>
                     </div>
                     <div class="slice-row">
                         <label style="display: block; margin-bottom: 5px;">
@@ -18237,10 +18332,9 @@
                             <span class="slice-range-label">最大</span>
                         </div>
                         <span id="sliceZValue" class="slice-value">0%</span>
+                        <label class="slice-side"><input type="checkbox" id="sliceZReverse" disabled> 反対側を表示</label>
                     </div>
-                    <div class="slice-hint">
-                        チェックを入れてスライダーを動かしてください
-                    </div>
+                    <p class="slice-control-note">チェックした軸で片側を非表示にします。元の点群は変更されません。</p>
                     <button class="slice-view-btn" onclick="show2DSliceView()">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                             <rect x="3" y="3" width="18" height="18" rx="2"></rect>
@@ -18248,18 +18342,17 @@
                         </svg>
                         <span>2D断面ビューを開く</span>
                     </button>
-                    <button class="slice-reset-btn" onclick="resetSlicing()">リセット</button>
+                    <button class="control-btn slice-reset-btn" onclick="resetSlicing()">切断をすべて解除</button>
                 </div>
             `;
-        const panelHost = document.querySelector("#rightPanel .panel-stack");
-        const fallbackHost = document.getElementById("rightPanel");
-        (panelHost || fallbackHost || document.body).appendChild(slicePanel);
+        document.querySelector(".slice-section").appendChild(slicePanel);
+        setSliceControlsVisible(true);
 
-        // イベントリスナー追加
         ["X", "Y", "Z"].forEach((axis) => {
-          document
-            .getElementById(`slice${axis}Check`)
-            .addEventListener("change", updateSlicing);
+          const check = document.getElementById(`slice${axis}Check`);
+          const reverse = document.getElementById(`slice${axis}Reverse`);
+          check.addEventListener("change", updateSlicing);
+          reverse.addEventListener("change", updateSlicing);
           document
             .getElementById(`slice${axis}Range`)
             .addEventListener("input", function () {
@@ -18268,9 +18361,17 @@
               updateSlicing();
             });
         });
+        updateSlicing();
       };
 
       function updateSlicing() {
+        for (const axis of ["X", "Y", "Z"]) {
+          const enabled = !!document.getElementById(`slice${axis}Check`)?.checked;
+          for (const suffix of ["Range", "Reverse"]) {
+            const input = document.getElementById(`slice${axis}${suffix}`);
+            if (input) input.disabled = !enabled;
+          }
+        }
         if (!pointCloud || !pointCloud.geometry.boundingBox) {
           console.warn("点群データまたはバウンディングボックスが存在しません");
           return;
@@ -18287,6 +18388,7 @@
           .filter((child) => child.name === "sliceHelper")
           .forEach((helper) => {
             scene.remove(helper);
+          disposeObject3D(helper);
           });
 
         // スライス平面のビジュアルヘルパーを追加
@@ -18301,6 +18403,7 @@
             new THREE.Vector3(1, 0, 0),
             -(center.x + pos),
           );
+          if (document.getElementById("sliceXReverse")?.checked) plane.negate();
           planes.push(plane);
 
           // ヘルパー平面を追加（半透明の赤）- クリッピング位置と完全に一致させる
@@ -18348,6 +18451,7 @@
             new THREE.Vector3(0, 1, 0),
             -(center.y + pos),
           );
+          if (document.getElementById("sliceYReverse")?.checked) plane.negate();
           planes.push(plane);
 
           // ヘルパー平面を追加（半透明の緑）
@@ -18393,6 +18497,7 @@
             new THREE.Vector3(0, 0, 1),
             -(center.z + pos),
           );
+          if (document.getElementById("sliceZReverse")?.checked) plane.negate();
           planes.push(plane);
 
           // ヘルパー平面を追加（半透明の青）
@@ -18426,6 +18531,9 @@
 
           // console.log(`Z軸スライス: スライダー値=${sliderValue}%, 実際の位置=${(center.z + pos).toFixed(2)}, 平面constant=${plane.constant.toFixed(2)}`);
         }
+
+        const openView = document.querySelector("#sliceControlPanel .slice-view-btn");
+        if (openView) openView.disabled = !planes.length;
 
         // PointsMaterialにクリッピングプレーンを適用
         if (pointCloud.material) {
@@ -18746,17 +18854,11 @@
           const range = document.getElementById(`slice${axis}Range`);
           const value = document.getElementById(`slice${axis}Value`);
           if (checkbox) checkbox.checked = false;
+          const reverse = document.getElementById(`slice${axis}Reverse`);
+          if (reverse) reverse.checked = false;
           if (range) range.value = 0;
           if (value) value.textContent = "0%";
         });
-        // ヘルパーも削除
-        if (scene) {
-          scene.children
-            .filter((child) => child.name === "sliceHelper")
-            .forEach((helper) => {
-              scene.remove(helper);
-            });
-        }
         updateSlicing();
       };
 

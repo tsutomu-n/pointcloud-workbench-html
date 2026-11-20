@@ -102,6 +102,43 @@ try {
   assert.doesNotMatch(await page.locator("#measurementHistoryList").innerText(), /[\u3040-\u30ff\u4e00-\u9fff]/);
   await page.locator("#measurementHistoryList .measurement-history-item").first().hover();
   assert.match(await page.getByRole("tooltip").locator(".measurement-tooltip-title").innerText(), /m equivalent/);
+  const historyCount = await page.evaluate(() => measurementState.history.length);
+  await page.getByRole("button", { name: "Clear draft points", exact: true }).click();
+  assert.equal(await page.evaluate(() => measurementState.selectedPoints.length), 0);
+  assert.equal(await page.evaluate(() => measurementState.history.length), historyCount);
+  await page.locator("#measurementHistoryList .measurement-history-distance").first().click();
+  await page.getByRole("button", { name: "Deselect history item", exact: true }).click();
+  assert.equal(await page.evaluate(() => measurementState.selectedRecordId), null);
+  await page.getByRole("button", { name: "Delete all history", exact: true }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Cancel", exact: true }).click();
+  assert.equal(await page.evaluate(() => measurementState.history.length), historyCount);
+  await page.getByRole("button", { name: "Open slicing controls", exact: true }).click();
+  const slicing = page.locator("#sliceControlPanel");
+  assert.equal(await slicing.evaluate(node => !!node.closest(".slice-section")), true);
+  await slicing.locator("#sliceZCheck").check();
+  const originalPlane = await page.evaluate(() => pointCloud.material.clippingPlanes[0].normal.z);
+  assert.equal(await page.evaluate(() => {
+    window.set2DView("top");
+    camera.updateMatrixWorld();
+    const planes = pointCloud.material.clippingPlanes;
+    const rect = renderer.domElement.getBoundingClientRect();
+    const projected = sourceToDisplayPoint({ x: 0, y: 60, z: 0 }).project(camera);
+    const event = {
+      clientX: rect.left + (projected.x + 1) * rect.width / 2,
+      clientY: rect.top + (1 - projected.y) * rect.height / 2,
+    };
+    const clippedHit = pickMeasurementPoint(event);
+    pointCloud.material.clippingPlanes = [];
+    try {
+      return clippedHit === null && pickMeasurementPoint(event) !== null;
+    } finally {
+      pointCloud.material.clippingPlanes = planes;
+    }
+  }), true);
+  await slicing.getByRole("checkbox", { name: "Show the opposite side", exact: true }).last().check();
+  assert.equal(await page.evaluate(() => pointCloud.material.clippingPlanes[0].normal.z), -originalPlane);
+  await page.getByRole("button", { name: "Disable slicing", exact: true }).click();
+  assert.equal(await page.evaluate(() => pointCloud.material.clippingPlanes.length), 0);
   await page.getByRole("button", { name: "Explore density", exact: true }).click();
   await page.waitForFunction(() => densityOverlayState.enabled);
   await page.getByRole("button", { name: "Inspect the empty cell" }).click();
