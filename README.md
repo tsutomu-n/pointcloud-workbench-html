@@ -1,7 +1,5 @@
 # PointCloudWorkbench
 
-timestamp="2026-11-20(金)_23:35 JST"
-
 [日本語](./docs/README.ja.md) · [Project website](https://tsutomu-n.github.io/pointcloud-workbench-html/)
 
 Inspect LAS and LAZ point clouds in your browser. Use 3D and 2D views, cross-sections, measurements, and density overlays to explore your data. No installation or build step is required.
