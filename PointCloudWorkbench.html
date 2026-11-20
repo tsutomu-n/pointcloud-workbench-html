@@ -4106,7 +4106,8 @@
       .stats-tile > summary { cursor: pointer; }
       .stats-tile:not([open]) > summary { margin-bottom: 0; }
       .section-width-control { display: grid; gap: 8px; margin-top: 12px; }
-      .section-width-control[hidden] { display: none; }
+      .section-width-control[hidden], #referenceGridControl[hidden] { display: none; }
+      #referenceGridControl { margin-bottom: 12px; }
       .section-width-label, .section-ground-filter { display: flex; align-items: center; gap: 8px; }
       .section-width-label { justify-content: space-between; }
       .section-width-label .slice-value { margin: 0; white-space: nowrap; }
@@ -4951,6 +4952,10 @@
                   </div>
                 </div>
 
+                <label class="section-ground-filter" id="referenceGridControl">
+                  <input type="checkbox" id="referenceGrid" autocomplete="off" onchange="updateGridHelper()">
+                  参考グリッド
+                </label>
                 <div class="panel-section">
                   <div class="panel-section-title">
                     <svg
@@ -10452,6 +10457,7 @@
         ["1本指で移動 / 2本指で拡大・移動", "One finger to pan / Two fingers to zoom and pan"],
         ["2D上面に切替", "Show 2D top view"],
         ["3D視点", "3D views"],
+        ["参考グリッド", "Reference grid"],
         ["3Dで真上", "3D from above"],
         ["2Dビュー", "2D views"],
         ["標高", "Elevation"],
@@ -12372,14 +12378,12 @@
         const direction = new THREE.Vector3(0.65, 1.05, 1).normalize();
         camera.position.copy(target).addScaledVector(direction, distance);
         controls.update();
-        setRiverDemoSceneHelpers(false);
+        setRiverDemoAxisVisible(false);
       }
 
-      function setRiverDemoSceneHelpers(visible) {
-        for (const name of ["gridHelper", "axisHelper"]) {
-          const helper = scene?.getObjectByName?.(name);
-          if (helper) helper.visible = visible;
-        }
+      function setRiverDemoAxisVisible(visible) {
+        const axis = scene?.getObjectByName?.("axisHelper");
+        if (axis) axis.visible = visible;
       }
 
       function endBridgeGuide() {
@@ -14439,7 +14443,7 @@
         const demoMode = document.getElementById("riverDemoMode");
         if (demoMode && !demoMode.hidden) {
           demoMode.hidden = true;
-          setRiverDemoSceneHelpers(true);
+          setRiverDemoAxisVisible(true);
         }
         try {
           clearMeasurement();
@@ -14904,6 +14908,7 @@
         );
         gridHelper.name = "gridHelper";
         targetScene.add(gridHelper);
+        updateGridHelper(targetScene);
 
         const axisHelper = new THREE.AxesHelper(20);
         axisHelper.name = "axisHelper";
@@ -18136,6 +18141,9 @@
         if (viewStatus) viewStatus.textContent = currentViewLabel;
         const sectionWidth = document.querySelector(".section-width-control");
         if (sectionWidth) sectionWidth.hidden = !is2DMode;
+        const gridControl = document.getElementById("referenceGridControl");
+        if (gridControl) gridControl.hidden = is2DMode;
+        updateGridHelper();
         if (sampleViewToggle) {
           sampleViewToggle.textContent = isTopView ? "3Dに戻る" : "2D上面に切替";
         }
@@ -19547,32 +19555,11 @@
         scene.add(axisHelper);
       }
 
-      // グリッドヘルパーを更新する関数
-      function updateGridHelper() {
-        // 既存のグリッドを削除
-        const existingGrid = scene.getObjectByName("gridHelper");
-        if (existingGrid) {
-          scene.remove(existingGrid);
-        }
-
-        // 新しいグリッドを追加
-        const gridSize = 100;
-        const gridDivisions = 10;
-        const gridHelper = new THREE.GridHelper(
-          gridSize,
-          gridDivisions,
-          0x888888,
-          0x444444,
-        );
-        gridHelper.name = "gridHelper";
-
-        if (isCADMode) {
-          // Z-up座標系の場合、グリッドをXY平面に配置
-          gridHelper.rotation.x = Math.PI / 2;
-        }
-        // Y-up座標系の場合はデフォルト（XZ平面）
-
-        scene.add(gridHelper);
+      function updateGridHelper(targetScene = scene) {
+        const grid = targetScene?.getObjectByName?.("gridHelper");
+        if (!grid) return;
+        grid.rotation.x = isCADMode ? Math.PI / 2 : 0;
+        grid.visible = !is2DMode && Boolean(document.getElementById("referenceGrid")?.checked);
       }
 
       // 高さ表示の色を更新する関数

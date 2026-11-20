@@ -106,6 +106,21 @@ try {
   }
   assert.match(await page.locator("#colorModeToggle").innerText(), /Color mode\s+Classification/);
   assert.equal(await page.locator(".section-width-control").isVisible(), false);
+  await page.locator("#viewControlsToggle").click();
+  const referenceGrid = page.getByRole("checkbox", { name: "Reference grid", exact: true });
+  const gridVisible = () => page.evaluate(() => scene.getObjectByName("gridHelper").visible);
+  assert.equal(await referenceGrid.isChecked(), false);
+  assert.equal(await gridVisible(), false);
+  await referenceGrid.check();
+  assert.equal(await gridVisible(), true);
+  assert.equal(await page.evaluate(() => scene.getObjectByName("axisHelper").visible), false);
+  await page.evaluate(() => window.set2DView("top"));
+  assert.equal(await gridVisible(), false);
+  await page.evaluate(() => window.exit2DView());
+  assert.equal(await gridVisible(), true);
+  await referenceGrid.uncheck();
+  assert.equal(await gridVisible(), false);
+  await page.locator("#viewControlsToggle").click();
   await page.locator("#colorModeToggle").press("Enter");
   await page.getByRole("button", { name: "Color by elevation", exact: true }).click();
   assert.equal(await page.locator("#colorModeStatus").innerText(), "Elevation");
