@@ -118,6 +118,19 @@ try {
   const orbitDegrees = Math.abs(Math.atan2(Math.sin(orbitDelta), Math.cos(orbitDelta))) * 180 / Math.PI;
   assert.ok(orbitDegrees >= 12 && orbitDegrees <= 20, `A short mouse drag rotated ${orbitDegrees}°`);
 
+  const wheelZoomRatio = deltaY => page.evaluate(deltaY => {
+    window.fitToView();
+    const distance = () => camera.position.distanceTo(controls.target);
+    const before = distance();
+    renderer.domElement.dispatchEvent(new WheelEvent("wheel", { deltaY, cancelable: true }));
+    return distance() / before;
+  }, deltaY);
+  const fineZoom = await wheelZoomRatio(-10);
+  const wheelStep = await wheelZoomRatio(-100);
+  assert.ok(fineZoom < 1 && fineZoom > wheelStep && wheelStep > 0.95);
+  assert.ok(Math.abs(await wheelZoomRatio(-10000) - 1) < 0.1);
+  await page.getByRole("button", { name: "Fit to view", exact: true }).click();
+
   assert.equal(await page.locator("#qualitySelectPanel").isVisible(), false);
   const sampleHelp = page.locator("#riverDemoMode button[data-sample-help]");
   assert.equal(await sampleHelp.count(), 5);
@@ -275,10 +288,11 @@ try {
   const markerLeft = await endMarker.evaluate(button => button.style.left);
   const originalZoom = await page.evaluate(() => camera.zoom);
   await page.getByRole("button", { name: "Zoom in", exact: true }).press("Space");
-  assert.ok(await page.evaluate(() => camera.zoom) > originalZoom);
+  const toolbarZoomRatio = (await page.evaluate(() => camera.zoom)) / originalZoom;
+  assert.ok(toolbarZoomRatio > 1 && toolbarZoomRatio < 1.15);
   await page.waitForFunction(left => document.querySelector("#bridgeEndMarkers button").style.left !== left, markerLeft);
   await page.getByRole("button", { name: "Zoom out", exact: true }).click();
-  assert.equal(await page.evaluate(() => camera.zoom), originalZoom);
+  assert.ok(Math.abs((await page.evaluate(() => camera.zoom)) - originalZoom) < 1e-9);
   await page.getByRole("button", { name: "Zoom in", exact: true }).click();
   await page.getByRole("button", { name: "Fit to view", exact: true }).click();
   assert.equal(await page.evaluate(() => camera.zoom), originalZoom);
