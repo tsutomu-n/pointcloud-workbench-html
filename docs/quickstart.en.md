@@ -1,6 +1,6 @@
 # River and bridge demo
 
-timestamp="2026-11-20(金)_22:54 JST"
+timestamp="2026-11-20(金)_22:56 JST"
 
 [English README](../README.md) · [日本語ガイド](./quickstart.ja.md)
 
@@ -11,4 +11,4 @@ Open the [river and bridge demo](https://tsutomu-n.github.io/pointcloud-workbenc
 3. Choose **Explore density** to locate the cell on the right bank with zero displayed points. Density depends on the displayed sample.
 4. Choose **Open your own file** to inspect a LAS or LAZ file. Review the estimated memory use and displayed point ratio before loading.
 
-On a phone, tap **Tools** above the model to open the controls. Drag with one finger to rotate in 3D or pan in 2D. Pinch to zoom or drag with two fingers to pan. Ordinary measurements snap to displayed points and depend on the source coordinate units.
+Select the question mark beside a sample tool for help. On a phone, tap **Tools** above the model to open the controls. Drag with one finger to rotate in 3D or pan in 2D. Pinch to zoom or drag with two fingers to pan. Ordinary measurements snap to displayed points and depend on the source coordinate units.
