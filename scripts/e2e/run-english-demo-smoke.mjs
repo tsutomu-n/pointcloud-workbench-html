@@ -152,6 +152,14 @@ try {
   assert.ok(landingContrast.every(ratio => ratio >= 4.5), landingContrast.join(", "));
   await demoLink.click();
   await page.getByText("Sample mode · River and bridge", { exact: true }).waitFor();
+  assert.equal(await page.evaluate(() => {
+    const pos = pointCloud.geometry.getAttribute("position");
+    const rect = renderer.domElement.getBoundingClientRect();
+    const v = new THREE.Vector3().fromBufferAttribute(pos, 0).applyMatrix4(pointCloud.matrixWorld).project(camera);
+    const hit = pickMeasurementPoint({ clientX: rect.left + (v.x + 1) * rect.width / 2 + 2,
+      clientY: rect.top + (1 - v.y) * rect.height / 2 + 1 });
+    return hit && hit.display.distanceTo(v.fromBufferAttribute(pos, hit.index).applyMatrix4(pointCloud.matrixWorld)) < 1e-8;
+  }), true);
   const appTheme = page.getByRole("button", { name: "Light theme", exact: true });
   assert.equal(await page.locator("html").getAttribute("data-theme"), "light");
   assert.equal(await appTheme.getAttribute("aria-pressed"), "true");
@@ -346,8 +354,17 @@ try {
   await page.waitForFunction(async () => (await navigator.clipboard.readText()).includes("60.000"));
   await page.locator("#measurementDisclosure").click();
   assert.match(await page.locator("#measurementSummary").innerText(), /60\.000/);
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "Download history CSV", exact: true }).click(),
+  ]);
+  assert.equal(download.suggestedFilename(), "measurement-history.csv");
+  const csvRows = (await readFile(await download.path(), "utf8")).trim().split(/\r?\n/);
+  assert.equal(csvRows.length, 3);
+  assert.match(csvRows[0], /sourceX,sourceY,sourceZ/);
+  assert.match(csvRows[1], /60\.000/);
   await page.locator('button[onclick="copyMeasurementResult()"]').click();
-  await page.waitForFunction(async () => (await navigator.clipboard.readText()).includes("Distance: 60.000 m equivalent"));
+  await page.waitForFunction(async () => (await navigator.clipboard.readText()).includes("Distance: 60.000 m"));
   await page.getByRole("button", { name: "Start measuring", exact: true }).click();
   await page.evaluate(() => {
     setMeasurementMode("areaXY");
@@ -368,7 +385,7 @@ try {
   assert.equal(await page.evaluate(() => measurementState.selectedPoints.length), 3);
   assert.doesNotMatch(await page.locator("#measurementHistoryList").innerText(), /[\u3040-\u30ff\u4e00-\u9fff]/);
   await page.locator("#measurementHistoryList .measurement-history-item").first().hover();
-  assert.match(await page.getByRole("tooltip").locator(".measurement-tooltip-title").innerText(), /m equivalent/);
+  assert.match(await page.getByRole("tooltip").locator(".measurement-tooltip-title").innerText(), /60\.000 m$/);
   const historyCount = await page.evaluate(() => measurementState.history.length);
   await page.locator("#measurementModePolyline").click();
   await changeMode.getByRole("button", { name: "Discard points and switch", exact: true }).click();

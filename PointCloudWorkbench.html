@@ -5328,6 +5328,7 @@
                       <span id="measurementHistoryCount">0/20</span>
                     </div>
                     <div class="measurement-actions measurement-history-tools">
+                      <button class="control-btn" type="button" onclick="downloadMeasurementHistory()">履歴をCSV保存</button>
                       <button class="control-btn" id="measurementDeselectBtn" onclick="deselectMeasurementRecord()">履歴の選択を解除</button>
                       <button class="control-btn" id="measurementClearHistoryBtn" onclick="confirmClearMeasurementHistory()">履歴を全削除</button>
                     </div>
@@ -5337,7 +5338,7 @@
                     ></div>
                   </div>
                   <div class="measurement-note" id="measurementNote">
-                    表示点への計測です。距離はLAS座標単位をm相当として表示し、元データの座標単位に依存します。
+                    表示点への計測です。3D距離と勾配には水平・鉛直両方の長さ単位が必要です。
                   </div>
                 </div>
               </div>
@@ -7236,7 +7237,7 @@
       };
       let pointSize = 1.0;
       const MEASUREMENT_NOTE =
-        "表示点への計測です。距離はLAS座標単位をm相当として表示し、元データの座標単位に依存します。";
+        "表示点への計測です。3D距離と勾配には水平・鉛直両方の長さ単位が必要です。";
       const MEASUREMENT_AREA_NOTE =
         "面積はXY投影面積です。斜面表面積ではありません。";
       const MEASUREMENT_HISTORY_LIMIT = 20;
@@ -8028,6 +8029,7 @@
         const mode = record.mode || metrics.mode || "distance";
         if (mode === "polyline") {
           return {
+            units: metrics.units,
             id: Number.isFinite(Number(record.id)) ? Number(record.id) : null,
             mode,
             pointCount: Number(metrics.pointCount || 0),
@@ -8040,6 +8042,7 @@
         }
         if (mode === "areaXY") {
           return {
+            units: metrics.units,
             id: Number.isFinite(Number(record.id)) ? Number(record.id) : null,
             mode,
             pointCount: Number(metrics.pointCount || 0),
@@ -8048,6 +8051,7 @@
           };
         }
         return {
+          units: metrics.units,
           id: Number.isFinite(Number(record.id)) ? Number(record.id) : null,
           mode,
           distance3d: roundWorkAssistNumber(metrics.distance3d, 3),
@@ -10779,8 +10783,10 @@
         ["CSVコピー", "Copy CSV", "复制 CSV"],
         ["計測を全消去", "Clear measurements", "清除测量"],
         ["コピー", "Copy", "复制"],
+        ["単位未確認", "Unit unconfirmed", "单位未确认"],
+        ["履歴をCSV保存", "Download history CSV", "下载测量历史 CSV"],
         ["計測履歴", "Measurement history", "测量历史"],
-        ["表示点への計測です。距離はLAS座標単位をm相当として表示し、元データの座標単位に依存します。", "Measurements snap to displayed points. Distance is shown as meter-equivalent and depends on the source coordinate units.", "测量吸附到显示点。距离以米当量显示，取决于原始坐标单位。"],
+        ["表示点への計測です。3D距離と勾配には水平・鉛直両方の長さ単位が必要です。", "Measurements snap to displayed points. 3D distance and slope require known horizontal and vertical length units.", "测量吸附到显示点。三维距离和坡度需要已知的水平和垂直长度单位。"],
         ["スライス表示", "Slicing", "切片"],
         ["スライス表示を開始", "Enable slicing", "启用切片"],
         ["高さ方向の断面を切り取って内部構造を確認できます", "Use a slice to inspect the interior of the point cloud.", "使用切片查看点云内部结构。"],
@@ -11191,6 +11197,10 @@
         [/^(距離|折れ線|面積) (-?[\d.]+)\s*(m²?)相当$/, (_, mode, value, unit) =>
           `${englishUiText.get(mode)} ${value} ${unit} equivalent`,
           (_, mode, value, unit) => `${chineseUiText.get(mode)} ${value} ${unit} 当量`],
+        [/^(#\d+ )?(-?[\d.]+ )?\(?単位未確認\)?$/, (_, id = "", value = "") => id + value + (value ? "(unit unconfirmed)" : "Unit unconfirmed"),
+          (_, id = "", value = "") => id + value + (value ? "（单位未确认）" : "单位未确认")],
+        [/^(水平|高さ差|周長|距離|折れ線|面積) ([^/]+)$/, (_, label, value) => translateAppUi(label) + " " + translateAppUi(value.trim()),
+          (_, label, value) => translateChineseUi(label) + " " + translateChineseUi(value.trim())],
         [/^(水平|高さ差|周長) (-?[\d.]+) m相当$/, (_, metric, value) =>
           `${englishUiText.get(metric)} ${value} m equivalent`,
           (_, metric, value) => `${chineseUiText.get(metric)} ${value} 米当量`],
@@ -13116,10 +13126,10 @@
         return point;
       }
 
-      function calculateMeasurementMetrics(startPoint, endPoint) {
+      function calculateMeasurementMetrics(startPoint, endPoint, zScale = 1) {
         const start = getMeasurementPointCoordinates(startPoint);
         const end = getMeasurementPointCoordinates(endPoint);
-        const segment = calculateMeasurementSegmentMetrics(start, end);
+        const segment = calculateMeasurementSegmentMetrics(start, end, zScale);
 
         return {
           mode: "distance",
@@ -13127,21 +13137,21 @@
           end,
           ...segment,
           heightDifference: Math.abs(segment.dz),
-          slopePercent: calculateSlopePercent(
-            segment.dz,
+          slopePercent: zScale === null ? null : calculateSlopePercent(
+            segment.dz * zScale,
             segment.horizontalDistance,
           ),
         };
       }
 
-      function calculateMeasurementSegmentMetrics(startPoint, endPoint) {
+      function calculateMeasurementSegmentMetrics(startPoint, endPoint, zScale = 1) {
         const start = getMeasurementPointCoordinates(startPoint);
         const end = getMeasurementPointCoordinates(endPoint);
         const dx = end.x - start.x;
         const dy = end.y - start.y;
         const dz = end.z - start.z;
         const horizontalDistance = Math.sqrt(dx * dx + dy * dy);
-        const distance3d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        const distance3d = zScale === null ? null : Math.hypot(horizontalDistance, dz * zScale);
 
         return {
           start,
@@ -13170,7 +13180,7 @@
         return points.map(getMeasurementPointCoordinates);
       }
 
-      function calculatePolylineMeasurementMetrics(points = []) {
+      function calculatePolylineMeasurementMetrics(points = [], zScale = 1) {
         const sourcePoints = getMeasurementSourcePoints(points);
         if (sourcePoints.length < 2) {
           throw new Error("折れ線計測には2点以上が必要です");
@@ -13178,10 +13188,10 @@
         const segments = [];
         for (let i = 1; i < sourcePoints.length; i += 1) {
           segments.push(
-            calculateMeasurementSegmentMetrics(sourcePoints[i - 1], sourcePoints[i]),
+            calculateMeasurementSegmentMetrics(sourcePoints[i - 1], sourcePoints[i], zScale),
           );
         }
-        const total3d = segments.reduce((sum, segment) => sum + segment.distance3d, 0);
+        const total3d = zScale === null ? null : segments.reduce((sum, segment) => sum + segment.distance3d, 0);
         const totalHorizontal = segments.reduce(
           (sum, segment) => sum + segment.horizontalDistance,
           0,
@@ -13198,7 +13208,7 @@
           total3d,
           totalHorizontal,
           verticalDelta,
-          slopePercent: calculateSlopePercent(verticalDelta, totalHorizontal),
+          slopePercent: zScale === null ? null : calculateSlopePercent(verticalDelta * zScale, totalHorizontal),
         };
       }
 
@@ -13228,16 +13238,19 @@
         };
       }
 
-      function formatMeasurementValue(value) {
-        const numeric = Number(value);
-        if (!Number.isFinite(numeric)) return "-";
-        return `${numeric.toFixed(3)} m相当`;
-      }
+      const lengthUnits = {
+        metre: { scale: 1, symbol: "m" },
+        foot: { scale: 0.3048, symbol: "ft" },
+        "US survey foot": { scale: 1200 / 3937, symbol: "ftUS" },
+      };
 
-      function formatMeasurementAreaValue(value) {
-        const numeric = Number(value);
-        if (!Number.isFinite(numeric)) return "-";
-        return `${numeric.toFixed(3)} m²相当`;
+      function formatMeasurementValue(value, unit, area = false) {
+        if (value == null) return "単位未確認";
+        if (!Number.isFinite(value)) return "-";
+        const symbol = lengthUnits[unit]?.symbol;
+        return symbol
+          ? `${value.toFixed(3)} ${symbol}${area ? "²" : ""}`
+          : `${value.toFixed(3)} (単位未確認)`;
       }
 
       function formatMeasurementPercentValue(value) {
@@ -13270,13 +13283,13 @@
         const mode = metrics?.mode || "distance";
         if (mode === "polyline") {
           return {
-            summary: formatMeasurementValue(metrics.total3d),
+            summary: formatMeasurementValue(metrics.total3d, metrics.units?.horizontal),
             rows: [
               ["点数", `${metrics.pointCount || 0}`],
               ["区間数", `${metrics.segmentCount || 0}`],
-              ["累計3D距離", formatMeasurementValue(metrics.total3d)],
-              ["累計水平距離", formatMeasurementValue(metrics.totalHorizontal)],
-              ["始点終点高低差", formatMeasurementValue(metrics.verticalDelta)],
+              ["累計3D距離", formatMeasurementValue(metrics.total3d, metrics.units?.horizontal)],
+              ["累計水平距離", formatMeasurementValue(metrics.totalHorizontal, metrics.units?.horizontal)],
+              ["始点終点高低差", formatMeasurementValue(metrics.verticalDelta, metrics.units?.vertical)],
               ["平均勾配", formatMeasurementPercentValue(metrics.slopePercent)],
             ],
             note: MEASUREMENT_NOTE,
@@ -13284,24 +13297,24 @@
         }
         if (mode === "areaXY") {
           return {
-            summary: formatMeasurementAreaValue(metrics.areaXY),
+            summary: formatMeasurementValue(metrics.areaXY, metrics.units?.horizontal, true),
             rows: [
               ["点数", `${metrics.pointCount || 0}`],
-              ["XY投影面積", formatMeasurementAreaValue(metrics.areaXY)],
-              ["周長", formatMeasurementValue(metrics.perimeter)],
+              ["XY投影面積", formatMeasurementValue(metrics.areaXY, metrics.units?.horizontal, true)],
+              ["周長", formatMeasurementValue(metrics.perimeter, metrics.units?.horizontal)],
             ],
             note: `${MEASUREMENT_NOTE} ${MEASUREMENT_AREA_NOTE}`,
           };
         }
         return {
-          summary: formatMeasurementValue(metrics.distance3d),
+          summary: formatMeasurementValue(metrics.distance3d, metrics.units?.horizontal),
           rows: [
-            ["水平距離", formatMeasurementValue(metrics.horizontalDistance)],
-            ["高さ差", formatMeasurementValue(metrics.heightDifference)],
+            ["水平距離", formatMeasurementValue(metrics.horizontalDistance, metrics.units?.horizontal)],
+            ["高さ差", formatMeasurementValue(metrics.heightDifference, metrics.units?.vertical)],
             ["勾配", formatMeasurementPercentValue(resolveMeasurementSlopePercent(metrics))],
-            ["dX", formatMeasurementValue(metrics.dx)],
-            ["dY", formatMeasurementValue(metrics.dy)],
-            ["dZ", formatMeasurementValue(metrics.dz)],
+            ["dX", formatMeasurementValue(metrics.dx, metrics.units?.horizontal)],
+            ["dY", formatMeasurementValue(metrics.dy, metrics.units?.horizontal)],
+            ["dZ", formatMeasurementValue(metrics.dz, metrics.units?.vertical)],
           ],
           note: MEASUREMENT_NOTE,
         };
@@ -13337,57 +13350,64 @@
       }
 
       function formatMeasurementCsvText(metrics) {
-        const mode = metrics?.mode || "distance";
-        if (mode === "polyline") {
-          return [
-            "mode,pointCount,segmentCount,total3d,totalHorizontal,verticalDelta,slopePercent",
-            [
-              "polyline",
-              metrics.pointCount || 0,
-              metrics.segmentCount || 0,
-              formatMeasurementCsvNumber(metrics.total3d),
-              formatMeasurementCsvNumber(metrics.totalHorizontal),
-              formatMeasurementCsvNumber(metrics.verticalDelta),
-              formatMeasurementCsvNumber(metrics.slopePercent, 2),
-            ].join(","),
-          ].join("\n");
+        const fields = measurementCsvFields(metrics);
+        return [Object.keys(fields), Object.values(fields)].map(row => row.join(",")).join("\n");
+      }
+
+      function measurementCsvFields(metrics) {
+        const mode = metrics.mode || "distance";
+        const columns = {
+          distance: ["distance3d", "horizontal", "dz", "slopePercent", "dx", "dy"],
+          polyline: ["pointCount", "segmentCount", "total3d", "totalHorizontal", "verticalDelta", "slopePercent"],
+          areaXY: ["pointCount", "areaXY", "perimeter"],
+        };
+        const fields = { mode };
+        for (const key of columns[mode] || columns.distance) {
+          if (key.endsWith("Count")) fields[key] = metrics[key];
+          else {
+            const value = key === "horizontal" ? metrics.horizontalDistance : metrics[key];
+            fields[key] = formatMeasurementCsvNumber(value, key === "slopePercent" ? 2 : 3);
+          }
         }
-        if (mode === "areaXY") {
-          return [
-            "mode,pointCount,areaXY,perimeter",
-            [
-              "areaXY",
-              metrics.pointCount || 0,
-              formatMeasurementCsvNumber(metrics.areaXY),
-              formatMeasurementCsvNumber(metrics.perimeter),
-            ].join(","),
-          ].join("\n");
-        }
-        return [
-          "mode,distance3d,horizontal,dz,slopePercent,dx,dy",
-          [
-            "distance",
-            formatMeasurementCsvNumber(metrics.distance3d),
-            formatMeasurementCsvNumber(metrics.horizontalDistance),
-            formatMeasurementCsvNumber(metrics.dz),
-            formatMeasurementCsvNumber(resolveMeasurementSlopePercent(metrics), 2),
-            formatMeasurementCsvNumber(metrics.dx),
-            formatMeasurementCsvNumber(metrics.dy),
-          ].join(","),
-        ].join("\n");
+        fields.horizontalUnit = lengthUnits[metrics.units?.horizontal]?.symbol || "unknown";
+        fields.verticalUnit = lengthUnits[metrics.units?.vertical]?.symbol || "unknown";
+        fields.resultUnit = mode === "areaXY"
+          ? (fields.horizontalUnit === "unknown" ? "unknown" : fields.horizontalUnit + "²")
+          : (fields.verticalUnit === "unknown" ? "unknown" : fields.horizontalUnit);
+        return fields;
+      }
+
+      function formatMeasurementHistoryCsv(history) {
+        const results = history.map(record => measurementCsvFields(record.metrics));
+        const columns = [...new Set(results.flatMap(Object.keys))];
+        const rows = [["id", "pointOrder", "sourceX", "sourceY", "sourceZ", ...columns]];
+        history.forEach((record, index) => {
+          record.points.forEach((point, order) => {
+            const { x, y, z } = getMeasurementPointCoordinates(point);
+            const fields = results[index];
+            const values = columns.map(key => {
+              if (order > 0 && key !== "mode" && !key.endsWith("Unit")) return "";
+              return fields[key] ?? "";
+            });
+            rows.push([record.id, order + 1, x, y, z, ...values]);
+          });
+        });
+        return rows.map(row => row.join(",")).join("\r\n");
+      }
+
+      function downloadMeasurementHistory() {
+        if (!measurementState.history.length) return;
+        const csv = formatMeasurementHistoryCsv(measurementState.history);
+        const url = URL.createObjectURL(new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" }));
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "measurement-history.csv";
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
       }
 
       function createMeasurementRecord(id, startPoint, endPoint, helperGroup = null) {
-        const metrics = calculateMeasurementMetrics(startPoint, endPoint);
-        return {
-          id,
-          mode: "distance",
-          points: [startPoint, endPoint],
-          startPoint,
-          endPoint,
-          metrics,
-          helperGroup,
-        };
+        return createMeasurementRecordFromPoints(id, "distance", [startPoint, endPoint], helperGroup);
       }
 
       function createMeasurementRecordFromPoints(
@@ -13397,19 +13417,25 @@
         helperGroup = null,
       ) {
         const safeMode = MEASUREMENT_MODES[mode] ? mode : "distance";
+        const units = isRiverDemo()
+          ? { horizontal: "metre", vertical: "metre" }
+          : statsData.crsDiagnostics?.units || {};
+        const horizontal = lengthUnits[units.horizontal];
+        const vertical = lengthUnits[units.vertical];
+        const zScale = horizontal && vertical ? vertical.scale / horizontal.scale : null;
         let metrics;
         if (safeMode === "polyline") {
-          metrics = calculatePolylineMeasurementMetrics(points);
+          metrics = calculatePolylineMeasurementMetrics(points, zScale);
         } else if (safeMode === "areaXY") {
           metrics = calculateAreaXYMeasurementMetrics(points);
         } else {
-          metrics = calculateMeasurementMetrics(points[0], points[1]);
+          metrics = calculateMeasurementMetrics(points[0], points[1], zScale);
         }
         const record = {
           id,
           mode: safeMode,
           points: Array.isArray(points) ? [...points] : [],
-          metrics,
+          metrics: { ...metrics, units: { ...units } },
           helperGroup,
         };
         if (safeMode === "distance") {
@@ -13667,19 +13693,19 @@
         if (mode === "polyline") {
           meta = [
             `${record.metrics.pointCount || 0}点`,
-            `水平 ${formatMeasurementValue(record.metrics.totalHorizontal)}`,
+            `水平 ${formatMeasurementValue(record.metrics.totalHorizontal, record.metrics.units?.horizontal)}`,
             `平均勾配 ${formatMeasurementPercentValue(record.metrics.slopePercent)}`,
           ].join(" / ");
         } else if (mode === "areaXY") {
           meta = [
             `${record.metrics.pointCount || 0}点`,
-            `周長 ${formatMeasurementValue(record.metrics.perimeter)}`,
+            `周長 ${formatMeasurementValue(record.metrics.perimeter, record.metrics.units?.horizontal)}`,
             MEASUREMENT_AREA_NOTE,
           ].join(" / ");
         } else {
           meta = [
-            `水平 ${formatMeasurementValue(record.metrics.horizontalDistance)}`,
-            `高さ差 ${formatMeasurementValue(record.metrics.heightDifference)}`,
+            `水平 ${formatMeasurementValue(record.metrics.horizontalDistance, record.metrics.units?.horizontal)}`,
+            `高さ差 ${formatMeasurementValue(record.metrics.heightDifference, record.metrics.units?.vertical)}`,
             `勾配 ${formatMeasurementPercentValue(record.metrics.slopePercent)}`,
           ].join(" / ");
         }
@@ -14291,7 +14317,7 @@
         if (!source) return null;
         return {
           index: hit.index,
-          display: hit.point.clone(),
+          display: vertex.fromBufferAttribute(positions, hit.index).applyMatrix4(pointCloud.matrixWorld),
           source,
         };
       }
@@ -14331,19 +14357,8 @@
       function addMeasurementRecord(points, mode = measurementState.mode) {
         const id = measurementState.nextRecordId++;
         const safePoints = Array.isArray(points) ? [...points] : [];
-        const metrics =
-          mode === "polyline"
-            ? calculatePolylineMeasurementMetrics(safePoints)
-            : mode === "areaXY"
-              ? calculateAreaXYMeasurementMetrics(safePoints)
-              : calculateMeasurementMetrics(safePoints[0], safePoints[1]);
-        const helperGroup = createMeasurementHelpers(safePoints, metrics, id);
-        const record = createMeasurementRecordFromPoints(
-          id,
-          metrics.mode || mode,
-          safePoints,
-          helperGroup,
-        );
+        const record = createMeasurementRecordFromPoints(id, mode, safePoints);
+        record.helperGroup = createMeasurementHelpers(safePoints, record.metrics, id);
         const next = appendMeasurementRecord(
           measurementState.history,
           record,
@@ -16499,6 +16514,38 @@
         };
       }
 
+      function wktLengthUnits(text) {
+        const stack = [];
+        const found = { horizontal: [], vertical: [] };
+        // Only a CRS or its immediate coordinate axes establish the measurement units.
+        const tokens = /"(?:""|[^"])*"|([a-z_][a-z_0-9]*)\s*\[|\]|[^\s,\[\]"]+/gi;
+        for (const match of text.matchAll(tokens)) {
+          const node = stack.at(-1);
+          if (match[1]) {
+            stack.push({ type: match[1].toUpperCase(), args: [], axes: [], unit: undefined });
+          } else if (match[0] === "]" && node) {
+            stack.pop();
+            const parent = stack.at(-1);
+            if (/^(LENGTHUNIT|UNIT)$/.test(node.type) && parent) {
+              const factor = Number(node.args[1]);
+              parent.unit = Object.keys(lengthUnits).find(key => Math.abs(lengthUnits[key].scale - factor) < 1e-12) || null;
+            } else if (node.type === "AXIS" && parent) {
+              parent.axes.push(node);
+            } else if (!parent || /^(COMPOUNDCRS|COMPD_CS)$/.test(parent.type)) {
+              const vertical = /^(VERTCRS|VERT_CS)$/.test(node.type);
+              if (!vertical && !/^(PROJCS|PROJCRS|PROJECTEDCRS|LOCAL_CS|ENGCRS)$/.test(node.type)) continue;
+              if (!node.axes.length) found[vertical ? "vertical" : "horizontal"].push(node.unit);
+              for (const axis of node.axes) {
+                const isHeight = vertical || /^(up|down)$/i.test(axis.args[1]);
+                found[isHeight ? "vertical" : "horizontal"].push(axis.unit === undefined ? node.unit : axis.unit);
+              }
+            }
+          } else if (node) node.args.push(match[0]);
+        }
+        const unique = values => values.every(value => value === values[0]) ? values[0] ?? null : null;
+        return { horizontal: unique(found.horizontal), vertical: unique(found.vertical) };
+      }
+
       function summarizeWktCrs(wktText) {
         const text = String(wktText || "").trim();
         const nameMatch = text.match(/^(?:PROJCRS|PROJCS|GEOGCRS|GEOGCS|COMPOUNDCRS|VERTCRS|VERT_CS)\s*\[\s*"([^"]+)"/i);
@@ -16507,9 +16554,7 @@
           text: text.slice(0, CRS_DIAGNOSTIC_POLICY.maxTextChars),
           name: nameMatch?.[1] || null,
           hasVertical: /\b(?:VERTCRS|VERT_CS|VERT_DATUM)\b/i.test(text),
-          units: /\b(?:UNIT|LENGTHUNIT)\s*\[\s*"metre"/i.test(text)
-            ? { horizontal: "metre", vertical: /\b(?:VERTCRS|VERT_CS)\b/i.test(text) ? "metre" : null }
-            : { horizontal: null, vertical: null },
+          units: wktLengthUnits(text),
           epsgCandidates: classifyWktEpsgCandidates(text),
         };
       }
@@ -16560,19 +16605,21 @@
         const geographic = getValue(2048);
         const vertical = getValue(4096);
         const horizontal = projected || geographic;
-        const unit = getValue(3076) || getValue(4099);
+        const xyUnit = getValue(3076);
+        const zUnit = getValue(4099);
+        const names = { 9001: "metre", 9002: "foot", 9003: "US survey foot" };
         return {
           present: Object.keys(keys).length > 0,
           name: geoAsciiParams || null,
           epsgCandidates: {
             horizontal: uniqueStrings([horizontal]),
             vertical: uniqueStrings([vertical]),
-            unit: uniqueStrings([unit]),
+            unit: uniqueStrings([xyUnit, zUnit]),
             other: [],
           },
           units: {
-            horizontal: unit === "9001" ? "metre" : null,
-            vertical: getValue(4099) === "9001" ? "metre" : null,
+            horizontal: names[xyUnit] || null,
+            vertical: names[zUnit] || null,
           },
           warnings,
         };
@@ -16638,10 +16685,12 @@
           ...(wkt?.epsgCandidates?.unit || []),
           ...(geoTiff?.epsgCandidates?.unit || []),
         ]);
-        const horizontalName = wkt?.name || geoTiff?.name || null;
+        const horizontalName = wkt?.name && !/^VERT(?:CRS|_CS)\s*\[/i.test(wkt.text)
+          ? wkt.name : geoTiff?.name || null;
         const verticalDetected = Boolean(wkt?.hasVertical || verticalCandidates.length);
         const hasHorizontal = Boolean(horizontalName || horizontalCandidates.length);
-        const hasUnits = Boolean(wkt?.units?.horizontal || geoTiff?.units?.horizontal || unitCandidates.length);
+        const units = (wkt || geoTiff)?.units || { horizontal: null, vertical: null };
+        const hasUnits = Boolean(units.horizontal);
         const pointFormat = Number(header?.pointDataRecordFormat);
         const requiresWkt = pointFormat >= 6 && pointFormat <= 10;
         if (requiresWkt && !projectionSummary?.rawSources?.hasWkt) {
@@ -16679,10 +16728,7 @@
             heightBasis: verticalDetected ? wkt?.name || null : null,
             source: wkt?.hasVertical ? "wkt" : verticalCandidates.length ? "geotiff" : null,
           },
-          units: {
-            horizontal: wkt?.units?.horizontal || geoTiff?.units?.horizontal || (unitCandidates.length ? `EPSG:${unitCandidates[0]}` : null),
-            vertical: wkt?.units?.vertical || geoTiff?.units?.vertical || null,
-          },
+          units,
           rawSources: {
             ...(projectionSummary?.rawSources || {}),
             globalEncodingWktBit: Boolean(header?.wktGlobalEncodingBit),
@@ -16732,7 +16778,9 @@
           vertical,
           epsg,
           sources: sources || unknown,
-          units: diagnostics?.units?.horizontal || diagnostics?.units?.vertical || unknown,
+          units: diagnostics?.units?.horizontal || diagnostics?.units?.vertical
+            ? `XY: ${lengthUnits[diagnostics.units.horizontal]?.symbol || "?"} / Z: ${lengthUnits[diagnostics.units.vertical]?.symbol || "?"}`
+            : unknown,
           warnings: diagnostics?.warnings?.length ? diagnostics.warnings.join(" / ") : "なし",
         };
       }

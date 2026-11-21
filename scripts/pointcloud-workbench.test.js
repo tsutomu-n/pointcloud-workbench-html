@@ -809,6 +809,37 @@ test("summarizeGeoTiffKeys extracts CRS and unit EPSG candidates", () => {
   expect(summary.units.horizontal).toBe("metre");
 });
 
+test("vertical units and nested WKT parameters do not establish horizontal units", () => {
+  const context = createContext();
+  expect(vm.runInContext(`summarizeGeoTiffKeys({keys:{4099:{valueOffset:9001}}}).units`, context))
+    .toEqual({horizontal:null, vertical:"metre"});
+  expect(vm.runInContext(`summarizeWktCrs('COMPOUNDCRS["site",PROJCRS["grid",CONVERSION["shift",PARAMETER["offset",0,LENGTHUNIT["metre",1]]]],VERTCRS["height",LENGTHUNIT["foot",0.3048]]]').units`, context))
+    .toEqual({horizontal:null, vertical:"foot"});
+});
+
+test("measurement history uses compatible axes for 3D and retains original ordered coordinates", () => {
+  const context = createContext();
+  const read = (vertical) => {
+    context.__vertical = vertical;
+    return vm.runInContext(`
+      statsData.crsDiagnostics = {units:{horizontal:"metre",vertical:__vertical}};
+      (() => {
+        const record = createMeasurementRecord(4, {x:10,y:0,z:0}, {x:13,y:0,z:10});
+        return {metrics:record.metrics, csv:formatMeasurementHistoryCsv([record])};
+      })()
+    `, context);
+  };
+  const mixed = read("foot");
+  expect(mixed.metrics.distance3d).toBeCloseTo(Math.hypot(3, 3.048), 8);
+  expect(mixed.metrics.slopePercent).toBeCloseTo(101.6, 8);
+  expect(mixed.csv.split(/\r?\n/)).toHaveLength(3);
+  expect(mixed.csv).toContain("13,0,10");
+  const unknown = read(null);
+  expect(unknown.metrics.distance3d).toBeNull();
+  expect(unknown.metrics.slopePercent).toBeNull();
+  expect(unknown.metrics.horizontalDistance).toBe(3);
+});
+
 test("summarizeProjectionRecords prefers WKT and warns on CRS mismatch", () => {
   const context = createContext();
   const wktPayload = new TextEncoder().encode('PROJCRS["JGD2011 / Japan Plane Rectangular CS IX",LENGTHUNIT["metre",1,ID["EPSG",9001]],ID["EPSG",6677]]\0');
@@ -1575,6 +1606,7 @@ test("work assist snapshot summarizes current work without file names or point p
           cell: { row: 2, column: 3, centerX: 100, centerY: 200 },
         },
       };
+      statsData.crsDiagnostics = { units: { horizontal: "metre", vertical: "metre" } };
       measurementState.history = [
         window.__pcwTestApi.createMeasurementRecord(
           4,
@@ -3438,6 +3470,7 @@ test("calculateMeasurementMetrics returns null slope for zero horizontal distanc
   const result = vm.runInContext(
     `
       window.__pcwTestApi.formatMeasurementResult({
+        units: { horizontal: "metre", vertical: "metre" },
         mode: "distance",
         distance3d: 12,
         horizontalDistance: 0,
@@ -3513,12 +3546,13 @@ test("calculateMeasurementMetrics rejects invalid source coordinates", () => {
   ).toThrow("計測点の元座標が無効です");
 });
 
-test("formatMeasurementResult labels displayed-point measurement and meter-equivalent units", () => {
+test("formatMeasurementResult shows axis units at the result", () => {
   const context = createContext();
 
   const result = vm.runInContext(
     `
       window.__pcwTestApi.formatMeasurementResult({
+        units: { horizontal: "metre", vertical: "metre" },
         distance3d: 13,
         horizontalDistance: 5,
         heightDifference: 12,
@@ -3530,12 +3564,12 @@ test("formatMeasurementResult labels displayed-point measurement and meter-equiv
     context,
   );
 
-  expect(result.summary).toContain("13.000 m相当");
+  expect(result.summary).toContain("13.000 m");
   expect(result.note).toContain("表示点への計測");
-  expect(result.note).toContain("元データの座標単位に依存");
-  expect(result.rows).toContainEqual(["高さ差", "12.000 m相当"]);
+  expect(result.note).toContain("単位");
+  expect(result.rows).toContainEqual(["高さ差", "12.000 m"]);
   expect(result.rows).toContainEqual(["勾配", "+240.00 %"]);
-  expect(result.rows).toContainEqual(["dZ", "12.000 m相当"]);
+  expect(result.rows).toContainEqual(["dZ", "12.000 m"]);
 });
 
 test("formatMeasurementCopyText includes source point coordinates", () => {
@@ -3544,6 +3578,7 @@ test("formatMeasurementCopyText includes source point coordinates", () => {
   const text = vm.runInContext(
     `
       window.__pcwTestApi.formatMeasurementCopyText({
+        units: { horizontal: "metre", vertical: "metre" },
         start: { x: 10, y: 20, z: 30 },
         end: { x: 13, y: 24, z: 42 },
         distance3d: 13,
@@ -3559,7 +3594,7 @@ test("formatMeasurementCopyText includes source point coordinates", () => {
   );
 
   expect(text).toContain("モード: 距離");
-  expect(text).toContain("距離: 13.000 m相当");
+  expect(text).toContain("距離: 13.000 m");
   expect(text).toContain("勾配: +240.00 %");
   expect(text).toContain("点1 元LAS座標: X=10.000, Y=20.000, Z=30.000");
   expect(text).toContain("点2 元LAS座標: X=13.000, Y=24.000, Z=42.000");
@@ -3573,6 +3608,7 @@ test("formatMeasurementCsvText emits mode-specific CSV summaries", () => {
     `
       [
         window.__pcwTestApi.formatMeasurementCsvText({
+          units: { horizontal: "metre", vertical: "metre" },
           mode: "distance",
           distance3d: 13,
           horizontalDistance: 5,
@@ -3582,6 +3618,7 @@ test("formatMeasurementCsvText emits mode-specific CSV summaries", () => {
           dy: 4,
         }),
         window.__pcwTestApi.formatMeasurementCsvText({
+          units: { horizontal: "metre", vertical: "metre" },
           mode: "polyline",
           pointCount: 3,
           segmentCount: 2,
@@ -3591,6 +3628,7 @@ test("formatMeasurementCsvText emits mode-specific CSV summaries", () => {
           slopePercent: 240,
         }),
         window.__pcwTestApi.formatMeasurementCsvText({
+          units: { horizontal: "metre", vertical: "metre" },
           mode: "areaXY",
           pointCount: 4,
           areaXY: 50,
@@ -3603,18 +3641,18 @@ test("formatMeasurementCsvText emits mode-specific CSV summaries", () => {
 
   expect(csv[0]).toBe(
     [
-      "mode,distance3d,horizontal,dz,slopePercent,dx,dy",
-      "distance,13.000,5.000,12.000,240.00,3.000,4.000",
+      "mode,distance3d,horizontal,dz,slopePercent,dx,dy,horizontalUnit,verticalUnit,resultUnit",
+      "distance,13.000,5.000,12.000,240.00,3.000,4.000,m,m,m",
     ].join("\n"),
   );
   expect(csv[1]).toBe(
     [
-      "mode,pointCount,segmentCount,total3d,totalHorizontal,verticalDelta,slopePercent",
-      "polyline,3,2,17.000,5.000,12.000,240.00",
+      "mode,pointCount,segmentCount,total3d,totalHorizontal,verticalDelta,slopePercent,horizontalUnit,verticalUnit,resultUnit",
+      "polyline,3,2,17.000,5.000,12.000,240.00,m,m,m",
     ].join("\n"),
   );
   expect(csv[2]).toBe(
-    ["mode,pointCount,areaXY,perimeter", "areaXY,4,50.000,30.000"].join(
+    ["mode,pointCount,areaXY,perimeter,horizontalUnit,verticalUnit,resultUnit", "areaXY,4,50.000,30.000,m,m,m²"].join(
       "\n",
     ),
   );
@@ -3625,6 +3663,7 @@ test("createMeasurementRecord stores metrics for measurement history", () => {
 
   const record = vm.runInContext(
     `
+      statsData.crsDiagnostics = { units: { horizontal: "metre", vertical: "metre" } };
       window.__pcwTestApi.createMeasurementRecord(
         7,
         { source: { x: 10, y: 20, z: 30 } },
@@ -3664,6 +3703,7 @@ test("formatMeasurementHistoryItem summarizes distance and deltas", () => {
       window.__pcwTestApi.formatMeasurementHistoryItem({
         id: 4,
         metrics: {
+          units: { horizontal: "metre", vertical: "metre" },
           distance3d: 13,
           horizontalDistance: 5,
           heightDifference: 12,
@@ -3678,9 +3718,9 @@ test("formatMeasurementHistoryItem summarizes distance and deltas", () => {
   );
 
   expect(item.id).toBe(4);
-  expect(item.distance).toBe("距離 13.000 m相当");
-  expect(item.meta).toContain("水平 5.000 m相当");
-  expect(item.meta).toContain("高さ差 12.000 m相当");
+  expect(item.distance).toBe("距離 13.000 m");
+  expect(item.meta).toContain("水平 5.000 m");
+  expect(item.meta).toContain("高さ差 12.000 m");
   expect(item.meta).toContain("勾配 +240.00 %");
 });
 
@@ -3716,6 +3756,7 @@ test("formatMeasurementTooltip summarizes the hovered history record", () => {
       window.__pcwTestApi.formatMeasurementTooltip({
         id: 4,
         metrics: {
+          units: { horizontal: "metre", vertical: "metre" },
           distance3d: 13,
           horizontalDistance: 5,
           heightDifference: 12,
@@ -3725,9 +3766,9 @@ test("formatMeasurementTooltip summarizes the hovered history record", () => {
     context,
   );
 
-  expect(tooltip.title).toBe("#4 13.000 m相当");
-  expect(tooltip.rows).toContainEqual(["水平距離", "5.000 m相当"]);
-  expect(tooltip.rows).toContainEqual(["高さ差", "12.000 m相当"]);
+  expect(tooltip.title).toBe("#4 13.000 m");
+  expect(tooltip.rows).toContainEqual(["水平距離", "5.000 m"]);
+  expect(tooltip.rows).toContainEqual(["高さ差", "12.000 m"]);
 });
 
 test("active measurement record prefers hover preview over click selection", () => {
