@@ -811,10 +811,30 @@ test("summarizeGeoTiffKeys extracts CRS and unit EPSG candidates", () => {
 
 test("vertical units and nested WKT parameters do not establish horizontal units", () => {
   const context = createContext();
-  expect(vm.runInContext(`summarizeGeoTiffKeys({keys:{4099:{valueOffset:9001}}}).units`, context))
+  expect(vm.runInContext(`summarizeGeoTiffKeys({keys:{4099:{valueOffset:9001,tiffTagLocation:0,count:1}}}).units`, context))
     .toEqual({horizontal:null, vertical:"metre"});
   expect(vm.runInContext(`summarizeWktCrs('COMPOUNDCRS["site",PROJCRS["grid",CONVERSION["shift",PARAMETER["offset",0,LENGTHUNIT["metre",1]]]],VERTCRS["height",LENGTHUNIT["foot",0.3048]]]').units`, context))
     .toEqual({horizontal:null, vertical:"foot"});
+});
+
+test("geographic 3D WKT keeps the height unit independent of angular axes", () => {
+  const context = createContext();
+  context.wkt = 'GEOGCRS["WGS 84",CS[ellipsoidal,3],AXIS["latitude",north,ANGLEUNIT["degree",0.01745329252]],AXIS["longitude",east,ANGLEUNIT["degree",0.01745329252]],AXIS["height",up,LENGTHUNIT["metre",1]]]';
+  const summary = vm.runInContext("summarizeWktCrs(wkt)", context);
+  expect(summary.units).toEqual({ horizontal: null, vertical: "metre" });
+  expect(summary.hasVertical).toBe(true);
+});
+
+test("GeoKey offsets and stray projected units cannot establish geographic XY length units", () => {
+  const context = createContext();
+  context.payload = createGeoKeyDirectoryPayload([
+    { keyId: 1024, valueOffset: 2 },
+    { keyId: 3076, valueOffset: 9001 },
+    { keyId: 4099, tiffTagLocation: 34736, valueOffset: 9002 },
+  ]);
+  const summary = vm.runInContext("summarizeGeoTiffKeys(parseGeoKeyDirectory(payload))", context);
+  expect(summary.units).toEqual({ horizontal: null, vertical: null });
+  expect(summary.epsgCandidates.unit).not.toContain("9002");
 });
 
 test("measurement history uses compatible axes for 3D and retains original ordered coordinates", () => {

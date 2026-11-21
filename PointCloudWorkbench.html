@@ -16503,7 +16503,7 @@
           const owner = contextStack[contextStack.length - 1] || "";
           if (/^(UNIT|LENGTHUNIT|ANGLEUNIT)$/.test(owner)) result.unit.push(code);
           else if (/^(VERTCRS|VERT_CS|VERT_DATUM)$/.test(owner)) result.vertical.push(code);
-          else if (/^(PROJCRS|PROJCS|GEOGCRS|GEOGCS|COMPOUNDCRS)$/.test(owner)) result.horizontal.push(code);
+          else if (/^(PROJCRS|PROJCS|GEOGCRS|GEODCRS|GEOGCS|COMPOUNDCRS)$/.test(owner)) result.horizontal.push(code);
           else result.other.push(code);
         }
         return {
@@ -16531,7 +16531,13 @@
               parent.unit = Object.keys(lengthUnits).find(key => Math.abs(lengthUnits[key].scale - factor) < 1e-12) || null;
             } else if (node.type === "AXIS" && parent) {
               parent.axes.push(node);
-            } else if (!parent || /^(COMPOUNDCRS|COMPD_CS)$/.test(parent.type)) {
+            } else if (!parent || (stack.length === 1 && /^(COMPOUNDCRS|COMPD_CS)$/.test(parent.type))) {
+              if (/^(GEOGCRS|GEODCRS|GEOGRAPHICCRS|GEODETICCRS)$/.test(node.type)) {
+                for (const axis of node.axes) {
+                  if (/^(up|down)$/i.test(axis.args[1])) found.vertical.push(axis.unit);
+                }
+                continue;
+              }
               const vertical = /^(VERTCRS|VERT_CS)$/.test(node.type);
               if (!vertical && !/^(PROJCS|PROJCRS|PROJECTEDCRS|LOCAL_CS|ENGCRS)$/.test(node.type)) continue;
               if (!node.axes.length) found[vertical ? "vertical" : "horizontal"].push(node.unit);
@@ -16548,13 +16554,14 @@
 
       function summarizeWktCrs(wktText) {
         const text = String(wktText || "").trim();
-        const nameMatch = text.match(/^(?:PROJCRS|PROJCS|GEOGCRS|GEOGCS|COMPOUNDCRS|VERTCRS|VERT_CS)\s*\[\s*"([^"]+)"/i);
+        const nameMatch = text.match(/^(?:PROJCRS|PROJCS|GEOGCRS|GEODCRS|GEOGCS|COMPOUNDCRS|VERTCRS|VERT_CS)\s*\[\s*"([^"]+)"/i);
+        const units = wktLengthUnits(text);
         return {
           present: Boolean(text),
           text: text.slice(0, CRS_DIAGNOSTIC_POLICY.maxTextChars),
           name: nameMatch?.[1] || null,
-          hasVertical: /\b(?:VERTCRS|VERT_CS|VERT_DATUM)\b/i.test(text),
-          units: wktLengthUnits(text),
+          hasVertical: /\b(?:VERTCRS|VERT_CS|VERT_DATUM)\b/i.test(text) || Boolean(units.vertical),
+          units,
           epsgCandidates: classifyWktEpsgCandidates(text),
         };
       }
@@ -16600,12 +16607,17 @@
       function summarizeGeoTiffKeys(geoKeyDirectory, geoDoubleParams = [], geoAsciiParams = "") {
         const warnings = [...(geoKeyDirectory?.warnings || [])];
         const keys = geoKeyDirectory?.keys || {};
-        const getValue = (id) => keys[id]?.valueOffset ? String(keys[id].valueOffset) : null;
+        const getValue = (id) => {
+          const key = keys[id];
+          return key?.tiffTagLocation === 0 && key.count === 1 && key.valueOffset
+            ? String(key.valueOffset) : null;
+        };
         const projected = getValue(3072);
         const geographic = getValue(2048);
         const vertical = getValue(4096);
         const horizontal = projected || geographic;
-        const xyUnit = getValue(3076);
+        const model = getValue(1024);
+        const xyUnit = model && model !== "1" ? null : getValue(3076);
         const zUnit = getValue(4099);
         const names = { 9001: "metre", 9002: "foot", 9003: "US survey foot" };
         return {
