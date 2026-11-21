@@ -208,8 +208,8 @@ test("landing app links preserve the sample and all three languages", () => {
     api.applyLandingLanguage(language);
     const routes = appLinks.map(({ href }) => href);
     expect(routes).toEqual([
-      `./PointCloudWorkbench.html?lang=${language}&demo=river`,
       `./PointCloudWorkbench.html?lang=${language}&open=file`,
+      `./PointCloudWorkbench.html?lang=${language}&demo=river`,
     ]);
     expect(nodes.docThreeTitle.href).toBe(
       `https://github.com/tsutomu-n/pointcloud-workbench-html/blob/main/docs/quickstart.${language}.md`,

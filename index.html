@@ -182,6 +182,7 @@
         --space-huge: clamp(3.5rem, 7vw, 7rem);
         --space-md: clamp(1.25rem, 3vw, 2.5rem);
         --font-copy: "Avenir Next", "Segoe UI", "Noto Sans JP", "Hiragino Sans", sans-serif;
+        --font-wordmark: "Barlow Semi Condensed", "Aptos Narrow", "Arial Narrow", system-ui, sans-serif;
         --font-mono: "SF Mono", "Menlo", "Consolas", monospace;
       }
 
@@ -202,6 +203,8 @@
       * {
         box-sizing: border-box;
       }
+
+      html, body { overflow-x: clip; }
 
       body {
         margin: 0;
@@ -322,7 +325,7 @@
         grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
         align-items: center;
         gap: clamp(2rem, 5vw, 5rem);
-        padding: clamp(2.75rem, 7vw, 7rem) 0 clamp(3rem, 6vw, 6rem);
+        padding: clamp(1.25rem, 4vw, 3.5rem) 0 clamp(2.5rem, 5vw, 4rem);
       }
 
       .massive-headline {
@@ -331,26 +334,25 @@
         gap: clamp(0.65rem, 1.6vw, 1.25rem);
         margin: 0 0 1.6rem;
         color: var(--color-bone);
-        font: 600 clamp(3.1rem, 6vw, 6rem)/0.92 "Barlow Semi Condensed", "Aptos Narrow",
-          "Arial Narrow", system-ui, sans-serif;
+        font: 600 clamp(2rem, 4vw, 3.7rem)/1 var(--font-wordmark);
         letter-spacing: -0.035em;
       }
 
       .massive-headline .brand-mark {
-        width: clamp(2rem, 4.1vw, 3.7rem);
+        width: clamp(1.6rem, 3vw, 2.8rem);
         height: auto;
         flex: none;
         margin-top: 0.08em;
       }
 
-      .massive-headline .brand-wordmark { min-width: 0; }
+      .massive-headline .brand-wordmark { min-width: 0; overflow-wrap: anywhere; }
       .massive-headline .brand-wordmark > span { display: block; }
       .massive-headline .brand-wordmark > span + span { color: var(--color-accent); }
 
       .hero-lead {
         margin: 0;
         color: var(--color-bone);
-        font-size: clamp(1.13rem, 1.7vw, 1.45rem);
+        font-size: clamp(1.25rem, 2.2vw, 1.95rem);
         font-weight: 600;
         line-height: 1.45;
       }
@@ -450,12 +452,34 @@
         padding: 0 0 var(--space-huge);
       }
 
-      .stats-matrix {
-        grid-column: 1 / 13;
+      .feature-preview {
+        grid-column: 1 / -1;
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
-        gap: clamp(1.5rem, 4vw, 3rem);
+        grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+        gap: clamp(1rem, 4vw, 3rem);
+        align-items: center;
       }
+
+      .feature-preview img {
+        display: block;
+        width: 100%;
+        height: auto;
+        border: 1px solid var(--color-border);
+        border-radius: 6px;
+      }
+
+      .stats-matrix {
+        display: grid;
+        gap: 1.25rem;
+      }
+
+      .stat-node + .stat-node {
+        padding-top: 1rem;
+        border-top: 1px solid var(--color-border);
+      }
+
+      .guide-links { grid-column: 1 / -1; }
+      .guide-links a { color: var(--color-bone); }
 
       .stat-node {
         display: flex;
@@ -525,43 +549,6 @@
         color: var(--color-accent);
       }
 
-      .docs-matrix {
-        grid-column: 1 / 13;
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 1rem;
-      }
-
-      .doc-item {
-        padding: 1.3rem 1.15rem;
-        border-left: 1px solid var(--color-border);
-        background: var(--color-surface);
-        overflow-wrap: anywhere;
-        font-family: var(--font-mono);
-      }
-
-      .doc-item strong {
-        display: block;
-        color: var(--color-bone);
-        font-weight: 400;
-      }
-
-      .doc-item span {
-        display: block;
-        margin-top: 0.55rem;
-        color: var(--color-muted);
-        font-size: 0.78rem;
-        font-family: var(--font-copy);
-      }
-
-      .docs-note {
-        grid-column: 1 / 13;
-        margin: 0;
-        color: var(--color-muted);
-        font-size: 0.8rem;
-        font-family: var(--font-mono);
-      }
-
       .footer-domain {
         padding: var(--space-md) 0 clamp(2rem, 4vw, 4rem);
         border-top: 1px solid var(--color-border);
@@ -597,7 +584,7 @@
           flex-direction: column;
         }
 
-        .hero-domain {
+        .hero-domain, .feature-preview {
           grid-template-columns: minmax(0, 1fr);
           gap: 1.5rem;
         }
@@ -612,9 +599,6 @@
           gap: 1rem;
         }
 
-        .docs-matrix {
-          grid-template-columns: 1fr;
-        }
       }
 
       @media (max-width: 460px) {
@@ -660,18 +644,19 @@
               <img class="brand-mark" src="data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%2024%2024%22%3E%3Crect%20width=%2224%22%20height=%2224%22%20rx=%225%22%20fill=%22%23132630%22/%3E%3Cg%20transform=%22translate%282%201%29%20scale%28.83%29%22%20fill=%22none%22%20stroke=%22%238de4d5%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22%20stroke-width=%221.9%22%3E%3Cpath%20d=%22M3%2014c1-4.5%203.5-6.5%205.75-3.75C10.5%204.5%2015%202.5%2017.25%209.5C19%209%2020.5%2011%2021%2014v3.5l-9%204l-9-4Z%22/%3E%3Cpath%20d=%22m3%2014l9%204l9-4m-9%204v3.5%22/%3E%3C/g%3E%3C/svg%3E" width="32" height="32" alt="" />
               <span class="brand-wordmark"><span>PointCloud</span><span>Workbench</span></span>
             </h1>
-            <p class="hero-lead" id="heroLead">Inspect and measure LAS / LAZ point clouds in your browser.</p>
-            <p class="hero-desc" id="heroDesc">Start with a river and bridge sample to explore cross-sections, measurements, and point density.</p>
+            <p class="hero-lead" id="heroLead">Open LAS / LAZ in your browser.</p>
+            <p class="hero-desc" id="heroDesc">Inspect cross-sections, read elevations, and save measurements.</p>
 
             <div class="trigger-matrix">
-              <a class="terminal-btn primary" href="./PointCloudWorkbench.html?lang=en&amp;demo=river" aria-describedby="heroSupport">
-                <span id="ctaLaunch">Try the river sample</span><span aria-hidden="true">→</span>
-              </a>
-              <a class="terminal-btn" href="./PointCloudWorkbench.html?lang=en&amp;open=file" aria-describedby="heroSupport">
+              <a class="terminal-btn primary" href="./PointCloudWorkbench.html?lang=en&amp;open=file" aria-describedby="heroSupport">
                 <span id="ctaOpenFile">Open LAS / LAZ</span>
               </a>
+              <a class="terminal-btn" href="./PointCloudWorkbench.html?lang=en&amp;demo=river" aria-describedby="sampleHint">
+                <span id="ctaLaunch">Try the river sample</span><span aria-hidden="true">→</span>
+              </a>
             </div>
-            <p class="hero-support" id="heroSupport">Supported browsers: latest Chrome or Edge.</p>
+            <p class="hero-support" id="heroSupport">Your LAS and LAZ files are processed on this device. No upload.</p>
+            <p class="hero-support" id="sampleHint">No file needed for the sample.</p>
           </div>
 
           <figure class="hero-slab">
@@ -690,30 +675,24 @@
         </header>
 
         <section class="metrics-domain grid-x">
-          <h2 class="section-label" id="sectionCapabilities">Explore point clouds</h2>
+          <h2 class="section-label" id="sectionCapabilities">Explore the river and bridge</h2>
 
-          <div class="stats-matrix">
-            <article class="stat-node">
-              <h3 class="stat-head" id="capOneTitle">Load large files in chunks</h3>
-              <p class="stat-desc" id="capOneDesc">
-                Chunked LAS reads and LAZ chunk transfer into WASM heap reduce load
-                spikes and unnecessary memory duplication.
-              </p>
-            </article>
-            <article class="stat-node">
-              <h3 class="stat-head" id="capTwoTitle">Check files before import</h3>
-              <p class="stat-desc" id="capTwoDesc">
-                Header-first inspection exposes load path, risk level, source point
-                count, and estimated render ratio before you commit to import.
-              </p>
-            </article>
-            <article class="stat-node">
-              <h3 class="stat-head" id="capThreeTitle">Inspect in 3D and 2D</h3>
-              <p class="stat-desc" id="capThreeDesc">
-                Switch between 3D and 2D, inspect slices, review classification output,
-                and validate results with the statistics panel in one browser tool.
-              </p>
-            </article>
+          <div class="feature-preview">
+            <img id="slicePreview" src="./demo/bridge-cross-section.png" width="1122" height="794" loading="lazy" alt="The bridge cross-section and its location map in PointCloudWorkbench.">
+            <div class="stats-matrix">
+              <article class="stat-node">
+                <h3 class="stat-head" id="capOneTitle">See the cross-section</h3>
+                <p class="stat-desc" id="capOneDesc">Move the slice and adjust its thickness to see which points it includes.</p>
+              </article>
+              <article class="stat-node">
+                <h3 class="stat-head" id="capTwoTitle">Read elevation by color</h3>
+                <p class="stat-desc" id="capTwoDesc">Use the color scale to see how the terrain rises and falls.</p>
+              </article>
+              <article class="stat-node">
+                <h3 class="stat-head" id="capThreeTitle">Save your measurements</h3>
+                <p class="stat-desc" id="capThreeDesc">Export measurement history and picked coordinates as CSV.</p>
+              </article>
+            </div>
           </div>
         </section>
 
@@ -724,76 +703,28 @@
 
           <div class="specs-grid">
             <article class="spec-card">
-              <h3 class="spec-title" id="reqTitle">Requirements</h3>
+              <h3 class="spec-title" id="reqTitle">Browser support</h3>
               <ul class="spec-list" id="reqList">
-                <li><strong>Recommended:</strong> latest Chrome / Edge only</li>
-                <li><strong>Unsupported:</strong> Firefox and Safari are not supported</li>
-                <li><strong>Required APIs:</strong> WebGL / File API / ArrayBuffer</li>
-                <li><strong>Accepted formats:</strong> <code>.las</code> / <code>.laz</code></li>
-                <li>
-                  <strong>Network:</strong> runtime loads <code>three.js</code> and
-                  <code>laz-perf</code> from CDNs
-                </li>
+                <li>Use the latest Chrome or Edge with WebGL and an internet connection.</li>
               </ul>
             </article>
 
             <article class="spec-card warn">
-              <h3 class="spec-title" id="limitsTitle">System Limits</h3>
+              <h3 class="spec-title" id="limitsTitle">File size limits</h3>
               <ul class="spec-list" id="limitsList">
-                <li>
-                  <strong>LAS ceiling:</strong> <code>above 3GB</code> is rejected.
-                  <code>2GB to 3GB</code> should start from <code>LOW</code>.
-                </li>
-                <li>
-                  <strong>LAZ ceiling:</strong> decoder overhead narrows the safe range.
-                  <code>above 2GB</code> is rejected.
-                </li>
-                <li>
-                  <strong>Auto classification:</strong> assistive only. It is not a
-                  survey-grade classification guarantee.
-                </li>
-                <li>
-                  URL loading and some compatibility paths may still use full
-                  <code>ArrayBuffer</code> reads.
-                </li>
+                <li><strong>LAS:</strong> up to 3 GB. Start with LOW for files from 2 to 3 GB.</li>
+                <li><strong>LAZ:</strong> up to 2 GB.</li>
               </ul>
             </article>
           </div>
         </section>
 
         <section class="system-domain grid-x">
-          <h2 class="section-label" id="sectionDocs">Files and documentation</h2>
+          <h2 class="section-label" id="sectionDocs">Quick start</h2>
 
-          <div class="docs-matrix">
-            <div class="doc-item">
-              <strong id="docOneTitle">PointCloudWorkbench.html</strong>
-              <span id="docOneDesc">Single-file runtime artifact. No build step.</span>
-            </div>
-            <div class="doc-item">
-              <strong id="docTwoTitle">demo/river-bridge-demo.las</strong>
-              <span id="docTwoDesc">
-                River and bridge sample for cross-sections and measurements.
-              </span>
-            </div>
-            <div class="doc-item">
-              <strong><a id="docThreeTitle" href="https://github.com/tsutomu-n/pointcloud-workbench-html/blob/main/docs/quickstart.en.md">English demo guide</a></strong>
-              <span id="docThreeDesc">
-                Try cross-sections, measurements, and density with the river sample.
-              </span>
-            </div>
-            <div class="doc-item">
-              <strong id="docFourTitle">scripts/*.test.js</strong>
-              <span id="docFourDesc">
-                Regression coverage for runtime behavior, repo metadata, and public
-                presentation.
-              </span>
-            </div>
-          </div>
-
-          <p class="docs-note" id="docsNote">
-            &gt; test commands: <code>bun test scripts/*.test.js</code> |
-            <code>bun scripts/check-readme.js</code>
-          </p>
+          <nav class="guide-links">
+            <a id="docThreeTitle" href="https://github.com/tsutomu-n/pointcloud-workbench-html/blob/main/docs/quickstart.en.md">English quick start</a>
+          </nav>
         </section>
 
       </main>
@@ -827,158 +758,93 @@
           languageLabel: "Language",
           languageAriaLabel: "Landing page language",
           themeLabel: "Light theme",
-          heroLead: "Inspect and measure LAS / LAZ point clouds in your browser.",
-          heroDesc: "Start with a river and bridge sample to explore cross-sections, measurements, and point density.",
-          heroSupport: "Supported browsers: latest Chrome or Edge.",
+          heroLead: "Open LAS / LAZ in your browser.",
+          heroDesc: "Inspect cross-sections, read elevations, and save measurements.",
+          heroSupport: "Your LAS and LAZ files are processed on this device. No upload.",
           heroSlabLabel: "Synthetic river and bridge sample",
           heroSlabPoints: "23,746 points",
           ctaLaunch: "Try the river sample",
           ctaOpenFile: "Open LAS / LAZ",
           ctaSample: "Download sample LAS",
-          sectionCapabilities: "Explore point clouds",
-          capOneTitle: "Load large files in chunks",
-          capOneDesc:
-            "Chunked LAS reads and LAZ chunk transfer into WASM heap reduce load spikes and unnecessary memory duplication.",
-          capTwoTitle: "Check files before import",
-          capTwoDesc:
-            "Header-first inspection exposes load path, risk level, source point count, and estimated render ratio before you commit to import.",
-          capThreeTitle: "Inspect in 3D and 2D",
-          capThreeDesc:
-            "Switch between 3D and 2D, inspect slices, review classification output, and validate results with the statistics panel in one browser tool.",
+          sectionCapabilities: "Explore the river and bridge",
+          capOneTitle: "See the cross-section",
+          capOneDesc: "Move the slice and adjust its thickness to see which points it includes.",
+          capTwoTitle: "Read elevation by color",
+          capTwoDesc: "Use the color scale to see how the terrain rises and falls.",
+          capThreeTitle: "Save your measurements",
+          capThreeDesc: "Export measurement history and picked coordinates as CSV.",
           sectionRequirements: "Browser support and limits",
-          reqTitle: "Requirements",
-          reqList: [
-            "<strong>Recommended:</strong> latest Chrome / Edge only",
-            "<strong>Unsupported:</strong> Firefox and Safari are not supported",
-            "<strong>Required APIs:</strong> WebGL / File API / ArrayBuffer",
-            "<strong>Accepted formats:</strong> <code>.las</code> / <code>.laz</code>",
-            "<strong>Network:</strong> runtime loads <code>three.js</code> and <code>laz-perf</code> from CDNs",
-          ],
-          limitsTitle: "System Limits",
-          limitsList: [
-            "<strong>LAS ceiling:</strong> <code>above 3GB</code> is rejected. <code>2GB to 3GB</code> should start from <code>LOW</code>.",
-            "<strong>LAZ ceiling:</strong> decoder overhead narrows the safe range. <code>above 2GB</code> is rejected.",
-            "<strong>Auto classification:</strong> assistive only. It is not a survey-grade classification guarantee.",
-            "URL loading and some compatibility paths may still use full <code>ArrayBuffer</code> reads.",
-          ],
-          sectionDocs: "Files and documentation",
-          docOneTitle: "PointCloudWorkbench.html",
-          docOneDesc: "Single-file runtime artifact. No build step.",
-          docTwoTitle: "demo/river-bridge-demo.las",
-          docTwoDesc:
-            "River and bridge sample for cross-sections and measurements.",
-          docThreeTitle: "English demo guide",
-          docThreeDesc: "Try cross-sections, measurements, and density with the river sample.",
-          docFourTitle: "scripts/*.test.js",
-          docFourDesc:
-            "Regression coverage for runtime behavior, repo metadata, and public presentation.",
-          docsNote:
-            "&gt; test commands: <code>bun test scripts/*.test.js</code> | <code>bun scripts/check-readme.js</code>",
+          reqTitle: "Browser support",
+          reqList: ["Use the latest Chrome or Edge with WebGL and an internet connection."],
+          limitsTitle: "File size limits",
+          limitsList: ["<strong>LAS:</strong> up to 3 GB. Start with LOW for files from 2 to 3 GB.", "<strong>LAZ:</strong> up to 2 GB."],
+          sectionDocs: "Quick start",
+          docThreeTitle: "English quick start",
           footerLicense: "MIT license · Single HTML distribution",
+          sampleHint: "No file needed for the sample.",
+          previewAlt: "The bridge cross-section and its location map in PointCloudWorkbench.",
         },
         ja: {
           title: "PointCloudWorkbench | ブラウザ点群ビューアー",
           languageLabel: "言語",
           languageAriaLabel: "ランディングページの表示言語",
           themeLabel: "ライトテーマ",
-          heroLead: "LAS / LAZ 点群をブラウザで確認・計測。",
-          heroDesc: "河川と橋のサンプルで、断面の確認、距離の計測、点の密度の確認を試せます。",
-          heroSupport: "対応ブラウザは最新の Chrome または Edge です。",
+          heroLead: "LAS・LAZをブラウザで開く",
+          heroDesc: "断面と高低差を確認し、計測結果を保存できます。",
+          heroSupport: "LAS・LAZファイルは端末内で処理されます。アップロードは不要です。",
           heroSlabLabel: "河川と橋の合成サンプル",
           heroSlabPoints: "23,746 点",
           ctaLaunch: "河川サンプルを試す",
           ctaOpenFile: "LAS / LAZ を開く",
           ctaSample: "サンプル LAS をダウンロード",
-          sectionCapabilities: "主な機能",
-          capOneTitle: "大容量負荷の平準化",
-          capOneDesc:
-            "LAS のチャンク読み込みと LAZ の WASM ヒープ直書きで、負荷の集中とメモリ重複を抑えます。",
-          capTwoTitle: "読込前の危険度と品質確認",
-          capTwoDesc:
-            "ヘッダー先読みで、読込経路、危険度、元点数、推定表示率を読み込み前に確認できます。",
-          capThreeTitle: "3D / 2D / スライス / 統計",
-          capThreeDesc:
-            "3D と 2D を切り替え、断面確認、分類確認、統計検証までブラウザ内で完結します。",
+          sectionCapabilities: "河川と橋を調べる",
+          capOneTitle: "断面を見る",
+          capOneDesc: "切断位置や厚さを動かし、どの点が断面に含まれるか確認できます。",
+          capTwoTitle: "高さを色で読む",
+          capTwoDesc: "標高の凡例で、地形の高低を確認できます。",
+          capThreeTitle: "計測結果を保存する",
+          capThreeDesc: "計測履歴と選んだ点の元座標をCSVで保存できます。",
           sectionRequirements: "動作条件と制約",
-          reqTitle: "動作条件",
-          reqList: [
-            "<strong>推奨環境:</strong> Chrome / Edge の最新版のみ対応",
-            "<strong>非対応:</strong> Firefox / Safari / 古いブラウザー",
-            "<strong>必須 API:</strong> WebGL / File API / ArrayBuffer",
-            "<strong>対応形式:</strong> <code>.las</code> / <code>.laz</code>",
-            "<strong>ネットワーク:</strong> 実行時に <code>three.js</code> と <code>laz-perf</code> を CDN から読み込みます",
-          ],
-          limitsTitle: "システム制約",
-          limitsList: [
-            "<strong>LAS 制限:</strong> <code>3GB超</code> は拒否します。<code>2GB〜3GB</code> 帯は <code>LOW</code> から開始してください。",
-            "<strong>LAZ 制限:</strong> デコーダの追加メモリ消費があるため、<code>2GB超</code> は拒否します。",
-            "<strong>自動分類:</strong> 補助機能であり、測量級の厳密な分類保証ではありません。",
-            "URL 読込や一部互換経路では全量 <code>ArrayBuffer</code> を使う場合があります。",
-          ],
-          sectionDocs: "ファイル構成と文書",
-          docOneTitle: "PointCloudWorkbench.html",
-          docOneDesc: "単一 HTML の実行本体。ビルド工程はありません。",
-          docTwoTitle: "demo/river-bridge-demo.las",
-          docTwoDesc: "断面確認と計測を試すための河川と橋の LAS サンプルです。",
-          docThreeTitle: "クイックスタート",
-          docThreeDesc: "河川サンプルの操作と手元のファイルの開き方を案内します。",
-          docFourTitle: "scripts/*.test.js",
-          docFourDesc: "挙動回帰、公開面、リポジトリ整合性を Bun で検証します。",
-          docsNote:
-            "&gt; test commands: <code>bun test scripts/*.test.js</code> | <code>bun scripts/check-readme.js</code>",
+          reqTitle: "対応ブラウザ",
+          reqList: ["WebGLが使える最新版のChromeまたはEdge。ビューアーの起動にはインターネット接続が必要です。"],
+          limitsTitle: "ファイル容量の上限",
+          limitsList: ["<strong>LAS</strong> は最大3GB。2〜3GBの場合はLOWから始めてください。", "<strong>LAZ</strong> は最大2GB。"],
+          sectionDocs: "クイックスタート",
+          docThreeTitle: "日本語ガイド",
           footerLicense: "MIT ライセンス · 単一 HTML 配布",
+          sampleHint: "サンプルはファイルの準備不要です。",
+          previewAlt: "PointCloudWorkbenchで表示した橋の断面と切断位置の上面図。",
         },
         zh: {
           title: "PointCloudWorkbench | 浏览器点云查看器",
           languageLabel: "语言",
           languageAriaLabel: "着陆页语言",
           themeLabel: "浅色主题",
-          heroLead: "在浏览器中查看和测量 LAS / LAZ 点云。",
-          heroDesc: "用河流和桥梁样本查看剖面、测量距离并检查点密度。",
-          heroSupport: "支持最新版 Chrome 或 Edge。",
+          heroLead: "在浏览器中打开 LAS 和 LAZ",
+          heroDesc: "查看切片和高程，并保存测量结果。",
+          heroSupport: "LAS 和 LAZ 文件在本机处理，无需上传。",
           heroSlabLabel: "河流和桥梁合成样本",
           heroSlabPoints: "23,746 个点",
           ctaLaunch: "试用河流样本",
           ctaOpenFile: "打开 LAS / LAZ",
           ctaSample: "下载 LAS 样本",
-          sectionCapabilities: "主要功能",
-          capOneTitle: "大文件压力平滑",
-          capOneDesc:
-            "LAS 分块读取与 LAZ 写入 WASM 堆相结合，可减少加载高峰和重复内存占用。",
-          capTwoTitle: "加载前风险与质量确认",
-          capTwoDesc:
-            "通过预读头信息，在正式导入前查看加载路径、风险级别、源点数和预计显示比例。",
-          capThreeTitle: "3D / 2D / 切片 / 统计",
-          capThreeDesc:
-            "在浏览器中切换 3D 与 2D，查看切片断面、分类结果，并结合统计面板进行验证。",
+          sectionCapabilities: "查看河流与桥梁",
+          capOneTitle: "查看切片",
+          capOneDesc: "移动切片并调整厚度，查看哪些点落在切片范围内。",
+          capTwoTitle: "按颜色查看高程",
+          capTwoDesc: "根据高程图例判断地形的高低。",
+          capThreeTitle: "保存测量结果",
+          capThreeDesc: "将测量历史和选点的原始坐标导出为 CSV。",
           sectionRequirements: "运行条件与限制",
-          reqTitle: "运行条件",
-          reqList: [
-            "<strong>推荐环境:</strong> 仅支持最新版 Chrome / Edge",
-            "<strong>不支持:</strong> Firefox / Safari / 旧版浏览器",
-            "<strong>必需 API:</strong> WebGL / File API / ArrayBuffer",
-            "<strong>支持格式:</strong> <code>.las</code> / <code>.laz</code>",
-            "<strong>网络:</strong> 运行时需要从 CDN 加载 <code>three.js</code> 与 <code>laz-perf</code>",
-          ],
-          limitsTitle: "系统限制",
-          limitsList: [
-            "<strong>LAS 上限:</strong> <code>超过 3GB</code> 将被拒绝，<code>2GB 到 3GB</code> 建议从 <code>LOW</code> 开始。",
-            "<strong>LAZ 上限:</strong> 解码器会额外占用内存，因此 <code>超过 2GB</code> 将被拒绝。",
-            "<strong>自动分类:</strong> 仅为辅助能力，不保证测绘级分类精度。",
-            "URL 加载和部分兼容路径仍可能使用完整 <code>ArrayBuffer</code> 读取。",
-          ],
-          sectionDocs: "文件与文档",
-          docOneTitle: "PointCloudWorkbench.html",
-          docOneDesc: "单文件运行主体，无需构建。",
-          docTwoTitle: "demo/river-bridge-demo.las",
-          docTwoDesc: "用于查看剖面和测量距离的河流和桥梁 LAS 样本。",
+          reqTitle: "支持的浏览器",
+          reqList: ["支持 WebGL 的最新版 Chrome 或 Edge。启动查看器需要联网。"],
+          limitsTitle: "文件大小上限",
+          limitsList: ["<strong>LAS</strong> 最大 3 GB。2 至 3 GB 的文件建议从 LOW 开始。", "<strong>LAZ</strong> 最大 2 GB。"],
+          sectionDocs: "快速入门",
           docThreeTitle: "中文快速入门",
-          docThreeDesc: "试用河流示例，或打开自己的 LAS 和 LAZ 文件。",
-          docFourTitle: "scripts/*.test.js",
-          docFourDesc: "使用 Bun 验证运行行为、仓库元数据与公开展示面。",
-          docsNote:
-            "&gt; test commands: <code>bun test scripts/*.test.js</code> | <code>bun scripts/check-readme.js</code>",
           footerLicense: "MIT 许可证 · 单 HTML 文件分发",
+          sampleHint: "无须准备文件即可试用样本。",
+          previewAlt: "PointCloudWorkbench 中的桥梁切片和位置俯视图。",
         },
       };
 
@@ -1059,13 +925,6 @@
         }
       }
 
-      function setLandingHtml(id, html) {
-        const element = document.getElementById(id);
-        if (element) {
-          element.innerHTML = html;
-        }
-      }
-
       function setLandingList(id, items) {
         const element = document.getElementById(id);
         if (element) {
@@ -1087,6 +946,7 @@
         setLandingText("heroLead", copy.heroLead);
         setLandingText("heroDesc", copy.heroDesc);
         setLandingText("heroSupport", copy.heroSupport);
+        setLandingText("sampleHint", copy.sampleHint);
         setLandingText("heroSlabLabel", copy.heroSlabLabel);
         setLandingText("heroSlabPoints", copy.heroSlabPoints);
         setLandingText("ctaLaunch", copy.ctaLaunch);
@@ -1105,19 +965,18 @@
         setLandingText("limitsTitle", copy.limitsTitle);
         setLandingList("limitsList", copy.limitsList);
         setLandingText("sectionDocs", copy.sectionDocs);
-        setLandingText("docOneTitle", copy.docOneTitle);
-        setLandingText("docOneDesc", copy.docOneDesc);
-        setLandingText("docTwoTitle", copy.docTwoTitle);
-        setLandingText("docTwoDesc", copy.docTwoDesc);
         setLandingText("docThreeTitle", copy.docThreeTitle);
         const guideLink = document.getElementById("docThreeTitle");
         if (guideLink) {
           guideLink.href = `https://github.com/tsutomu-n/pointcloud-workbench-html/blob/main/docs/quickstart.${normalized}.md`;
         }
-        setLandingText("docThreeDesc", copy.docThreeDesc);
-        setLandingText("docFourTitle", copy.docFourTitle);
-        setLandingText("docFourDesc", copy.docFourDesc);
-        setLandingHtml("docsNote", copy.docsNote);
+        const slicePreview = document.getElementById("slicePreview");
+        if (slicePreview) {
+          const suffix = normalized === "en" ? "" : `-${normalized}`;
+          slicePreview.height = normalized === "en" ? 794 : 804;
+          slicePreview.alt = copy.previewAlt;
+          slicePreview.src = `./demo/bridge-cross-section${suffix}.png`;
+        }
         setLandingText("footerLicense", copy.footerLicense);
 
         for (const link of document.querySelectorAll('a[href^="./PointCloudWorkbench.html"]')) {

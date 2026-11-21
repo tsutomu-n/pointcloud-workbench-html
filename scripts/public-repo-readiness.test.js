@@ -127,10 +127,10 @@ test("Pages demo assets and deployment workflow are present", () => {
   expect(index).toContain("./PointCloudWorkbench.html");
   expect(index).toContain("Open LAS / LAZ");
   expect(index).toContain("Browser support and limits");
-  expect(index).toContain("Files and documentation");
+  expect(index).toContain("Quick start");
   expect(index).toContain("Download sample LAS");
-  expect(index).toContain("Chrome / Edge only");
-  expect(index).toContain("Firefox and Safari are not supported");
+  expect(index).toContain("Chrome or Edge with WebGL");
+  expect(index).toContain("No upload.");
   expect(index).toContain("MIT license · Single HTML distribution");
   expect(index).toContain('id="landingLanguageSelector"');
   expect(index).toContain('const LANDING_SUPPORTED_LANGUAGES = ["ja", "en", "zh"]');

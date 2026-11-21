@@ -55,6 +55,9 @@ jobs:
           cp assets/v1.0.0/manifest.json site/assets/v1.0.0/manifest.json
           cp demo/pointcloud-demo-sample.las site/demo/pointcloud-demo-sample.las
           cp demo/river-bridge-demo.las site/demo/river-bridge-demo.las
+          for preview in bridge-cross-section.png bridge-cross-section-ja.png bridge-cross-section-zh.png; do
+            cp "demo/$preview" "site/demo/$preview"
+          done
           touch site/.nojekyll
 
       - name: Verify Pages artifact
@@ -66,6 +69,9 @@ jobs:
           test -f site/assets/latest/manifest.json
           test -f site/assets/v1.0.0/manifest.json
           test -f site/demo/pointcloud-demo-sample.las
+          for preview in bridge-cross-section.png bridge-cross-section-ja.png bridge-cross-section-zh.png; do
+            test -s "site/demo/$preview"
+          done
           test -f site/.nojekyll
           test "$(head -c 4 site/demo/pointcloud-demo-sample.las)" = "LASF"
           test "$(head -c 4 site/demo/river-bridge-demo.las)" = "LASF"

@@ -5,6 +5,9 @@ import { readFile } from "node:fs/promises";
 import { chromium } from "playwright";
 
 const files = new Map([
+  ["/demo/bridge-cross-section.png", "image/png"],
+  ["/demo/bridge-cross-section-ja.png", "image/png"],
+  ["/demo/bridge-cross-section-zh.png", "image/png"],
   ["/index.html", "text/html; charset=utf-8"],
   ["/PointCloudWorkbench.html", "text/html; charset=utf-8"],
   ["/demo/pointcloud-demo-sample.las", "application/octet-stream"],
@@ -153,7 +156,7 @@ try {
     return img.naturalWidth > 0;
   }), true);
   const demoLink = page.getByRole("link", { name: "Try the river sample", exact: true });
-  const landingAccent = await demoLink.evaluate(link => getComputedStyle(link).backgroundColor);
+  const landingAccent = await page.locator(".terminal-btn.primary").evaluate(link => getComputedStyle(link).backgroundColor);
   const wordmarkAccent = await heading.locator(".brand-wordmark > span").last().evaluate(node => getComputedStyle(node).color);
   assert.equal(wordmarkAccent, landingAccent);
   const landingContrast = await themeContrast(page, [
