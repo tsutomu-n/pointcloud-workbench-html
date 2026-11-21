@@ -4518,6 +4518,7 @@
                 style="color: var(--ec-muted); margin-top: 10px"
               ></div>
               <div class="file-load-actions">
+                <button id="replaceInvalidFile" type="button" class="ec-button ec-button--primary" style="display:none" onclick="document.getElementById('fileInput').click()">別のファイルを選ぶ</button>
                 <button id="recommendedLoad" type="button" class="ec-button ec-button--primary" onclick="openRecommendedFile()" disabled>推奨設定で開く</button>
                 <button
                   class="ec-button ec-button--secondary"
@@ -5208,6 +5209,11 @@
                     </svg>
                     <span>種類で色分け</span>
                   </button>
+                </div>
+                <div id="heightLegend" hidden>
+                  <span>Z値</span> <span id="heightLegendUnit"></span>
+                  <div id="heightLegendRamp" style="height:6px;border-radius:3px"></div>
+                  <div id="heightLegendLabels" style="display:flex;justify-content:space-between"></div>
                 </div>
                 <div
                   class="mode-recommendation panel-card"
@@ -10784,6 +10790,10 @@
         ["計測を全消去", "Clear measurements", "清除测量"],
         ["コピー", "Copy", "复制"],
         ["単位未確認", "Unit unconfirmed", "单位未确认"],
+        ["別のファイルを選ぶ", "Choose another file", "选择其他文件"],
+        ["LAS・LAZのヘッダーを読み取れません。ファイルを確認してください。", "Could not read the LAS or LAZ header. Check the file.", "无法读取 LAS 或 LAZ 文件头。请检查文件。"],
+        ["この位置を3Dに反映", "Apply position to 3D", "将此位置应用到三维视图"],
+        ["Z値", "Z values", "Z 值"],
         ["履歴をCSV保存", "Download history CSV", "下载测量历史 CSV"],
         ["計測履歴", "Measurement history", "测量历史"],
         ["表示点への計測です。3D距離と勾配には水平・鉛直両方の長さ単位が必要です。", "Measurements snap to displayed points. 3D distance and slope require known horizontal and vertical length units.", "测量吸附到显示点。三维距离和坡度需要已知的水平和垂直长度单位。"],
@@ -12040,16 +12050,6 @@
               updateLastFileInfo(); // ファイル選択後は「前回のセッション」を非表示
               void analyzeSelectedFilePreview(file);
 
-              // Enable next button safely
-              const proceedBtn = document.getElementById("proceedToQuality");
-              if (proceedBtn) {
-                proceedBtn.disabled = false;
-                proceedBtn.style.display = "inline-flex";
-                console.log("次へボタンを有効化しました (file handler)");
-              } else {
-                console.error("次へボタンが見つかりません");
-              }
-
             } catch (error) {
               console.error("File Selection State Update Error:", error);
               resetFileSelection();
@@ -12435,6 +12435,17 @@
         fileSize.textContent = `ファイルサイズ: ${formatFileSize(file.size)}`;
 
         const sizeCheck = checkFileSizeLimits(file);
+        const invalid = !file.isSample && workflowState.previewProfile && !previewHeader;
+        const settings = document.getElementById("proceedToQuality");
+        settings.disabled = !file.isSample && !previewHeader;
+        settings.style.display = invalid ? "none" : "inline-flex";
+        document.getElementById("replaceInvalidFile").style.display = invalid ? "inline-flex" : "none";
+        if (invalid) {
+          fileWarning.textContent = "LAS・LAZのヘッダーを読み取れません。ファイルを確認してください。";
+          fileWarning.style.display = "block";
+          fileInfo.style.display = "block";
+          return;
+        }
         const details = [];
         if (profile.totalPoints) details.push(`推定表示: ${profile.pointSummary}`);
         if (sizeCheck.level !== "ok") details.push(sizeCheck.message);
@@ -18485,6 +18496,7 @@
           }
 
           workflowState.step = "complete";
+          updateHeightLegend();
           updateRightPanelVisibility();
 
           // パネル切り替え
@@ -18715,6 +18727,24 @@
       };
 
       // カラーモード変更の実行（警告チェック後）
+      function updateHeightLegend() {
+        const legend = document.getElementById("heightLegend");
+        const header = statsData.header;
+        legend.hidden = colorMode !== "height" || !Number.isFinite(header?.minZ) || !Number.isFinite(header?.maxZ);
+        if (legend.hidden) return;
+        const { minZ, maxZ } = header;
+        const unit = lengthUnits[statsData.crsDiagnostics?.units?.vertical]?.symbol || (isRiverDemo() ? "m" : "");
+        document.getElementById("heightLegendUnit").textContent = unit;
+        const values = minZ === maxZ ? [minZ] : [minZ, (minZ + maxZ) / 2, maxZ];
+        const labels = values.map(value => {
+          const label = document.createElement("span");
+          label.textContent = Number(value.toPrecision(9)).toString();
+          return label;
+        });
+        document.getElementById("heightLegendLabels").replaceChildren(...labels);
+        document.getElementById("heightLegendRamp").style.background = minZ === maxZ ? "lime" : "linear-gradient(to right, blue, lime, red)";
+      }
+
       function executeColorModeChange(mode, isAutomatic = false) {
         if (!pointCloud || !statsData.header) {
           console.warn(
@@ -18730,6 +18760,7 @@
         const previousMode = colorMode;
         colorMode = mode;
         currentVisualizationMode = mode;
+        updateHeightLegend();
 
         // ユーザーの手動操作を記録
         if (!isAutomatic && previousMode !== mode) {
@@ -18775,7 +18806,7 @@
         for (let i = 0; i < colors.length; i += 3) {
           if (mode === "height") {
             // 実際のデータ範囲を使用した高度による色分け
-            const y = positionsData[i + 1]; // 変換後のY座標（高度）
+            const y = positionsData[i + (isCADMode ? 2 : 1)]; // 変換後のY座標（高度）
             const normalizedY = normalizeHeightValue(
               y,
               0,
@@ -19800,59 +19831,7 @@
 
       // 高さ表示の色を更新する関数
       function updateHeightColors() {
-        if (!pointCloud || !pointCloud.geometry) return;
-
-        const positions = pointCloud.geometry.attributes.position.array;
-        const colors = pointCloud.geometry.attributes.color.array;
-        const box = pointCloud.geometry.boundingBox;
-
-        // 高さ方向の軸を決定
-        const heightAxis = isCADMode ? 2 : 1; // CADモード: Z軸(2)、通常: Y軸(1)
-
-        // 高さの範囲を取得
-        let minHeight = Infinity,
-          maxHeight = -Infinity;
-        for (let i = 0; i < positions.length; i += 3) {
-          const height = positions[i + heightAxis];
-          if (isFinite(height)) {
-            minHeight = Math.min(minHeight, height);
-            maxHeight = Math.max(maxHeight, height);
-          }
-        }
-
-        const heightRange = maxHeight - minHeight || 1;
-
-        // 色を更新
-        for (let i = 0; i < positions.length; i += 3) {
-          const height = positions[i + heightAxis];
-          const normalizedHeight = (height - minHeight) / heightRange;
-
-          // 高さに基づいた色（青→緑→黄→赤）
-          let r, g, b;
-          if (normalizedHeight < 0.25) {
-            r = 0;
-            g = normalizedHeight * 4;
-            b = 1;
-          } else if (normalizedHeight < 0.5) {
-            r = 0;
-            g = 1;
-            b = 2 - normalizedHeight * 4;
-          } else if (normalizedHeight < 0.75) {
-            r = (normalizedHeight - 0.5) * 4;
-            g = 1;
-            b = 0;
-          } else {
-            r = 1;
-            g = 4 - normalizedHeight * 4;
-            b = 0;
-          }
-
-          colors[i] = r;
-          colors[i + 1] = g;
-          colors[i + 2] = b;
-        }
-
-        pointCloud.geometry.attributes.color.needsUpdate = true;
+        executeColorModeChange("height", true);
       }
 
       window.resetSlicing = function () {
@@ -19946,10 +19925,23 @@
               <input type="range" id="slice2DPointSize" min="0.1" max="4" value="2" step="0.1">
               <output id="pointSizeValue2D" for="slice2DPointSize">2.0</output> px
             </div>
+            ${bridge ? "" : '<button type="button" class="ec-button ec-button--secondary" data-apply-position>この位置を3Dに反映</button>'}
             <button id="autoThicknessBtn" class="ec-button ec-button--secondary">自動調整</button>
             <button class="ec-button ec-button--primary" data-export>画像保存</button>
           </footer>`;
 
+        modal.querySelector("[data-apply-position]")?.addEventListener("click", () => {
+          if (is2DMode) window.exit2DView();
+          slicePaused = false;
+          for (const { axis, position } of activeSlices) {
+            document.getElementById(`slice${axis}Check`).checked = true;
+            const percent = Math.round(position * 100);
+            document.getElementById(`slice${axis}Range`).value = percent;
+            document.getElementById(`slice${axis}Value`).textContent = percent + "%";
+          }
+          updateSlicing();
+          modal.close();
+        });
         const plots = modal.querySelector(".slice-dialog-plots");
         const locationMaps = [];
         const canvases = activeSlices.map((slice, index) => {

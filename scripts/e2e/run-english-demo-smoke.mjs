@@ -64,6 +64,9 @@ try {
   const base = `http://127.0.0.1:${server.address().port}`;
   const ownEntry = await context.newPage();
   await ownEntry.goto(`${base}/PointCloudWorkbench.html?lang=en&open=file`);
+  await ownEntry.locator("#fileInput").setInputFiles({name: "broken.las", mimeType: "application/octet-stream", buffer: Buffer.alloc(512)});
+  await ownEntry.getByRole("button", {name: "Choose another file", exact: true}).waitFor();
+  assert.equal(await ownEntry.locator("#proceedToQuality").isVisible(), false);
   await ownEntry.locator("#fileInput").setInputFiles(new URL("../../demo/pointcloud-demo-sample.las", import.meta.url).pathname);
   await ownEntry.getByText(/^Estimated display:.*4,096/).waitFor({ timeout: 10000 });
   assert.equal(await ownEntry.getByRole("button", { name: "Open with recommended settings" }).isEnabled(), true);
