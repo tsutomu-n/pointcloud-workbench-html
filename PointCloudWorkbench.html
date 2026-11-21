@@ -4514,11 +4514,11 @@
               <div id="selectedFileName" data-pcw-source-text>-</div>
               <div id="selectedFileSize">-</div>
               <div
-                id="selectedFileWarning"
+                id="selectedFileWarning" role="status"
                 style="color: var(--ec-muted); margin-top: 10px"
               ></div>
               <div class="file-load-actions">
-                <button id="replaceInvalidFile" type="button" class="ec-button ec-button--primary" style="display:none" onclick="document.getElementById('fileInput').click()">別のファイルを選ぶ</button>
+                <button id="replaceInvalidFile" type="button" class="ec-button ec-button--primary" style="display:none" onclick="chooseReplacementFile()">別のファイルを選ぶ</button>
                 <button id="recommendedLoad" type="button" class="ec-button ec-button--primary" onclick="openRecommendedFile()" disabled>推奨設定で開く</button>
                 <button
                   class="ec-button ec-button--secondary"
@@ -10790,6 +10790,7 @@
         ["計測を全消去", "Clear measurements", "清除测量"],
         ["コピー", "Copy", "复制"],
         ["単位未確認", "Unit unconfirmed", "单位未确认"],
+        ["ファイルのヘッダーを確認中", "Checking the file header", "正在检查文件头"],
         ["別のファイルを選ぶ", "Choose another file", "选择其他文件"],
         ["LAS・LAZのヘッダーを読み取れません。ファイルを確認してください。", "Could not read the LAS or LAZ header. Check the file.", "无法读取 LAS 或 LAZ 文件头。请检查文件。"],
         ["この位置を3Dに反映", "Apply position to 3D", "将此位置应用到三维视图"],
@@ -12009,14 +12010,6 @@
             console.log("ファイル選択:", file.name);
             saveLastFileName(file.name);
 
-            // まずボタンを有効化（緊急修正）
-            const proceedBtn = document.getElementById("proceedToQuality");
-            if (proceedBtn) {
-              proceedBtn.disabled = false;
-              proceedBtn.style.display = "inline-flex";
-              console.log("次へボタンを有効化しました");
-            }
-
             // 基本的なファイル検証のみ実行（緩和版）
             try {
               const validationResult = validateSelectedFileBasic(file);
@@ -12405,6 +12398,12 @@
         document.getElementById("englishDemoButton").className = "link-btn";
       }
 
+      function chooseReplacementFile() {
+        const input = document.getElementById("fileInput");
+        input.value = "";
+        input.click();
+      }
+
       function openRecommendedFile() {
         const file = workflowState.selectedFile;
         if (workflowState.step !== "file-select" || !file || !workflowState.previewHeader) return;
@@ -12447,6 +12446,7 @@
           return;
         }
         const details = [];
+        if (!file.isSample && !previewHeader) details.push("ファイルのヘッダーを確認中");
         if (profile.totalPoints) details.push(`推定表示: ${profile.pointSummary}`);
         if (sizeCheck.level !== "ok") details.push(sizeCheck.message);
         if (profile.totalPoints || profile.riskLevel !== "ok") {
@@ -18742,7 +18742,12 @@
           return label;
         });
         document.getElementById("heightLegendLabels").replaceChildren(...labels);
-        document.getElementById("heightLegendRamp").style.background = minZ === maxZ ? "lime" : "linear-gradient(to right, blue, lime, red)";
+        const stops = (minZ === maxZ ? [0.5] : [0, 0.5, 1]).map(value => {
+          const { r, g, b } = getHeightGradientColor(value);
+          return `rgb(${r * 255}, ${g * 255}, ${b * 255})`;
+        });
+        document.getElementById("heightLegendRamp").style.background =
+          stops.length === 1 ? stops[0] : `linear-gradient(to right, ${stops.join(", ")})`;
       }
 
       function executeColorModeChange(mode, isAutomatic = false) {
@@ -19784,7 +19789,7 @@
 
           // 色モードも更新（高さ表示の場合）
           if (colorMode === "height") {
-            updateHeightColors();
+            executeColorModeChange("height", true);
           }
         }
 
@@ -19830,10 +19835,6 @@
       }
 
       // 高さ表示の色を更新する関数
-      function updateHeightColors() {
-        executeColorModeChange("height", true);
-      }
-
       window.resetSlicing = function () {
         slicePaused = false;
         sliceAxes.forEach((axis) => {
